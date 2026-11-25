@@ -1872,7 +1872,7 @@ public readonly struct SearchTargetKind : IEquatable<SearchTargetKind>
     /// <summary>The text content of files.</summary>
     public static readonly SearchTargetKind FileText = new SearchTargetKind("fileText");
 
-    /// <summary>Session titles.</summary>
+    /// <summary>The host's sessions.</summary>
     public static readonly SearchTargetKind Sessions = new SearchTargetKind("sessions");
 
     /// <summary>The text of chat requests and responses.</summary>
@@ -7923,8 +7923,9 @@ public sealed record FileTextSearchTarget
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
-/// <summary>Searches the titles of the host's sessions, the same sessions that
-/// `listSessions` returns. Results are {@link SessionSearchResult}s.
+/// <summary>Searches the host's sessions, the same sessions that `listSessions`
+/// returns. The host decides which session content it matches, for example
+/// titles or requests. Results are {@link SessionSearchResult}s.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record SessionsSearchTarget
@@ -8028,7 +8029,7 @@ public sealed record FileTextSearchResult
     public required TextRange Range { get; init; }
 }
 
-/// <summary>A session whose title matches. {@link SearchResultBase.resource} is the
+/// <summary>A session whose content matches. {@link SearchResultBase.resource} is the
 /// session URI.
 ///
 /// Stability: 1.0 - Early development.</summary>

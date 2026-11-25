@@ -76,7 +76,7 @@ Each target has a `kind`:
 |---|---|---|
 | `fileNames` | File paths under `roots`. The host decides how to match `text` against paths, for example with fuzzy matching, and which query options apply. | `roots`, `includes`, `excludes`, `includeIgnored` |
 | `fileText` | The text content of files under `roots` | `roots`, `includes`, `excludes`, `includeIgnored` |
-| `sessions` | The titles of the host's sessions, the same sessions that `listSessions` returns | none |
+| `sessions` | The host's sessions, the same sessions that `listSessions` returns. The host decides which session content it matches, for example titles or requests. | none |
 | `chatMessages` | The visible text of chat requests and responses, including turns that are not loaded in the chat's state | `chats`: the chats to search. At least one chat URI. |
 
 `includes` and `excludes` are glob patterns relative to a root. By default, the
@@ -191,8 +191,7 @@ sequenceDiagram
 
 The client cancels a search by sending `unsubscribe` for its channel. When the
 last subscriber unsubscribes, the host stops the search and releases the
-channel. To cancel a search that it created but has not subscribed to, the
-client also sends `unsubscribe`.
+channel.
 
 A completed search keeps its state until the client unsubscribes. The client
 can change the query of a completed search to start it again.
@@ -208,7 +207,7 @@ that it chooses, so that a client can resume it with `reconnect` or
 ## Security
 
 A host applies the same access rules to a search as to the operations that
-would reach the same data: `resourceRead` for files, `listSessions` for
-session titles, and `subscribe` for chats. A host does not need to track which
-sessions or chats a particular client has seen. A host SHOULD limit the number of searches for each client and
-the work that each search does.
+would reach the same data: `resourceRead` for files, and `listSessions` and
+`subscribe` for sessions and chats. A host does not need to track which
+sessions or chats a particular client has seen. A host SHOULD limit the number
+of searches for each client and the work that each search does.

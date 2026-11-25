@@ -620,7 +620,7 @@ const (
 	SearchTargetKindFileNames SearchTargetKind = "fileNames"
 	// The text content of files.
 	SearchTargetKindFileText SearchTargetKind = "fileText"
-	// Session titles.
+	// The host's sessions.
 	SearchTargetKindSessions SearchTargetKind = "sessions"
 	// The text of chat requests and responses.
 	SearchTargetKindChatMessages SearchTargetKind = "chatMessages"
@@ -5510,8 +5510,9 @@ func (v FileTextSearchTarget) MarshalJSON() ([]byte, error) {
 	return marshalWithExtra(wire(v), v.Extra, "roots", "includes", "excludes", "includeIgnored", "kind")
 }
 
-// Searches the titles of the host's sessions, the same sessions that
-// `listSessions` returns. Results are {@link SessionSearchResult}s.
+// Searches the host's sessions, the same sessions that `listSessions`
+// returns. The host decides which session content it matches, for example
+// titles or requests. Results are {@link SessionSearchResult}s.
 //
 // Stability: 1.0 - Early development.
 type SessionsSearchTarget struct {
@@ -5613,7 +5614,7 @@ type FileTextSearchResult struct {
 	Range TextRange `json:"range"`
 }
 
-// A session whose title matches. {@link SearchResultBase.resource} is the
+// A session whose content matches. {@link SearchResultBase.resource} is the
 // session URI.
 //
 // Stability: 1.0 - Early development.

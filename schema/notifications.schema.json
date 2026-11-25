@@ -6693,7 +6693,7 @@
     },
     "SessionsSearchTarget": {
       "type": "object",
-      "description": "Searches the titles of the host's sessions, the same sessions that\n`listSessions` returns. Results are {@link SessionSearchResult}s.\n\nStability: 1.0 - Early development.",
+      "description": "Searches the host's sessions, the same sessions that `listSessions`\nreturns. The host decides which session content it matches, for example\ntitles or requests. Results are {@link SessionSearchResult}s.\n\nStability: 1.0 - Early development.",
       "properties": {
         "kind": {
           "const": "sessions"
@@ -6845,7 +6845,7 @@
     },
     "SessionSearchResult": {
       "type": "object",
-      "description": "A session whose title matches. {@link SearchResultBase.resource} is the\nsession URI.\n\nStability: 1.0 - Early development.",
+      "description": "A session whose content matches. {@link SearchResultBase.resource} is the\nsession URI.\n\nStability: 1.0 - Early development.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",

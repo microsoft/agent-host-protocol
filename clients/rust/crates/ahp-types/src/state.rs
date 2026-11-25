@@ -1629,7 +1629,7 @@ pub enum SearchTargetKind {
     FileNames,
     /// The text content of files.
     FileText,
-    /// Session titles.
+    /// The host's sessions.
     Sessions,
     /// The text of chat requests and responses.
     ChatMessages,
@@ -7086,8 +7086,9 @@ pub struct FileTextSearchTarget {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
-/// Searches the titles of the host's sessions, the same sessions that
-/// `listSessions` returns. Results are {@link SessionSearchResult}s.
+/// Searches the host's sessions, the same sessions that `listSessions`
+/// returns. The host decides which session content it matches, for example
+/// titles or requests. Results are {@link SessionSearchResult}s.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -7181,7 +7182,7 @@ pub struct FileTextSearchResult {
     pub range: TextRange,
 }
 
-/// A session whose title matches. {@link SearchResultBase.resource} is the
+/// A session whose content matches. {@link SearchResultBase.resource} is the
 /// session URI.
 ///
 /// Stability: 1.0 - Early development.

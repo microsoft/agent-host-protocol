@@ -75,7 +75,7 @@ export const enum SearchTargetKind {
   FileNames = 'fileNames',
   /** The text content of files. */
   FileText = 'fileText',
-  /** Session titles. */
+  /** The host's sessions. */
   Sessions = 'sessions',
   /** The text of chat requests and responses. */
   ChatMessages = 'chatMessages',
@@ -129,8 +129,9 @@ export interface FileTextSearchTarget extends FileSearchTargetBase {
 }
 
 /**
- * Searches the titles of the host's sessions, the same sessions that
- * `listSessions` returns. Results are {@link SessionSearchResult}s.
+ * Searches the host's sessions, the same sessions that `listSessions`
+ * returns. The host decides which session content it matches, for example
+ * titles or requests. Results are {@link SessionSearchResult}s.
  *
  * @category Search Types
  * @stability 1.0
@@ -267,7 +268,7 @@ export interface FileTextSearchResult extends SearchResultBase {
 }
 
 /**
- * A session whose title matches. {@link SearchResultBase.resource} is the
+ * A session whose content matches. {@link SearchResultBase.resource} is the
  * session URI.
  *
  * @category Search Types

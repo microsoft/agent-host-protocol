@@ -2544,8 +2544,6 @@ public sealed record ResourceWatchChangedAction
 /// replaces the results with an empty list and then changes the lifecycle to
 /// {@link SearchLifecycleStatus.Failed | failed}.
 ///
-/// Only clients dispatch this action.
-///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record SearchQueryChangedAction
 {

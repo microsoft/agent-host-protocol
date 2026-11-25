@@ -2490,8 +2490,6 @@ public struct ResourceWatchChangedAction: Codable, Sendable, Equatable {
 /// replaces the results with an empty list and then changes the lifecycle to
 /// {@link SearchLifecycleStatus.Failed | failed}.
 ///
-/// Only clients dispatch this action.
-///
 /// Stability: 1.0 - Early development.
 public struct SearchQueryChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType

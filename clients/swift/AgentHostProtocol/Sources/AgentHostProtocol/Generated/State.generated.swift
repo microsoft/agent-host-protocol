@@ -1212,7 +1212,7 @@ public enum SearchTargetKind: Codable, Sendable, Equatable {
     case fileNames
     /// The text content of files.
     case fileText
-    /// Session titles.
+    /// The host's sessions.
     case sessions
     /// The text of chat requests and responses.
     case chatMessages
@@ -9219,8 +9219,9 @@ public struct FileTextSearchTarget: Codable, Sendable, Equatable {
     }
 }
 
-/// Searches the titles of the host's sessions, the same sessions that
-/// `listSessions` returns. Results are {@link SessionSearchResult}s.
+/// Searches the host's sessions, the same sessions that `listSessions`
+/// returns. The host decides which session content it matches, for example
+/// titles or requests. Results are {@link SessionSearchResult}s.
 ///
 /// Stability: 1.0 - Early development.
 public struct SessionsSearchTarget: Codable, Sendable, Equatable {
@@ -9397,7 +9398,7 @@ public struct FileTextSearchResult: Codable, Sendable, Equatable {
     }
 }
 
-/// A session whose title matches. {@link SearchResultBase.resource} is the
+/// A session whose content matches. {@link SearchResultBase.resource} is the
 /// session URI.
 ///
 /// Stability: 1.0 - Early development.

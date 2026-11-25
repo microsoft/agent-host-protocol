@@ -1311,7 +1311,7 @@ value class SearchTargetKind(val rawValue: String) {
          */
         val FILE_TEXT: SearchTargetKind = SearchTargetKind("fileText")
         /**
-         * Session titles.
+         * The host's sessions.
          */
         val SESSIONS: SearchTargetKind = SearchTargetKind("sessions")
         /**
@@ -7132,8 +7132,9 @@ internal object FileTextSearchTargetSerializer : UnknownMembersSerializer<FileTe
 )
 
 /**
- * Searches the titles of the host's sessions, the same sessions that
- * `listSessions` returns. Results are {@link SessionSearchResult}s.
+ * Searches the host's sessions, the same sessions that `listSessions`
+ * returns. The host decides which session content it matches, for example
+ * titles or requests. Results are {@link SessionSearchResult}s.
  *
  * Stability: 1.0 - Early development.
  */
@@ -7271,7 +7272,7 @@ data class FileTextSearchResult(
 )
 
 /**
- * A session whose title matches. {@link SearchResultBase.resource} is the
+ * A session whose content matches. {@link SearchResultBase.resource} is the
  * session URI.
  *
  * Stability: 1.0 - Early development.

@@ -6391,7 +6391,7 @@
     },
     "SessionsSearchTarget": {
       "type": "object",
-      "description": "Searches the titles of the host's sessions, the same sessions that\n`listSessions` returns. Results are {@link SessionSearchResult}s.\n\nStability: 1.0 - Early development.",
+      "description": "Searches the host's sessions, the same sessions that `listSessions`\nreturns. The host decides which session content it matches, for example\ntitles or requests. Results are {@link SessionSearchResult}s.\n\nStability: 1.0 - Early development.",
       "properties": {
         "kind": {
           "const": "sessions"
@@ -6543,7 +6543,7 @@
     },
     "SessionSearchResult": {
       "type": "object",
-      "description": "A session whose title matches. {@link SearchResultBase.resource} is the\nsession URI.\n\nStability: 1.0 - Early development.",
+      "description": "A session whose content matches. {@link SearchResultBase.resource} is the\nsession URI.\n\nStability: 1.0 - Early development.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -12258,7 +12258,7 @@
     },
     "SearchQueryChangedAction": {
       "type": "object",
-      "description": "Replaces the search's query and restarts the search.\n\nKeeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to\n{@link SearchLifecycleStatus.Pending | pending}. The old results stay\nvisible until the host replaces them, so the client does not flash an empty\nlist.\n\nAfter the host applies this action, it stops the previous search and drops\nany of its results that it has not dispatched yet. The host MUST then\ndispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with\n`replace: true` before any other search action. The replacement can keep\nold results that still match the new query, and can be empty. If the new\nquery is not valid,\nfor example because it contains an invalid regular expression, the host\nreplaces the results with an empty list and then changes the lifecycle to\n{@link SearchLifecycleStatus.Failed | failed}.\n\nOnly clients dispatch this action.\n\nStability: 1.0 - Early development.",
+      "description": "Replaces the search's query and restarts the search.\n\nKeeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to\n{@link SearchLifecycleStatus.Pending | pending}. The old results stay\nvisible until the host replaces them, so the client does not flash an empty\nlist.\n\nAfter the host applies this action, it stops the previous search and drops\nany of its results that it has not dispatched yet. The host MUST then\ndispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with\n`replace: true` before any other search action. The replacement can keep\nold results that still match the new query, and can be empty. If the new\nquery is not valid,\nfor example because it contains an invalid regular expression, the host\nreplaces the results with an empty list and then changes the lifecycle to\n{@link SearchLifecycleStatus.Failed | failed}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "search/queryChanged"

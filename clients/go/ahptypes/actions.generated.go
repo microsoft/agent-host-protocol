@@ -1749,8 +1749,6 @@ type ResourceWatchChangedAction struct {
 // replaces the results with an empty list and then changes the lifecycle to
 // {@link SearchLifecycleStatus.Failed | failed}.
 //
-// Only clients dispatch this action.
-//
 // Stability: 1.0 - Early development.
 type SearchQueryChangedAction struct {
 	Type ActionType `json:"type"`

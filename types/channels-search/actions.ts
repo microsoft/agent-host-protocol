@@ -25,8 +25,6 @@ import type { SearchLifecycleState, SearchQuery, SearchResult } from './state.js
  * replaces the results with an empty list and then changes the lifecycle to
  * {@link SearchLifecycleStatus.Failed | failed}.
  *
- * Only clients dispatch this action.
- *
  * @category Search Actions
  * @version 1
  * @stability 1.0
