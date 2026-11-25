@@ -1617,6 +1617,20 @@ export interface AuthenticateParams extends BaseParams {
    * @minLength 1
    */
   accountId?: string;
+  /**
+   * Optional OpenID Connect ID Token that the authorization server issued
+   * with `token`, forwarded unchanged. This corresponds to `id_token` in a
+   * token response (OpenID Connect Core 1.0 section 3.1.3.3). It lets the
+   * host read identity claims without decoding the (opaque) access token.
+   *
+   * The ID Token is not a bearer credential: hosts MUST NOT present it to a
+   * resource, and MUST treat its claims as unverified unless they validate
+   * it. It can carry personal data, so hosts SHOULD NOT write it to logs.
+   * see {@link /specification/authentication#id-tokens | ID tokens}.
+   *
+   * @minLength 1
+   */
+  idToken?: string;
 }
 
 /**

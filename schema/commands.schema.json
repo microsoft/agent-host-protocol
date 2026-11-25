@@ -1109,6 +1109,11 @@
           "type": "string",
           "description": "Optional identifier for the client's selected account, sent alongside the token.\nHosts can compare `accountId` values to detect when the underlying account has changed.\nHosts MUST treat `accountId` as an opaque string.\nsee {@link /specification/authentication#account-selection-hints | Account selection hints}.",
           "minLength": 1
+        },
+        "idToken": {
+          "type": "string",
+          "description": "Optional OpenID Connect ID Token that the authorization server issued\nwith `token`, forwarded unchanged. This corresponds to `id_token` in a\ntoken response (OpenID Connect Core 1.0 section 3.1.3.3). It lets the\nhost read identity claims without decoding the (opaque) access token.\n\nThe ID Token is not a bearer credential: hosts MUST NOT present it to a\nresource, and MUST treat its claims as unverified unless they validate\nit. It can carry personal data, so hosts SHOULD NOT write it to logs.\nsee {@link /specification/authentication#id-tokens | ID tokens}.",
+          "minLength": 1
         }
       },
       "required": [

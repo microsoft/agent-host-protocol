@@ -172,6 +172,36 @@ Clients MAY include `accountId` alongside the token to identify their selected a
 }
 ```
 
+### ID tokens
+
+Clients MAY include `idToken`, the OpenID Connect ID Token that the authorization server issued with the access token. It corresponds to the `id_token` field of a token response, as defined by [OpenID Connect Core 1.0 section 3.1.3.3](https://openid.net/specs/openid-connect-core-1_0.html#TokenResponse), and the client MUST forward it unchanged. When present, `idToken` MUST be a nonempty string.
+
+An access token is opaque to everyone but its resource, so a host that needs identity claims, such as the issuer or the tenant an account belongs to, reads them from the ID Token instead.
+
+```jsonc
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "authenticate",
+  "params": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.com",
+    "token": "access_token",
+    "idToken": "id_token"
+  }
+}
+```
+
+The ID Token is not a bearer credential, and its audience is the client's OAuth client rather than the host:
+
+- Hosts MUST NOT present `idToken` to a resource or use it to authorize access; validation of `token` remains authoritative.
+- Hosts MUST treat its claims as unverified unless they validate the ID Token against its issuer.
+- An ID Token can carry personal data such as a name and email address. Clients and hosts SHOULD protect it like `token` and SHOULD NOT write it to logs.
+
+`idToken` is optional independently of `accountId`, and it describes the account that `token` belongs to. It is irrelevant when `token` is empty to revoke authentication and SHOULD be omitted in that request. Older hosts ignore it, and newer hosts continue accepting requests that omit it. No capability or protocol-version change is required.
+
+Wire compatibility does not imply native source or binary compatibility: Rust struct literals must add `id_token: None` when omitting the ID Token, and existing Kotlin data-class binaries must be rebuilt against the updated generated model.
+
 ## Error Handling
 
 ### `AuthRequired` Error Code

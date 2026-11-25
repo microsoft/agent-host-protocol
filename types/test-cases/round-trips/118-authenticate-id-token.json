@@ -1,0 +1,22 @@
+{
+  "name": "authenticate-id-token",
+  "group": "A",
+  "description": "Authentication preserves an optional OpenID Connect ID Token alongside the access token and the account-selection hint.",
+  "type": "AuthenticateParams",
+  "input": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.com",
+    "token": "test-token",
+    "accountId": "client-selection-7",
+    "idToken": "header.payload.signature"
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-root://",
+      "resource": "https://api.example.com",
+      "token": "test-token",
+      "accountId": "client-selection-7",
+      "idToken": "header.payload.signature"
+    }
+  ]
+}

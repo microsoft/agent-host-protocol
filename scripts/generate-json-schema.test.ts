@@ -411,6 +411,19 @@ describe('generated JSON schemas', () => {
         ]);
       });
 
+      it('accepts an optional ID token without requiring it for authentication', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const authenticate = defs.AuthenticateParams;
+        const base = { channel: 'ahp-root://', resource: 'https://api.example.com', token: 'test-token' };
+        const values = [base, ...['header.payload.signature', '', 42, null, {}, []].map(idToken => ({ ...base, idToken }))];
+        assert.deepEqual(values.map(value => schemaAccepts(schema, authenticate as JsonNode, value)), [
+          true, true, false, false, false, false, false,
+        ]);
+      });
+
       it('accepts optional, empty, single-kind, and combined automation disable conditions', () => {
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const afterRuns = { kind: 'afterRuns', max: 3 };

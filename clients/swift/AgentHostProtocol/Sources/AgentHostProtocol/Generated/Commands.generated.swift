@@ -2183,6 +2183,16 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// Hosts MUST treat `accountId` as an opaque string.
     /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
     public var accountId: String?
+    /// Optional OpenID Connect ID Token that the authorization server issued
+    /// with `token`, forwarded unchanged. This corresponds to `id_token` in a
+    /// token response (OpenID Connect Core 1.0 section 3.1.3.3). It lets the
+    /// host read identity claims without decoding the (opaque) access token.
+    ///
+    /// The ID Token is not a bearer credential: hosts MUST NOT present it to a
+    /// resource, and MUST treat its claims as unverified unless they validate
+    /// it. It can carry personal data, so hosts SHOULD NOT write it to logs.
+    /// see {@link /specification/authentication#id-tokens | ID tokens}.
+    public var idToken: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -2193,6 +2203,7 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
         case scopes
         case target
         case accountId
+        case idToken
     }
 
     public init(
@@ -2203,7 +2214,8 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
         expiresIn: Int? = nil,
         scopes: [String]? = nil,
         target: AuthenticateTarget? = nil,
-        accountId: String? = nil
+        accountId: String? = nil,
+        idToken: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -2213,6 +2225,7 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
         self.scopes = scopes
         self.target = target
         self.accountId = accountId
+        self.idToken = idToken
     }
 }
 
