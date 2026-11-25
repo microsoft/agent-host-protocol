@@ -30,7 +30,7 @@ All channels use the same `subscribe` and `unsubscribe` messages.
 | `ahp-canvas:/<id>` | `CanvasState` | Experimental. One canvas. The URI is listed in `ChatState.canvases`. See [Canvas Channel](/reference/canvas). |
 | `ahp-terminal:/<id>` | `TerminalState` | One terminal. See [Terminal Channel](/specification/terminal-channel). |
 | `ahp-tcp:/<id>` | `EmptyState` | Experimental. One TCP connection that the host opened with `createTcpConnection`. Private to the client that created it. See [TCP Channel](/specification/tcp-channel). |
-| `ahp-search:/<id>` | `SearchState` | Experimental. One search that the client started with `createSearch`. Private to the client that created it. See [Search Channel](/specification/search-channel). |
+| `ahp-search:/<id>` | `SearchState` | Experimental. One search that a client started with `createSearch`. See [Search Channel](/specification/search-channel). |
 | `ahp-changeset:/<id>` | `ChangesetState` | One changeset. The client builds the URI from the `Changeset.uriTemplate` of a session or chat. |
 | `ahp-resource-watch:/<id>` | `ResourceWatchState` | One file watch. The URI is returned by `createResourceWatch`. |
 | `ahp-otlp:` | `EmptyState` | OpenTelemetry logs, traces, or metrics. The URIs are listed in `InitializeResult.telemetry`. See [Telemetry Channel](/specification/telemetry-channel). |

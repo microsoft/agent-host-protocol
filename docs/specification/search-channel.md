@@ -55,9 +55,7 @@ one of these errors:
 | `AlreadyExists` | The channel URI is already in use. The host MUST NOT replace the existing search. |
 
 The client then subscribes to the channel. A new search starts with no
-results and a `running` lifecycle. A search channel is private to the
-client that created it, on the same AHP connection. A host MUST reject a
-`subscribe` from any other client or connection. If the client does not
+results and a `running` lifecycle. If the client does not
 subscribe within a time limit that the host chooses, the host stops the search
 and releases the channel.
 
@@ -191,20 +189,21 @@ sequenceDiagram
 
 ## Cancelling a Search
 
-The client cancels a search by sending `unsubscribe` for its channel. The host
-stops the search and releases the channel. To cancel a search that it created
-but has not subscribed to, the client also sends `unsubscribe`.
+The client cancels a search by sending `unsubscribe` for its channel. When the
+last subscriber unsubscribes, the host stops the search and releases the
+channel. To cancel a search that it created but has not subscribed to, the
+client also sends `unsubscribe`.
 
 A completed search keeps its state until the client unsubscribes. The client
 can change the query of a completed search to start it again.
 
 ## Connection Loss
 
-A search channel does not survive the loss of the AHP connection. When the
-connection closes, the host stops every search that was created on it. A
-client MUST NOT include search channels in the `subscriptions` of a
-`reconnect` request; if it does, the server lists them in `missing`. To search
-again, the client sends `createSearch` with a new channel URI.
+When the AHP connection closes, the host MAY keep a search for a period of time
+that it chooses, so that a client can resume it with `reconnect` or
+`subscribe`. Once the host releases a search, `reconnect` lists the channel in
+`missing`, and `subscribe` fails. To search again, the client sends
+`createSearch`.
 
 ## Security
 
