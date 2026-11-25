@@ -1,12 +1,3 @@
-// SnapshotState is the shape-probed discriminated union of the six per-channel
-// state types (root, session, terminal, changeset, resource-watch, annotations).
-// The generated SnapshotStateConverter inspects distinctive top-level wire fields
-// to pick the variant. These tests round-trip a SnapshotState through the REAL
-// serializer (AhpJson.Options, the same options the production client uses) for
-// every variant and assert the result deserializes back to the CORRECT variant —
-// in particular that ResourceWatchState and AnnotationsState are NOT silently
-// mis-routed to RootState (the fallback branch), which is what a converter that
-// only probes session/terminal/changeset/root would do.
 #nullable enable
 
 using System.Collections.Generic;
@@ -18,13 +9,11 @@ namespace Microsoft.AgentHostProtocol.Tests;
 
 public sealed class SnapshotStateUnionTests
 {
-    private static SnapshotState RoundTrip(SnapshotState value)
+    private static SnapshotState RoundTrip(string resource, SnapshotState value)
     {
-        // Serialize through the real converter, then read it straight back. A
-        // correct converter recovers the same variant; a converter missing a
-        // probe drops the payload into the RootState fallback branch.
-        string wire = JsonSerializer.Serialize(value, AhpJson.Options);
-        return JsonSerializer.Deserialize<SnapshotState>(wire, AhpJson.Options)!;
+        var snapshot = new Snapshot { Resource = resource, State = value, FromSeq = 0 };
+        string wire = JsonSerializer.Serialize(snapshot, AhpJson.Options);
+        return JsonSerializer.Deserialize<Snapshot>(wire, AhpJson.Options)!.State;
     }
 
     [Fact]
@@ -39,10 +28,8 @@ public sealed class SnapshotStateUnionTests
             },
         };
 
-        SnapshotState decoded = RoundTrip(original);
+        SnapshotState decoded = RoundTrip("ahp-resource-watch:/a", original);
 
-        // The decisive assertion: the ResourceWatch variant is recovered and the
-        // payload was NOT mis-typed as RootState (the catch-all fallback).
         Assert.NotNull(decoded.ResourceWatch);
         Assert.Null(decoded.Root);
         Assert.Null(decoded.Session);
@@ -82,10 +69,8 @@ public sealed class SnapshotStateUnionTests
             },
         };
 
-        SnapshotState decoded = RoundTrip(original);
+        SnapshotState decoded = RoundTrip("ahp-annotations:/a", original);
 
-        // The decisive assertion: the Annotations variant is recovered and the
-        // payload was NOT mis-typed as RootState (the catch-all fallback).
         Assert.NotNull(decoded.Annotations);
         Assert.Null(decoded.Root);
         Assert.Null(decoded.Session);
@@ -98,8 +83,6 @@ public sealed class SnapshotStateUnionTests
         Assert.Equal("first note", decoded.Annotations.Annotations[0].Entries[0].Text.AsText());
     }
 
-    // Guard the other four variants too, so a future re-ordering of the probe
-    // chain that shadows an existing variant is caught here as well.
     [Fact]
     public void RootState_RoundTripsToRootVariant()
     {
@@ -108,7 +91,7 @@ public sealed class SnapshotStateUnionTests
             Root = new RootState { Agents = new List<AgentInfo>() },
         };
 
-        SnapshotState decoded = RoundTrip(original);
+        SnapshotState decoded = RoundTrip("ahp-root:/", original);
 
         Assert.NotNull(decoded.Root);
         Assert.Null(decoded.ResourceWatch);
@@ -130,7 +113,7 @@ public sealed class SnapshotStateUnionTests
             },
         };
 
-        SnapshotState decoded = RoundTrip(original);
+        SnapshotState decoded = RoundTrip("ahp-changeset:/a", original);
 
         Assert.NotNull(decoded.Changeset);
         Assert.Null(decoded.Root);
@@ -143,10 +126,6 @@ public sealed class SnapshotStateUnionTests
     [Fact]
     public void SessionState_RoundTripsToSessionVariant()
     {
-        // SessionState carries no `summary` field (it was removed when the session
-        // state was flattened), so the converter must discriminate on the required
-        // `lifecycle` field. A probe that still required `summary` drops a session
-        // snapshot into the RootState fallback — this test falsifies that regression.
         var original = new SnapshotState
         {
             Session = new SessionState
@@ -159,7 +138,7 @@ public sealed class SnapshotStateUnionTests
             },
         };
 
-        SnapshotState decoded = RoundTrip(original);
+        SnapshotState decoded = RoundTrip("ahp-session:/s1", original);
 
         Assert.NotNull(decoded.Session);
         Assert.Null(decoded.Root);
@@ -176,20 +155,18 @@ public sealed class SnapshotStateUnionTests
     [Fact]
     public void ChatState_RoundTripsToChatVariant()
     {
-        // ChatState is discriminated on its required `turns` field. Completes the
-        // per-variant coverage so a chat snapshot is never mis-routed to Root.
         var original = new SnapshotState
         {
             Chat = new ChatState
             {
-                Resource = "ahp-session:/s1#chat",
+                Resource = "ahp-chat:/c1",
                 Title = "chat-snapshot",
                 ModifiedAt = "0",
                 Turns = new List<Turn>(),
             },
         };
 
-        SnapshotState decoded = RoundTrip(original);
+        SnapshotState decoded = RoundTrip("ahp-chat:/c1", original);
 
         Assert.NotNull(decoded.Chat);
         Assert.Null(decoded.Root);
@@ -200,5 +177,42 @@ public sealed class SnapshotStateUnionTests
         Assert.Null(decoded.Annotations);
 
         Assert.Equal("chat-snapshot", decoded.Chat!.Title);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("false")]
+    [InlineData("42")]
+    [InlineData("\"state\"")]
+    [InlineData("[]")]
+    [InlineData("{}")]
+    [InlineData("{\"content\":null,\"lifecycle\":false,\"entries\":0}")]
+    public void WithoutKnownResource_PreservesAnyJson(string wire)
+    {
+        var standalone = JsonSerializer.Deserialize<SnapshotState>(wire, AhpJson.Options)!;
+        Assert.Equal(wire, standalone.Unknown!.Value.GetRawText());
+        Assert.Equal(wire, JsonSerializer.Serialize(standalone, AhpJson.Options));
+
+        using var doc = JsonDocument.Parse(wire);
+        foreach (var resource in new[] { "x-ext:/a", "ahp-root" })
+        {
+            var state = SnapshotState.FromResource(resource, doc.RootElement, AhpJson.Options);
+            Assert.Equal(wire, state.Unknown!.Value.GetRawText());
+        }
+        var snapshotWire = "{\"resource\":\"x-ext:/a\",\"state\":" + wire + ",\"fromSeq\":0}";
+        var snapshot = JsonSerializer.Deserialize<Snapshot>(snapshotWire, AhpJson.Options)!;
+        Assert.Equal(wire, snapshot.State.Unknown!.Value.GetRawText());
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("false")]
+    [InlineData("{\"lifecycle\":\"ready\"}")]
+    public void KnownResource_PropagatesDecodeErrors(string wire)
+    {
+        using var doc = JsonDocument.Parse(wire);
+        Assert.Throws<JsonException>(() => SnapshotState.FromResource("ahp-terminal:/t1", doc.RootElement, AhpJson.Options));
+        var snapshotWire = "{\"resource\":\"ahp-terminal:/t1\",\"state\":" + wire + ",\"fromSeq\":0}";
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<Snapshot>(snapshotWire, AhpJson.Options));
     }
 }

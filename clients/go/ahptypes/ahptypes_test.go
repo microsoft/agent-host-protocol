@@ -122,59 +122,109 @@ func TestNonexhaustiveEnumAndUnionRoundTrip(t *testing.T) {
 	}
 }
 
-// TestSnapshotStateVariants confirms the SnapshotState discriminator picks the
-// right variant for each state shape — in particular that a chat snapshot
-// resolves to Chat (and not the Root catch-all) and a flattened session
-// snapshot resolves to Session.
+// TestSnapshotStateVariants selects the state type from the resource scheme.
 func TestSnapshotStateVariants(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		wire string
-		want func(SnapshotState) bool
+		name     string
+		resource URI
+		wire     string
+		want     func(SnapshotState) bool
 	}{
 		{
 			"session",
+			"ahp-session:/s1",
 			`{"provider":"p","title":"S","status":0,"lifecycle":"ready","activeClients":[],"chats":[]}`,
 			func(s SnapshotState) bool { return s.Session != nil },
 		},
 		{
 			"chat",
+			"ahp-chat:/c1",
 			`{"resource":"ahp-chat:/c1","title":"C","status":0,"modifiedAt":"2025-03-10T18:42:03.123Z","turns":[]}`,
 			func(s SnapshotState) bool { return s.Chat != nil },
 		},
 		{
 			"terminal",
-			`{"title":"T","content":[],"claim":{"kind":"client","clientId":"x"}}`,
+			"ahp-terminal:/t1",
+			`{"title":"T","content":[],"lifecycle":{"status":"running"},"claim":{"kind":"client","clientId":"x"}}`,
 			func(s SnapshotState) bool { return s.Terminal != nil },
 		},
 		{
 			"changeset",
+			"ahp-changeset:/a",
 			`{"status":"open","files":[]}`,
 			func(s SnapshotState) bool { return s.Changeset != nil },
 		},
 		{
 			"resourceWatch",
+			"ahp-resource-watch:/a",
 			`{"root":"file:///r","recursive":true}`,
 			func(s SnapshotState) bool { return s.ResourceWatch != nil },
 		},
 		{
 			"annotations",
+			"ahp-annotations:/a",
 			`{"annotations":[]}`,
 			func(s SnapshotState) bool { return s.Annotations != nil },
 		},
 		{
 			"root",
+			"ahp-root:/",
 			`{"agents":[]}`,
 			func(s SnapshotState) bool { return s.Root != nil },
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var s SnapshotState
-			if err := json.Unmarshal([]byte(tc.wire), &s); err != nil {
+			s, err := SnapshotStateFromResource(tc.resource, []byte(tc.wire))
+			if err != nil {
 				t.Fatalf("unmarshal: %v", err)
 			}
 			if !tc.want(s) {
 				t.Fatalf("wrong variant for %s snapshot: %+v", tc.name, s)
+			}
+		})
+	}
+}
+
+func TestSnapshotStateWithoutKnownResource(t *testing.T) {
+	for _, wire := range []string{"null", "false", "42", `"state"`, "[]", "{}", `{"content":null,"lifecycle":false,"entries":0}`} {
+		t.Run(wire, func(t *testing.T) {
+			state := SnapshotState{Root: &RootState{}}
+			if err := json.Unmarshal([]byte(wire), &state); err != nil {
+				t.Fatal(err)
+			}
+			if string(state.Unknown) != wire || state.Root != nil {
+				t.Fatalf("standalone state was not preserved as unknown: %+v", state)
+			}
+			encoded, err := json.Marshal(state)
+			if err != nil || string(encoded) != wire {
+				t.Fatalf("standalone round-trip: %s, %v", encoded, err)
+			}
+			for _, resource := range []URI{"x-ext:/a", "ahp-root"} {
+				state, err := SnapshotStateFromResource(resource, []byte(wire))
+				if err != nil || string(state.Unknown) != wire {
+					t.Fatalf("unknown resource: %+v, %v", state, err)
+				}
+			}
+			var snapshot Snapshot
+			if err := json.Unmarshal([]byte(`{"resource":"x-ext:/a","state":`+wire+`,"fromSeq":0}`), &snapshot); err != nil {
+				t.Fatal(err)
+			}
+			if string(snapshot.State.Unknown) != wire {
+				t.Fatalf("unknown snapshot state: %+v", snapshot.State)
+			}
+		})
+	}
+}
+
+func TestSnapshotStateKnownResourceErrors(t *testing.T) {
+	for _, wire := range []string{"null", "false", `{"lifecycle":"ready"}`} {
+		t.Run(wire, func(t *testing.T) {
+			if _, err := SnapshotStateFromResource("ahp-terminal:/t1", []byte(wire)); err == nil {
+				t.Fatal("expected known-channel state decode error")
+			}
+			var snapshot Snapshot
+			if err := json.Unmarshal([]byte(`{"resource":"ahp-terminal:/t1","state":`+wire+`,"fromSeq":0}`), &snapshot); err == nil {
+				t.Fatal("expected snapshot decode error")
 			}
 		})
 	}

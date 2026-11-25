@@ -1,0 +1,9 @@
+{
+  "type": "fixed",
+  "message": "Decode snapshot state by its resource URI scheme, fixing terminal snapshots and preserving unknown channel states; standalone state decoding now preserves any JSON value as unknown. Use the resource-aware decode helpers for typed standalone state decoding (Kotlin Unknown.raw is now JsonElement).",
+  "targets": [
+    "kotlin",
+    "dotnet",
+    "go"
+  ]
+}
