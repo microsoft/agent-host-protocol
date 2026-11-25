@@ -1826,7 +1826,14 @@ data class AuthenticateParams(
      * Hosts MUST treat `accountId` as an opaque string.
      * see {@link /specification/authentication#account-selection-hints | Account selection hints}.
      */
-    val accountId: String? = null
+    val accountId: String? = null,
+    /**
+     * Optional OpenID Connect ID Token issued with `token`, forwarded unchanged
+     * (`id_token` in an OpenID Connect token response). Lets the host read
+     * identity claims that the opaque access token and `accountId` do not expose.
+     * see {@link /specification/authentication#id-tokens | ID tokens}.
+     */
+    val idToken: String? = null
 )
 
 @Serializable

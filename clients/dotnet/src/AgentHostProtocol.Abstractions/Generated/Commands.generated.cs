@@ -2079,6 +2079,13 @@ public sealed record AuthenticateParams
     /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? AccountId { get; init; }
+
+    /// <summary>Optional OpenID Connect ID Token issued with `token`, forwarded unchanged
+    /// (`id_token` in an OpenID Connect token response). Lets the host read
+    /// identity claims that the opaque access token and `accountId` do not expose.
+    /// see {@link /specification/authentication#id-tokens | ID tokens}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? IdToken { get; init; }
 }
 
 /// <summary>Result of the `authenticate` command.

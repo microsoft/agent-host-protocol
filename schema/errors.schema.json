@@ -7910,6 +7910,11 @@
           "type": "string",
           "description": "Optional identifier for the client's selected account, sent alongside the token.\nHosts can compare `accountId` values to detect when the underlying account has changed.\nHosts MUST treat `accountId` as an opaque string.\nsee {@link /specification/authentication#account-selection-hints | Account selection hints}.",
           "minLength": 1
+        },
+        "idToken": {
+          "type": "string",
+          "description": "Optional OpenID Connect ID Token issued with `token`, forwarded unchanged\n(`id_token` in an OpenID Connect token response). Lets the host read\nidentity claims that the opaque access token and `accountId` do not expose.\nsee {@link /specification/authentication#id-tokens | ID tokens}.",
+          "minLength": 1
         }
       },
       "required": [

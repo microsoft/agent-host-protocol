@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Add an optional `AuthenticateParams.idToken` so clients can forward the OpenID Connect ID Token issued with the access token, letting hosts read identity claims without decoding the access token. Read more in [ID tokens](https://microsoft.github.io/agent-host-protocol/specification/authentication#id-tokens)."
+}

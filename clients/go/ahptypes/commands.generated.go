@@ -1514,6 +1514,11 @@ type AuthenticateParams struct {
 	// Hosts MUST treat `accountId` as an opaque string.
 	// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
 	AccountId *string `json:"accountId,omitempty"`
+	// Optional OpenID Connect ID Token issued with `token`, forwarded unchanged
+	// (`id_token` in an OpenID Connect token response). Lets the host read
+	// identity claims that the opaque access token and `accountId` do not expose.
+	// see {@link /specification/authentication#id-tokens | ID tokens}.
+	IdToken *string `json:"idToken,omitempty"`
 }
 
 // Result of the `authenticate` command.

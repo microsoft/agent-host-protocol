@@ -172,6 +172,28 @@ Clients MAY include `accountId` alongside the token to identify their selected a
 }
 ```
 
+### ID tokens
+
+Clients MAY include `idToken`, the OpenID Connect ID Token issued with the access token: the `id_token` field of a [token response](https://openid.net/specs/openid-connect-core-1_0.html#TokenResponse), forwarded unchanged. When present, it MUST be a nonempty string.
+
+It gives the host identity claims, such as the issuer or the account's tenant, that an opaque access token and an opaque `accountId` do not.
+
+```jsonc
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "authenticate",
+  "params": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.com",
+    "token": "access_token",
+    "idToken": "id_token"
+  }
+}
+```
+
+The ID Token is client-supplied information about the account, not a credential. Hosts MUST NOT use it to authorize access, and its claims are unverified unless the host validates the token.
+
 ## Error Handling
 
 ### `AuthRequired` Error Code

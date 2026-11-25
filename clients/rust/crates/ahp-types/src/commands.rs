@@ -1929,6 +1929,12 @@ pub struct AuthenticateParams {
     /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account_id: Option<String>,
+    /// Optional OpenID Connect ID Token issued with `token`, forwarded unchanged
+    /// (`id_token` in an OpenID Connect token response). Lets the host read
+    /// identity claims that the opaque access token and `accountId` do not expose.
+    /// see {@link /specification/authentication#id-tokens | ID tokens}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id_token: Option<String>,
 }
 
 /// Result of the `authenticate` command.
