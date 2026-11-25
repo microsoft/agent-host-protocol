@@ -8,6 +8,7 @@ import com.microsoft.agenthostprotocol.generated.AutomationState
 import com.microsoft.agenthostprotocol.generated.AutomationRunState
 import com.microsoft.agenthostprotocol.generated.ResourceWatchState
 import com.microsoft.agenthostprotocol.generated.RootState
+import com.microsoft.agenthostprotocol.generated.SearchState
 import com.microsoft.agenthostprotocol.generated.SessionState
 import com.microsoft.agenthostprotocol.generated.StateAction
 import com.microsoft.agenthostprotocol.generated.TerminalState
@@ -209,6 +210,18 @@ class FixtureDrivenReducerTest {
                 run = { state ->
                     var s = state
                     for (action in actions) s = resourceWatchReducer(s, action)
+                    s
+                },
+            )
+
+            "search" -> compareFixture(
+                file = file,
+                initial = initial,
+                expected = expected,
+                serializer = SearchState.serializer(),
+                run = { state ->
+                    var s = state
+                    for (action in actions) s = searchReducer(s, action)
                     s
                 },
             )

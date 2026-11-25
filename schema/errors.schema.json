@@ -603,6 +603,9 @@
               "$ref": "#/$defs/AutomationRunState"
             },
             {
+              "$ref": "#/$defs/SearchState"
+            },
+            {
               "$ref": "#/$defs/EmptyState"
             }
           ],
@@ -6332,6 +6335,477 @@
       "description": "Present when the host supports `createTcpConnection`.\n\nA client creates a connection with `createTcpConnection`, then subscribes to\nits channel with windowed delivery. A TCP channel's state is an\n{@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`\nnotifications. TCP connections do not survive the loss of the AHP connection.\n\nStability: 1.0 - Early development.",
       "properties": {}
     },
+    "SearchCapability": {
+      "type": "object",
+      "description": "Present when the host supports `createSearch`.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchTargetKind"
+          },
+          "description": "The target kinds the host can search. A client MUST NOT send a\n{@link SearchTarget} whose kind is not listed here."
+        }
+      },
+      "required": [
+        "targets"
+      ]
+    },
+    "SearchQuery": {
+      "type": "object",
+      "description": "What a search looks for and where.\n\nThe client sends a query in `createSearch` and replaces it with\n{@link SearchQueryChangedAction | `search/queryChanged`}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The text to search for. Its meaning depends on the target: see\n{@link SearchTarget}. An empty `text` matches nothing; the host completes\nthe search with no results."
+        },
+        "matchCase": {
+          "type": "boolean",
+          "description": "Match case. Defaults to `false`."
+        },
+        "wholeWord": {
+          "type": "boolean",
+          "description": "Match only whole words. Defaults to `false`."
+        },
+        "isRegex": {
+          "type": "boolean",
+          "description": "Treat `text` as a regular expression. Defaults to `false`."
+        },
+        "fuzzy": {
+          "type": "boolean",
+          "description": "A hint that precise matching isn't expected, for example because the\nsearch powers a quick-find picker. The host MAY then match loosely, rank\nresults by how well they match, and ignore {@link isRegex} and\n{@link wholeWord}. Defaults to `false`."
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchTarget"
+          },
+          "description": "Where to search. MUST contain at least one target."
+        },
+        "maxResults": {
+          "type": "integer",
+          "description": "The maximum number of results. The host MAY apply a lower limit, and\ncompletes the search with {@link SearchCompletionReason.LimitReached}\nwhen it reaches the limit that applies.",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "text",
+        "targets"
+      ]
+    },
+    "FileSearchTargetBase": {
+      "type": "object",
+      "description": "Shared fields for file search targets.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "roots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "The folders to search. MUST contain at least one URI."
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. When present, only matching files are searched."
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. Matching files are not searched."
+        },
+        "includeIgnored": {
+          "type": "boolean",
+          "description": "Also search files that the host's ignore rules, such as `.gitignore`\nfiles, would otherwise skip. Defaults to `false`. `excludes` still apply."
+        }
+      },
+      "required": [
+        "roots"
+      ]
+    },
+    "FileNamesSearchTarget": {
+      "type": "object",
+      "description": "Searches file paths under {@link FileSearchTargetBase.roots}.\n\nThe host decides how to match {@link SearchQuery.text} against file paths,\nfor example with fuzzy matching, and which query options apply. Results\nare {@link FileNameSearchResult}s.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "roots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "The folders to search. MUST contain at least one URI."
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. When present, only matching files are searched."
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. Matching files are not searched."
+        },
+        "includeIgnored": {
+          "type": "boolean",
+          "description": "Also search files that the host's ignore rules, such as `.gitignore`\nfiles, would otherwise skip. Defaults to `false`. `excludes` still apply."
+        },
+        "kind": {
+          "const": "fileNames"
+        }
+      },
+      "required": [
+        "roots",
+        "kind"
+      ]
+    },
+    "FileTextSearchTarget": {
+      "type": "object",
+      "description": "Searches the text content of files under {@link FileSearchTargetBase.roots}.\nResults are {@link FileTextSearchResult}s.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "roots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "The folders to search. MUST contain at least one URI."
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. When present, only matching files are searched."
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. Matching files are not searched."
+        },
+        "includeIgnored": {
+          "type": "boolean",
+          "description": "Also search files that the host's ignore rules, such as `.gitignore`\nfiles, would otherwise skip. Defaults to `false`. `excludes` still apply."
+        },
+        "kind": {
+          "const": "fileText"
+        }
+      },
+      "required": [
+        "roots",
+        "kind"
+      ]
+    },
+    "SessionsSearchTarget": {
+      "type": "object",
+      "description": "Searches the host's sessions, the same sessions that `listSessions`\nreturns. The host decides which session content it matches, for example\ntitles or requests. Results are {@link SessionSearchResult}s.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "kind": {
+          "const": "sessions"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "ChatMessagesSearchTarget": {
+      "type": "object",
+      "description": "Searches the visible text of chat requests and responses, including the\nresponses of deferred turns. Results are\n{@link ChatMessageSearchResult}s.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "kind": {
+          "const": "chatMessages"
+        },
+        "chats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "The chats to search. MUST contain at least one chat URI."
+        }
+      },
+      "required": [
+        "kind",
+        "chats"
+      ]
+    },
+    "SearchHighlight": {
+      "type": "object",
+      "description": "A matched span within {@link SearchMatch.text}: the half-open interval\n`[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code\nunits, as in {@link CompletionItem.rangeStart}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "rangeStart": {
+          "type": "integer",
+          "description": "The start of the span.",
+          "minimum": 0
+        },
+        "rangeEnd": {
+          "type": "integer",
+          "description": "The end of the span, exclusive. MUST be greater than {@link rangeStart}\nand at most the length of {@link SearchMatch.text}.",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "rangeStart",
+        "rangeEnd"
+      ]
+    },
+    "SearchMatch": {
+      "type": "object",
+      "description": "The matched text of a result, with the matched spans highlighted. The host\nchooses how much text around the match to include.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The text to display."
+        },
+        "highlights": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchHighlight"
+          },
+          "description": "The matched spans, in order. Spans MUST NOT overlap."
+        }
+      },
+      "required": [
+        "text",
+        "highlights"
+      ]
+    },
+    "SearchResultBase": {
+      "type": "object",
+      "description": "Shared fields for search results. Each result is one match.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The resource that contains the match."
+        },
+        "match": {
+          "$ref": "#/$defs/SearchMatch",
+          "description": "The text to display, with the matched spans highlighted."
+        },
+        "score": {
+          "type": "number",
+          "description": "How well the result matches; higher is better. Scores have no fixed\nrange, and are comparable across all results of one search. Clients\nSHOULD show results in descending score order. A host that does not rank\nresults omits the score."
+        }
+      },
+      "required": [
+        "resource",
+        "match"
+      ]
+    },
+    "FileNameSearchResult": {
+      "type": "object",
+      "description": "A file whose path matches. {@link SearchResultBase.resource} is the file;\nthe match text is its path, usually relative to the root that contains it.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The resource that contains the match."
+        },
+        "match": {
+          "$ref": "#/$defs/SearchMatch",
+          "description": "The text to display, with the matched spans highlighted."
+        },
+        "score": {
+          "type": "number",
+          "description": "How well the result matches; higher is better. Scores have no fixed\nrange, and are comparable across all results of one search. Clients\nSHOULD show results in descending score order. A host that does not rank\nresults omits the score."
+        },
+        "kind": {
+          "const": "fileName"
+        }
+      },
+      "required": [
+        "resource",
+        "match",
+        "kind"
+      ]
+    },
+    "FileTextSearchResult": {
+      "type": "object",
+      "description": "A match in the text of a file. {@link SearchResultBase.resource} is the\nfile; the match text is the text around the match, usually its line.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The resource that contains the match."
+        },
+        "match": {
+          "$ref": "#/$defs/SearchMatch",
+          "description": "The text to display, with the matched spans highlighted."
+        },
+        "score": {
+          "type": "number",
+          "description": "How well the result matches; higher is better. Scores have no fixed\nrange, and are comparable across all results of one search. Clients\nSHOULD show results in descending score order. A host that does not rank\nresults omits the score."
+        },
+        "kind": {
+          "const": "fileText"
+        },
+        "range": {
+          "$ref": "#/$defs/TextRange",
+          "description": "The location of the match in the file."
+        }
+      },
+      "required": [
+        "resource",
+        "match",
+        "kind",
+        "range"
+      ]
+    },
+    "SessionSearchResult": {
+      "type": "object",
+      "description": "A session whose content matches. {@link SearchResultBase.resource} is the\nsession URI.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The resource that contains the match."
+        },
+        "match": {
+          "$ref": "#/$defs/SearchMatch",
+          "description": "The text to display, with the matched spans highlighted."
+        },
+        "score": {
+          "type": "number",
+          "description": "How well the result matches; higher is better. Scores have no fixed\nrange, and are comparable across all results of one search. Clients\nSHOULD show results in descending score order. A host that does not rank\nresults omits the score."
+        },
+        "kind": {
+          "const": "session"
+        },
+        "title": {
+          "type": "string",
+          "description": "The session's title."
+        }
+      },
+      "required": [
+        "resource",
+        "match",
+        "kind",
+        "title"
+      ]
+    },
+    "ChatMessageSearchResult": {
+      "type": "object",
+      "description": "A match in a chat request or response. {@link SearchResultBase.resource}\nis the chat URI.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The resource that contains the match."
+        },
+        "match": {
+          "$ref": "#/$defs/SearchMatch",
+          "description": "The text to display, with the matched spans highlighted."
+        },
+        "score": {
+          "type": "number",
+          "description": "How well the result matches; higher is better. Scores have no fixed\nrange, and are comparable across all results of one search. Clients\nSHOULD show results in descending score order. A host that does not rank\nresults omits the score."
+        },
+        "kind": {
+          "const": "chatMessage"
+        },
+        "title": {
+          "type": "string",
+          "description": "The chat's title."
+        },
+        "turnId": {
+          "type": "string",
+          "description": "The ID of the turn that contains the match."
+        }
+      },
+      "required": [
+        "resource",
+        "match",
+        "kind",
+        "title",
+        "turnId"
+      ]
+    },
+    "SearchPendingLifecycleState": {
+      "type": "object",
+      "description": "The query changed and the host has not replaced the results yet. Clients\nMAY show the previous query's results differently, for example dimmed.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "status": {
+          "const": "pending"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "SearchRunningLifecycleState": {
+      "type": "object",
+      "description": "The host is searching and may add more results.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "status": {
+          "const": "running"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "SearchCompletedLifecycleState": {
+      "type": "object",
+      "description": "The host found every result for the query. A host that watches the\nsearched files, sessions, or chats MAY still change the results later.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "status": {
+          "const": "completed"
+        },
+        "reason": {
+          "$ref": "#/$defs/SearchCompletionReason",
+          "description": "Why the search completed."
+        }
+      },
+      "required": [
+        "status",
+        "reason"
+      ]
+    },
+    "SearchFailedLifecycleState": {
+      "type": "object",
+      "description": "The search failed. Results found before the failure remain in\n{@link SearchState.results}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "status": {
+          "const": "failed"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Why the search failed, for example an invalid regular expression."
+        }
+      },
+      "required": [
+        "status",
+        "error"
+      ]
+    },
+    "SearchState": {
+      "type": "object",
+      "description": "Full state for one search, returned when a client subscribes to its\n`ahp-search:` URI.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "query": {
+          "$ref": "#/$defs/SearchQuery",
+          "description": "The current query."
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchResult"
+          },
+          "description": "Results in the order the host found them. Sort by\n{@link SearchResultBase.score} to rank them. While {@link lifecycle} is\n{@link SearchLifecycleStatus.Pending | pending}, these are results for the\nprevious query."
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/SearchLifecycleState",
+          "description": "Where the search is in its lifecycle."
+        }
+      },
+      "required": [
+        "query",
+        "results",
+        "lifecycle"
+      ]
+    },
     "BaseParams": {
       "type": "object",
       "description": "Base shape every command's params extends.\n\n`channel` identifies the channel the command targets, mirroring the\n`channel` field on every protocol notification. For commands that operate\non a specific channel (a session, terminal, or changeset), `channel` is\nthat channel's URI. For commands that are connection-level rather than\nchannel-scoped (e.g. {@link InitializeParams | `initialize`},\n{@link PingParams | `ping`}, {@link ListSessionsParams | `listSessions`},\nthe `resource*` filesystem commands, and {@link AuthenticateParams |\n`authenticate`}), the params type narrows `channel` to the literal\nroot URI `'ahp-root://'`.\n\nThis invariant lets implementations route every incoming message —\nrequest, response, or notification — by inspecting `params.channel`\nwithout needing to know the per-method param shape.",
@@ -6535,6 +7009,10 @@
         "tcpConnections": {
           "$ref": "#/$defs/TcpConnectionsCapability",
           "description": "Present when the host supports `createTcpConnection`, which opens a TCP\nconnection on the host's network for the client to forward.\n\nStability: 1.0 - Early development."
+        },
+        "search": {
+          "$ref": "#/$defs/SearchCapability",
+          "description": "Present when the host supports `createSearch`, which searches files,\nsessions, and chats and streams the results on an `ahp-search:` channel.\n\nStability: 1.0 - Early development."
         },
         "multipleChatProviders": {
           "$ref": "#/$defs/MultipleChatProvidersCapability",
@@ -7754,12 +8232,14 @@
           "description": "The text inserted into the input when this item is accepted."
         },
         "rangeStart": {
-          "type": "number",
-          "description": "If defined, the start of the range in the input's `text` that is replaced\nby `insertText`. The range is the half-open interval\n`[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code\nunits.\n\nWhen omitted, the client SHOULD insert `insertText` at the cursor.\n\nNote: this range refers to positions in the *current* input. The\nattachment's own `rangeStart`/`rangeEnd` (when present) refer to\npositions in the final {@link Message.text} after the item is\naccepted."
+          "type": "integer",
+          "description": "If defined, the start of the range in the input's `text` that is replaced\nby `insertText`. The range is the half-open interval\n`[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code\nunits.\n\nWhen omitted, the client SHOULD insert `insertText` at the cursor.\n\nNote: this range refers to positions in the *current* input. The\nattachment's own `rangeStart`/`rangeEnd` (when present) refer to\npositions in the final {@link Message.text} after the item is\naccepted.",
+          "minimum": 0
         },
         "rangeEnd": {
-          "type": "number",
-          "description": "The end of the range in the input's `text` that is replaced by\n`insertText`. See {@link rangeStart}."
+          "type": "integer",
+          "description": "The end of the range in the input's `text` that is replaced by\n`insertText`. See {@link rangeStart}.",
+          "minimum": 1
         },
         "attachment": {
           "$ref": "#/$defs/MessageAttachment",
@@ -8355,6 +8835,34 @@
     "CreateTcpConnectionResult": {
       "type": "object",
       "description": "Result of the `createTcpConnection` command.\n\nAn empty object on success.\n\nStability: 1.0 - Early development.",
+      "properties": {}
+    },
+    "CreateSearchParams": {
+      "type": "object",
+      "description": "Starts a search on the host.\n\nThe client chooses the channel URI and then subscribes to it to receive the\nsearch's {@link SearchState} and its results. The client replaces the query\nby dispatching {@link SearchQueryChangedAction | `search/queryChanged`},\nand cancels the search by unsubscribing.\n\nThe client MUST NOT send this command unless `InitializeResult.search` is\npresent, and MUST NOT include a target whose kind is not listed in\n{@link SearchCapability.targets}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The client-chosen URI for the new channel, for example `ahp-search:/<uuid>`."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "query": {
+          "$ref": "#/$defs/SearchQuery",
+          "description": "What to search for and where."
+        }
+      },
+      "required": [
+        "channel",
+        "query"
+      ]
+    },
+    "CreateSearchResult": {
+      "type": "object",
+      "description": "Result of the `createSearch` command.\n\nAn empty object on success.\n\nStability: 1.0 - Early development.",
       "properties": {}
     },
     "URI": {
@@ -9138,6 +9646,75 @@
       ],
       "description": "Discriminated lifecycle of an automation run."
     },
+    "SearchTargetKind": {
+      "enum": [
+        "fileNames",
+        "fileText",
+        "sessions",
+        "chatMessages"
+      ],
+      "type": "string",
+      "description": "Discriminant for {@link SearchTarget}."
+    },
+    "SearchTarget": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/FileNamesSearchTarget"
+        },
+        {
+          "$ref": "#/$defs/FileTextSearchTarget"
+        },
+        {
+          "$ref": "#/$defs/SessionsSearchTarget"
+        },
+        {
+          "$ref": "#/$defs/ChatMessagesSearchTarget"
+        }
+      ],
+      "description": "One place to search."
+    },
+    "SearchCompletionReason": {
+      "enum": [
+        "exhausted",
+        "limitReached"
+      ],
+      "type": "string",
+      "description": "Why a search completed."
+    },
+    "SearchResult": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/FileNameSearchResult"
+        },
+        {
+          "$ref": "#/$defs/FileTextSearchResult"
+        },
+        {
+          "$ref": "#/$defs/SessionSearchResult"
+        },
+        {
+          "$ref": "#/$defs/ChatMessageSearchResult"
+        }
+      ],
+      "description": "One search match."
+    },
+    "SearchLifecycleState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/SearchPendingLifecycleState"
+        },
+        {
+          "$ref": "#/$defs/SearchRunningLifecycleState"
+        },
+        {
+          "$ref": "#/$defs/SearchCompletedLifecycleState"
+        },
+        {
+          "$ref": "#/$defs/SearchFailedLifecycleState"
+        }
+      ],
+      "description": "Discriminated lifecycle of a search."
+    },
     "PathStyle": {
       "enum": [
         "posix",
@@ -9474,6 +10051,15 @@
         },
         {
           "$ref": "#/$defs/ResourceWatchChangedAction"
+        },
+        {
+          "$ref": "#/$defs/SearchQueryChangedAction"
+        },
+        {
+          "$ref": "#/$defs/SearchResultsChangedAction"
+        },
+        {
+          "$ref": "#/$defs/SearchLifecycleChangedAction"
         },
         {
           "$ref": "#/$defs/AutomationCreateRequestedAction"
@@ -11857,6 +12443,64 @@
       "required": [
         "type",
         "changes"
+      ]
+    },
+    "SearchQueryChangedAction": {
+      "type": "object",
+      "description": "Replaces the search's query and restarts the search.\n\nKeeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to\n{@link SearchLifecycleStatus.Pending | pending}. The old results stay\nvisible until the host replaces them, so the client does not flash an empty\nlist.\n\nAfter the host applies this action, it stops the previous search and drops\nany of its results that it has not dispatched yet. The host MUST then\ndispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with\n`replace: true` before any other search action. The replacement can keep\nold results that still match the new query, and can be empty. If the new\nquery is not valid,\nfor example because it contains an invalid regular expression, the host\nreplaces the results with an empty list and then changes the lifecycle to\n{@link SearchLifecycleStatus.Failed | failed}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "search/queryChanged"
+        },
+        "query": {
+          "$ref": "#/$defs/SearchQuery",
+          "description": "The new query."
+        }
+      },
+      "required": [
+        "type",
+        "query"
+      ]
+    },
+    "SearchResultsChangedAction": {
+      "type": "object",
+      "description": "Adds results to {@link SearchState.results}, or replaces them.\n\nBy default, the reducer appends `results`. Set `replace` to `true` to\nreplace every result instead; if {@link SearchState.lifecycle} is\n{@link SearchLifecycleStatus.Pending | pending}, a replacement also changes\nit to {@link SearchLifecycleStatus.Running | running}.\n\nThe host MUST dispatch a replacement first after a\n{@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also\nreplace the results at other times, for example to re-rank them, to remove\nduplicates, or to update a completed search when a watched file changes.\nThe host MUST NOT dispatch an empty `results` list unless `replace` is\n`true`.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "search/resultsChanged"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchResult"
+          },
+          "description": "The results to append, in the order the host found them, or the replacement results."
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "When `true`, replaces every result instead of appending."
+        }
+      },
+      "required": [
+        "type",
+        "results"
+      ]
+    },
+    "SearchLifecycleChangedAction": {
+      "type": "object",
+      "description": "Replaces {@link SearchState.lifecycle}.\n\nThe host dispatches this to complete or fail a search, or to move a\ncompleted search back to {@link SearchLifecycleStatus.Running | running} when it\nsearches again, for example after a watched file changes. The host MUST NOT\nchange the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only\n{@link SearchQueryChangedAction | `search/queryChanged`} does that.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "search/lifecycleChanged"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/SearchLifecycleState",
+          "description": "The new lifecycle."
+        }
+      },
+      "required": [
+        "type",
+        "lifecycle"
       ]
     },
     "AutomationCreateRequestedAction": {

@@ -57,6 +57,7 @@ import {
 import { PROTOCOL_VERSION } from '../src/types/version/registry.js';
 import { SessionLifecycle, SessionStatus } from '../src/types/channels-session/state.js';
 import type { CanvasState } from '../src/types/channels-canvas/state.js';
+import { SearchCompletionReason, SearchLifecycleStatus, SearchTargetKind, type SearchState } from '../src/types/channels-search/state.js';
 import { ActionType, type ActionEnvelope } from '../src/types/common/actions.js';
 
 const ROOT = 'ahp-root://' as const;
@@ -405,6 +406,39 @@ test('MultiHostStateMirror isolates canvas updates and clears canvas state on re
   mirror.reset();
   assert.deepEqual({ updated, afterHostReset, remaining: mirror.canvases.size }, {
     updated: unavailable,
+    afterHostReset: { removed: undefined, retained: initial },
+    remaining: 0,
+  });
+});
+
+test('MultiHostStateMirror isolates search updates and clears search state on reset', () => {
+  const mirror = new MultiHostStateMirror();
+  const resource = 'ahp-search:/s1';
+  const initial: SearchState = {
+    query: { text: 'parseConfig', targets: [{ kind: SearchTargetKind.Sessions }] },
+    results: [],
+    lifecycle: { status: SearchLifecycleStatus.Pending },
+  };
+  mirror.applySnapshot('host-a', { resource, state: initial, fromSeq: 1 });
+  mirror.applySnapshot('host-b', { resource, state: initial, fromSeq: 1 });
+  mirror.applyEnvelope('host-a', {
+    channel: resource,
+    serverSeq: 2,
+    origin: undefined,
+    action: {
+      type: ActionType.SearchLifecycleChanged,
+      lifecycle: { status: SearchLifecycleStatus.Completed, reason: SearchCompletionReason.LimitReached },
+    },
+  });
+  const updated = mirror.getSearch('host-a', resource)?.lifecycle;
+  mirror.resetHost('host-a');
+  const afterHostReset = {
+    removed: mirror.getSearch('host-a', resource),
+    retained: mirror.getSearch('host-b', resource),
+  };
+  mirror.reset();
+  assert.deepEqual({ updated, afterHostReset, remaining: mirror.searches.size }, {
+    updated: { status: SearchLifecycleStatus.Completed, reason: SearchCompletionReason.LimitReached },
     afterHostReset: { removed: undefined, retained: initial },
     remaining: 0,
   });

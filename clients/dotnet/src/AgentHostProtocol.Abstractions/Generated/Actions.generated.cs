@@ -225,6 +225,12 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ResourceWatchChanged = new ActionType("resourceWatch/changed");
 
+    public static readonly ActionType SearchQueryChanged = new ActionType("search/queryChanged");
+
+    public static readonly ActionType SearchResultsChanged = new ActionType("search/resultsChanged");
+
+    public static readonly ActionType SearchLifecycleChanged = new ActionType("search/lifecycleChanged");
+
     public static readonly ActionType AutomationCreateRequested = new ActionType("automation/createRequested");
 
     public static readonly ActionType AutomationUpdateRequested = new ActionType("automation/updateRequested");
@@ -2548,6 +2554,76 @@ public sealed record ResourceWatchChangedAction
     public JsonElement Changes { get; init; }
 }
 
+/// <summary>Replaces the search's query and restarts the search.
+///
+/// Keeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to
+/// {@link SearchLifecycleStatus.Pending | pending}. The old results stay
+/// visible until the host replaces them, so the client does not flash an empty
+/// list.
+///
+/// After the host applies this action, it stops the previous search and drops
+/// any of its results that it has not dispatched yet. The host MUST then
+/// dispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with
+/// `replace: true` before any other search action. The replacement can keep
+/// old results that still match the new query, and can be empty. If the new
+/// query is not valid,
+/// for example because it contains an invalid regular expression, the host
+/// replaces the results with an empty list and then changes the lifecycle to
+/// {@link SearchLifecycleStatus.Failed | failed}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchQueryChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.SearchQueryChanged;
+
+    /// <summary>The new query.</summary>
+    public required SearchQuery Query { get; init; }
+}
+
+/// <summary>Adds results to {@link SearchState.results}, or replaces them.
+///
+/// By default, the reducer appends `results`. Set `replace` to `true` to
+/// replace every result instead; if {@link SearchState.lifecycle} is
+/// {@link SearchLifecycleStatus.Pending | pending}, a replacement also changes
+/// it to {@link SearchLifecycleStatus.Running | running}.
+///
+/// The host MUST dispatch a replacement first after a
+/// {@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also
+/// replace the results at other times, for example to re-rank them, to remove
+/// duplicates, or to update a completed search when a watched file changes.
+/// The host MUST NOT dispatch an empty `results` list unless `replace` is
+/// `true`.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchResultsChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.SearchResultsChanged;
+
+    /// <summary>The results to append, in the order the host found them, or the replacement results.</summary>
+    public required List<SearchResult> Results { get; init; }
+
+    /// <summary>When `true`, replaces every result instead of appending.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Replace { get; init; }
+}
+
+/// <summary>Replaces {@link SearchState.lifecycle}.
+///
+/// The host dispatches this to complete or fail a search, or to move a
+/// completed search back to {@link SearchLifecycleStatus.Running | running} when it
+/// searches again, for example after a watched file changes. The host MUST NOT
+/// change the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only
+/// {@link SearchQueryChangedAction | `search/queryChanged`} does that.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchLifecycleChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.SearchLifecycleChanged;
+
+    /// <summary>The new lifecycle.</summary>
+    public required SearchLifecycleState Lifecycle { get; init; }
+}
+
 /// <summary>Upsert an {@link Annotation} in the annotations channel — adds a new
 /// annotation, or replaces an existing one identified by
 /// {@link Annotation.id}.
@@ -2996,6 +3072,9 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["terminal/commandExecuted"] = typeof(TerminalCommandExecutedAction),
         ["terminal/commandFinished"] = typeof(TerminalCommandFinishedAction),
         ["resourceWatch/changed"] = typeof(ResourceWatchChangedAction),
+        ["search/queryChanged"] = typeof(SearchQueryChangedAction),
+        ["search/resultsChanged"] = typeof(SearchResultsChangedAction),
+        ["search/lifecycleChanged"] = typeof(SearchLifecycleChangedAction),
         ["annotations/set"] = typeof(AnnotationsSetAction),
         ["annotations/removed"] = typeof(AnnotationsRemovedAction),
         ["annotations/entrySet"] = typeof(AnnotationsEntrySetAction),

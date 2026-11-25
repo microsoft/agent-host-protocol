@@ -53,6 +53,41 @@ public sealed class MultiHostStateMirrorTests
         Assert.Equal(new[] { false, false, true }, new[] { resourceFound, hostFound, otherFound });
     }
 
+    [Fact]
+    public void SearchState_IsIsolatedAndDroppedWithItsResourceAndHost()
+    {
+        var mirror = new MultiHostStateMirror();
+        const string uri = "ahp-search:/s1";
+        SearchState State() => new()
+        {
+            Query = new SearchQuery
+            {
+                Text = "parseConfig",
+                Targets = new List<SearchTarget> { new(new SessionsSearchTarget()) },
+            },
+            Results = new List<SearchResult>(),
+            Lifecycle = new SearchLifecycleState(new SearchPendingLifecycleState()),
+        };
+        mirror.PutSearch("host-a", uri, State());
+        mirror.PutSearch("host-b", uri, State());
+        var (target, _) = mirror.Search("host-a", uri);
+        Reducers.ApplyToSearch(target!, new StateAction(new SearchLifecycleChangedAction
+        {
+            Type = ActionType.SearchLifecycleChanged,
+            Lifecycle = new SearchLifecycleState(new SearchCompletedLifecycleState { Reason = SearchCompletionReason.Exhausted }),
+        }));
+        var (retained, _) = mirror.Search("host-b", uri);
+        var targeted = new[] { target!.Lifecycle.Value is SearchCompletedLifecycleState, retained!.Lifecycle.Value is SearchCompletedLifecycleState };
+        mirror.DropResource("host-a", uri);
+        var (_, resourceFound) = mirror.Search("host-a", uri);
+        mirror.PutSearch("host-a", uri, State());
+        mirror.DropHost("host-a");
+        var (_, hostFound) = mirror.Search("host-a", uri);
+        var (_, otherFound) = mirror.Search("host-b", uri);
+        Assert.Equal(new[] { true, false }, targeted);
+        Assert.Equal(new[] { false, false, true }, new[] { resourceFound, hostFound, otherFound });
+    }
+
     // A minimal-but-valid RootState carrying a distinguishing active-session
     // count so two hosts' roots are observably different snapshots.
     private static RootState Root(long activeSessions) => new()

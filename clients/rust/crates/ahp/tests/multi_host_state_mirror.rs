@@ -12,12 +12,14 @@ use ahp::hosts::{HostId, HostSubscriptionEvent};
 use ahp::{HostedResourceKey, MultiHostStateMirror, SubscriptionEvent};
 use ahp_types::actions::{
     ActionEnvelope, CanvasStateChangedAction, RootActiveSessionsChangedAction,
-    RootAgentsChangedAction, SessionTitleChangedAction, StateAction,
+    RootAgentsChangedAction, SearchLifecycleChangedAction, SessionTitleChangedAction, StateAction,
 };
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
-    AgentInfo, CanvasState, RootState, SessionLifecycle, SessionState, SessionStatus,
-    SessionSummary, Snapshot, SnapshotState,
+    AgentInfo, CanvasState, RootState, SearchCompletedLifecycleState, SearchCompletionReason,
+    SearchLifecycleState, SearchPendingLifecycleState, SearchQuery, SearchState, SearchTarget,
+    SessionLifecycle, SessionState, SessionStatus, SessionSummary, SessionsSearchTarget, Snapshot,
+    SnapshotState,
 };
 
 fn agent(provider: &str) -> AgentInfo {
@@ -212,6 +214,72 @@ fn canvases_are_reduced_and_reset_per_host() {
     assert_eq!(
         (targeted, reset, mirror.canvases().is_empty()),
         ((None, initial.uri), (false, true), true),
+    );
+}
+
+#[test]
+fn searches_are_reduced_and_reset_per_host() {
+    let mut mirror = MultiHostStateMirror::new();
+    let uri = "ahp-search:/s1";
+    let alpha = HostId::new("alpha");
+    let beta = HostId::new("beta");
+    let snapshot = Snapshot {
+        resource: uri.into(),
+        state: SnapshotState::Search(Box::new(SearchState {
+            query: SearchQuery {
+                text: "parseConfig".into(),
+                match_case: None,
+                whole_word: None,
+                is_regex: None,
+                fuzzy: None,
+                targets: vec![SearchTarget::Sessions(SessionsSearchTarget {
+                    extra: Default::default(),
+                })],
+                max_results: None,
+                extra: Default::default(),
+            },
+            results: vec![],
+            lifecycle: SearchLifecycleState::Pending(SearchPendingLifecycleState {}),
+        })),
+        from_seq: 1,
+    };
+    mirror.apply_snapshot(&alpha, &snapshot);
+    mirror.apply_snapshot(&beta, &snapshot);
+    mirror.apply_envelope(
+        &alpha,
+        &ActionEnvelope {
+            channel: uri.into(),
+            action: StateAction::SearchLifecycleChanged(SearchLifecycleChangedAction {
+                lifecycle: SearchLifecycleState::Completed(SearchCompletedLifecycleState {
+                    reason: SearchCompletionReason::Exhausted,
+                }),
+            }),
+            server_seq: 2,
+            origin: None,
+            rejection_reason: None,
+        },
+    );
+    let alpha_key = HostedResourceKey::new(alpha.clone(), uri);
+    let beta_key = HostedResourceKey::new(beta, uri);
+    let targeted = (
+        matches!(
+            mirror.searches()[&alpha_key].lifecycle,
+            SearchLifecycleState::Completed(_)
+        ),
+        matches!(
+            mirror.searches()[&beta_key].lifecycle,
+            SearchLifecycleState::Completed(_)
+        ),
+    );
+    mirror.reset_host(&alpha);
+    let reset = (
+        mirror.searches().contains_key(&alpha_key),
+        mirror.searches().contains_key(&beta_key),
+    );
+    mirror.reset();
+    assert_eq!(
+        (targeted, reset, mirror.searches().is_empty()),
+        ((true, false), (false, true), true),
     );
 }
 

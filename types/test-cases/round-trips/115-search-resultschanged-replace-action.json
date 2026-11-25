@@ -1,0 +1,68 @@
+{
+  "name": "search-resultschanged-replace-action",
+  "group": "A",
+  "description": "The search/resultsChanged action preserves replace and its replacement results.",
+  "type": "StateAction",
+  "input": {
+    "type": "search/resultsChanged",
+    "results": [
+      {
+        "kind": "fileText",
+        "resource": "file:///workspace/c.ts",
+        "match": {
+          "text": "parseConfigFile(path)",
+          "highlights": [
+            {
+              "rangeStart": 0,
+              "rangeEnd": 15
+            }
+          ]
+        },
+        "range": {
+          "start": {
+            "line": 2,
+            "character": 0
+          },
+          "end": {
+            "line": 2,
+            "character": 15
+          }
+        },
+        "score": 0.75
+      }
+    ],
+    "replace": true
+  },
+  "acceptableOutputs": [
+    {
+      "type": "search/resultsChanged",
+      "results": [
+        {
+          "kind": "fileText",
+          "resource": "file:///workspace/c.ts",
+          "match": {
+            "text": "parseConfigFile(path)",
+            "highlights": [
+              {
+                "rangeStart": 0,
+                "rangeEnd": 15
+              }
+            ]
+          },
+          "range": {
+            "start": {
+              "line": 2,
+              "character": 0
+            },
+            "end": {
+              "line": 2,
+              "character": 15
+            }
+          },
+          "score": 0.75
+        }
+      ],
+      "replace": true
+    }
+  ]
+}

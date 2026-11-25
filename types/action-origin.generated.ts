@@ -103,6 +103,9 @@ import type {
   TerminalCommandExecutedAction,
   TerminalCommandFinishedAction,
   ResourceWatchChangedAction,
+  SearchQueryChangedAction,
+  SearchResultsChangedAction,
+  SearchLifecycleChangedAction,
   AutomationCreateRequestedAction,
   AutomationUpdateRequestedAction,
   AutomationSetAction,
@@ -417,6 +420,24 @@ export type ServerResourceWatchAction =
   | ResourceWatchChangedAction
 ;
 
+/** Union of all search-scoped actions. */
+export type SearchAction =
+  | SearchQueryChangedAction
+  | SearchResultsChangedAction
+  | SearchLifecycleChangedAction
+;
+
+/** Union of search actions that clients may dispatch. */
+export type ClientSearchAction =
+  | SearchQueryChangedAction
+;
+
+/** Union of search actions that only the server may produce. */
+export type ServerSearchAction =
+  | SearchResultsChangedAction
+  | SearchLifecycleChangedAction
+;
+
 /** Union of all automation-scoped actions. */
 export type AutomationAction =
   | AutomationCreateRequestedAction
@@ -566,6 +587,9 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.TerminalCommandExecuted]: false,
   [ActionType.TerminalCommandFinished]: false,
   [ActionType.ResourceWatchChanged]: false,
+  [ActionType.SearchQueryChanged]: true,
+  [ActionType.SearchResultsChanged]: false,
+  [ActionType.SearchLifecycleChanged]: false,
   [ActionType.AutomationCreateRequested]: true,
   [ActionType.AutomationUpdateRequested]: true,
   [ActionType.AutomationSet]: false,

@@ -1309,6 +1309,33 @@ public func canvasReducer(state: CanvasState, action: StateAction) -> CanvasStat
     return a.canvas
 }
 
+// MARK: - Search Reducer
+
+/// Pure reducer for search state. Handles the `search/*` actions.
+public func searchReducer(state: SearchState, action: StateAction) -> SearchState {
+    var next = state
+    switch action {
+    case .searchQueryChanged(let a):
+        next.query = a.query
+        next.lifecycle = .pending(SearchPendingLifecycleState(status: .pending))
+    case .searchResultsChanged(let a):
+        guard a.replace == true else {
+            guard !a.results.isEmpty else { return state }
+            next.results.append(contentsOf: a.results)
+            return next
+        }
+        next.results = a.results
+        if case .pending = state.lifecycle {
+            next.lifecycle = .running(SearchRunningLifecycleState(status: .running))
+        }
+    case .searchLifecycleChanged(let a):
+        next.lifecycle = a.lifecycle
+    default:
+        return state
+    }
+    return next
+}
+
 // MARK: - Terminal Reducer
 
 /// Pure reducer for terminal state. Handles all terminal-scoped actions.

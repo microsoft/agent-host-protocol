@@ -1,0 +1,218 @@
+{
+  "description": "a replacing search/resultsChanged after search/queryChanged replaces results and moves pending to running, then appends add more",
+  "reducer": "search",
+  "initial": {
+    "query": {
+      "text": "parseConfig",
+      "targets": [
+        {
+          "kind": "fileText",
+          "roots": [
+            "file:///workspace"
+          ]
+        }
+      ]
+    },
+    "results": [
+      {
+        "kind": "fileText",
+        "resource": "file:///workspace/a.ts",
+        "match": {
+          "text": "parseConfig()",
+          "highlights": [
+            {
+              "rangeStart": 0,
+              "rangeEnd": 11
+            }
+          ]
+        },
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 11
+          }
+        }
+      },
+      {
+        "kind": "fileText",
+        "resource": "file:///workspace/b.ts",
+        "match": {
+          "text": "const x = parseConfig(raw);",
+          "highlights": [
+            {
+              "rangeStart": 10,
+              "rangeEnd": 21
+            }
+          ]
+        },
+        "range": {
+          "start": {
+            "line": 4,
+            "character": 10
+          },
+          "end": {
+            "line": 4,
+            "character": 21
+          }
+        },
+        "score": 0.5
+      }
+    ],
+    "lifecycle": {
+      "status": "running"
+    }
+  },
+  "actions": [
+    {
+      "type": "search/queryChanged",
+      "query": {
+        "text": "parseConfigFile",
+        "targets": [
+          {
+            "kind": "fileText",
+            "roots": [
+              "file:///workspace"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "search/resultsChanged",
+      "results": [
+        {
+          "kind": "fileText",
+          "resource": "file:///workspace/b.ts",
+          "match": {
+            "text": "const x = parseConfig(raw);",
+            "highlights": [
+              {
+                "rangeStart": 10,
+                "rangeEnd": 21
+              }
+            ]
+          },
+          "range": {
+            "start": {
+              "line": 4,
+              "character": 10
+            },
+            "end": {
+              "line": 4,
+              "character": 21
+            }
+          },
+          "score": 0.5
+        }
+      ],
+      "replace": true
+    },
+    {
+      "type": "search/resultsChanged",
+      "results": [
+        {
+          "kind": "fileText",
+          "resource": "file:///workspace/c.ts",
+          "match": {
+            "text": "parseConfigFile(path)",
+            "highlights": [
+              {
+                "rangeStart": 0,
+                "rangeEnd": 15
+              }
+            ]
+          },
+          "range": {
+            "start": {
+              "line": 2,
+              "character": 0
+            },
+            "end": {
+              "line": 2,
+              "character": 15
+            }
+          },
+          "score": 0.75
+        }
+      ]
+    },
+    {
+      "type": "search/lifecycleChanged",
+      "lifecycle": {
+        "status": "completed",
+        "reason": "exhausted"
+      }
+    }
+  ],
+  "expected": {
+    "query": {
+      "text": "parseConfigFile",
+      "targets": [
+        {
+          "kind": "fileText",
+          "roots": [
+            "file:///workspace"
+          ]
+        }
+      ]
+    },
+    "results": [
+      {
+        "kind": "fileText",
+        "resource": "file:///workspace/b.ts",
+        "match": {
+          "text": "const x = parseConfig(raw);",
+          "highlights": [
+            {
+              "rangeStart": 10,
+              "rangeEnd": 21
+            }
+          ]
+        },
+        "range": {
+          "start": {
+            "line": 4,
+            "character": 10
+          },
+          "end": {
+            "line": 4,
+            "character": 21
+          }
+        },
+        "score": 0.5
+      },
+      {
+        "kind": "fileText",
+        "resource": "file:///workspace/c.ts",
+        "match": {
+          "text": "parseConfigFile(path)",
+          "highlights": [
+            {
+              "rangeStart": 0,
+              "rangeEnd": 15
+            }
+          ]
+        },
+        "range": {
+          "start": {
+            "line": 2,
+            "character": 0
+          },
+          "end": {
+            "line": 2,
+            "character": 15
+          }
+        },
+        "score": 0.75
+      }
+    ],
+    "lifecycle": {
+      "status": "completed",
+      "reason": "exhausted"
+    }
+  }
+}

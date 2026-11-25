@@ -527,6 +527,13 @@ data class InitializeResult(
      */
     val tcpConnections: TcpConnectionsCapability? = null,
     /**
+     * Present when the host supports `createSearch`, which searches files,
+     * sessions, and chats and streams the results on an `ahp-search:` channel.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val search: SearchCapability? = null,
+    /**
      * Present when chats in one session may be backed by different agent
      * providers (see {@link CreateChatParams.provider} and
      * {@link ChatState.provider}).
@@ -1573,6 +1580,48 @@ data class CreateResourceWatchResult(
      */
     val channel: String
 )
+
+/**
+ * Starts a search on the host.
+ *
+ * The client chooses the channel URI and then subscribes to it to receive the
+ * search's {@link SearchState} and its results. The client replaces the query
+ * by dispatching {@link SearchQueryChangedAction | `search/queryChanged`},
+ * and cancels the search by unsubscribing.
+ *
+ * The client MUST NOT send this command unless `InitializeResult.search` is
+ * present, and MUST NOT include a target whose kind is not listed in
+ * {@link SearchCapability.targets}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class CreateSearchParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * What to search for and where.
+     */
+    val query: SearchQuery
+)
+
+/**
+ * Result of the `createSearch` command.
+ *
+ * An empty object on success.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+class CreateSearchResult
 
 /**
  * Requests that the host load older historical turns into a chat state.

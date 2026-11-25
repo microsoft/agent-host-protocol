@@ -171,6 +171,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | SearchState | EmptyState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -863,6 +864,8 @@ const STATE_ENUMS = [
   'AutomationDisableConditionKind',
   'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'SearchTargetKind', 'SearchResultKind',
+  'SearchLifecycleStatus', 'SearchCompletionReason',
 ];
 
 /**
@@ -1045,6 +1048,23 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationCancelledRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState' },
+  { name: 'SearchCapability' },
+  { name: 'SearchQuery' },
+  { name: 'FileNamesSearchTarget', omitDiscriminants: true },
+  { name: 'FileTextSearchTarget', omitDiscriminants: true },
+  { name: 'SessionsSearchTarget', omitDiscriminants: true },
+  { name: 'ChatMessagesSearchTarget', omitDiscriminants: true },
+  { name: 'SearchHighlight' },
+  { name: 'SearchMatch' },
+  { name: 'FileNameSearchResult', omitDiscriminants: true },
+  { name: 'FileTextSearchResult', omitDiscriminants: true },
+  { name: 'SessionSearchResult', omitDiscriminants: true },
+  { name: 'ChatMessageSearchResult', omitDiscriminants: true },
+  { name: 'SearchPendingLifecycleState', omitDiscriminants: true },
+  { name: 'SearchRunningLifecycleState', omitDiscriminants: true },
+  { name: 'SearchCompletedLifecycleState', omitDiscriminants: true },
+  { name: 'SearchFailedLifecycleState', omitDiscriminants: true },
+  { name: 'SearchState' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1361,6 +1381,45 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
+const SEARCH_TARGET_UNION: UnionConfig = {
+  name: 'SearchTarget',
+  discriminantField: 'kind',
+  doc: 'One place to search.',
+  variants: [
+    { variantName: 'FileNames', innerType: 'FileNamesSearchTarget', wireValue: 'fileNames' },
+    { variantName: 'FileText', innerType: 'FileTextSearchTarget', wireValue: 'fileText' },
+    { variantName: 'Sessions', innerType: 'SessionsSearchTarget', wireValue: 'sessions' },
+    { variantName: 'ChatMessages', innerType: 'ChatMessagesSearchTarget', wireValue: 'chatMessages' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_RESULT_UNION: UnionConfig = {
+  name: 'SearchResult',
+  discriminantField: 'kind',
+  doc: 'One search match.',
+  variants: [
+    { variantName: 'FileName', innerType: 'FileNameSearchResult', wireValue: 'fileName' },
+    { variantName: 'FileText', innerType: 'FileTextSearchResult', wireValue: 'fileText' },
+    { variantName: 'Session', innerType: 'SessionSearchResult', wireValue: 'session' },
+    { variantName: 'ChatMessage', innerType: 'ChatMessageSearchResult', wireValue: 'chatMessage' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_LIFECYCLE_UNION: UnionConfig = {
+  name: 'SearchLifecycleState',
+  discriminantField: 'status',
+  doc: 'Lifecycle of a search.',
+  variants: [
+    { variantName: 'Pending', innerType: 'SearchPendingLifecycleState', wireValue: 'pending' },
+    { variantName: 'Running', innerType: 'SearchRunningLifecycleState', wireValue: 'running' },
+    { variantName: 'Completed', innerType: 'SearchCompletedLifecycleState', wireValue: 'completed' },
+    { variantName: 'Failed', innerType: 'SearchFailedLifecycleState', wireValue: 'failed' },
+  ],
+  unknown: true,
+};
+
 function generateChatOrigin(project: Project): string {
   const originKind = findEnum(project, 'ChatOriginKind');
   if (!originKind) throw new Error('ChatOriginKind enum not found');
@@ -1432,6 +1491,7 @@ pub enum SnapshotState {
     Annotations(Box<AnnotationsState>),
     Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
+    Search(Box<SearchState>),
     Root(Box<RootState>),
     /// A state that this version does not recognize, kept as raw JSON so it
     /// re-encodes unchanged.
@@ -1701,6 +1761,12 @@ where D: serde::Deserializer<'de>,
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_TARGET_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_RESULT_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_LIFECYCLE_UNION));
+  lines.push('');
   lines.push(generateSnapshotState());
   lines.push('');
 
@@ -1817,6 +1883,9 @@ const ACTION_VARIANTS: {
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'search/queryChanged', variantName: 'SearchQueryChanged', tsInterface: 'SearchQueryChangedAction' },
+  { type: 'search/resultsChanged', variantName: 'SearchResultsChanged', tsInterface: 'SearchResultsChangedAction' },
+  { type: 'search/lifecycleChanged', variantName: 'SearchLifecycleChanged', tsInterface: 'SearchLifecycleChangedAction' },
   { type: 'automation/createRequested', variantName: 'AutomationCreateRequested', tsInterface: 'AutomationCreateRequestedAction', boxed: true },
   { type: 'automation/updateRequested', variantName: 'AutomationUpdateRequested', tsInterface: 'AutomationUpdateRequestedAction', boxed: true },
   { type: 'automation/set', variantName: 'AutomationSet', tsInterface: 'AutomationSetAction', boxed: true },
@@ -1903,7 +1972,7 @@ impl Serialize for ChatErrorAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, MaterializedTurn, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, MaterializedTurn, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary, SearchQuery, SearchLifecycleState, SearchResult};');
   lines.push('');
   // ActionType enum
   lines.push('// ─── ActionType ──────────────────────────────────────────────────────\n');
@@ -2047,6 +2116,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'ResourceMkdirParams' }, { name: 'ResourceMkdirResult' },
   { name: 'ResourceRequestParams' }, { name: 'ResourceRequestResult' },
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
+  { name: 'CreateSearchParams' }, { name: 'CreateSearchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget', omitDiscriminants: true },
@@ -2107,7 +2177,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, SearchCapability, SearchQuery, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -2649,6 +2719,11 @@ function checkExhaustiveness(project: Project): void {
     'TerminalLifecycleState',       // TERMINAL_LIFECYCLE_STATE_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
     'BackgroundWork',               // BACKGROUND_WORK_UNION discriminated union
+    'SearchTarget',                 // SEARCH_TARGET_UNION discriminated union
+    'SearchResult',                 // SEARCH_RESULT_UNION discriminated union
+    'SearchLifecycleState',              // SEARCH_LIFECYCLE_UNION discriminated union
+    'FileSearchTargetBase',         // base interface, flattened into the file search target structs via `extends`
+    'SearchResultBase',             // base interface, flattened into the search result structs via `extends`
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'ReconnectResult',
     'SessionOrigin',

@@ -2455,6 +2455,56 @@ public static class Reducers
             : ReduceOutcome.OutOfScope;
     }
 
+    // ─── Search Reducer ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Applies <paramref name="action"/> to the <see cref="SearchState"/> in
+    /// place. Returns <see cref="ReduceOutcome.OutOfScope"/> for actions that
+    /// target a different state tree.
+    /// </summary>
+    public static ReduceOutcome ApplyToSearch(SearchState state, StateAction action)
+    {
+        Guard.ThrowIfNull(state, nameof(state));
+        Guard.ThrowIfNull(action, nameof(action));
+        switch (action.Value)
+        {
+            case SearchQueryChangedAction a:
+                {
+                    state.Query = a.Query;
+                    state.Lifecycle = new SearchLifecycleState(new SearchPendingLifecycleState());
+                    return ReduceOutcome.Applied;
+                }
+            case SearchResultsChangedAction a:
+                {
+                    if (a.Replace != true)
+                    {
+                        if (a.Results.Count == 0)
+                        {
+                            return ReduceOutcome.NoOp;
+                        }
+
+                        state.Results.AddRange(a.Results);
+                        return ReduceOutcome.Applied;
+                    }
+
+                    state.Results = new List<SearchResult>(a.Results);
+                    if (state.Lifecycle.Value is SearchPendingLifecycleState)
+                    {
+                        state.Lifecycle = new SearchLifecycleState(new SearchRunningLifecycleState());
+                    }
+
+                    return ReduceOutcome.Applied;
+                }
+            case SearchLifecycleChangedAction a:
+                {
+                    state.Lifecycle = a.Lifecycle;
+                    return ReduceOutcome.Applied;
+                }
+            default:
+                return ReduceOutcome.OutOfScope;
+        }
+    }
+
     // ─── Annotations Reducer ───────────────────────────────────────────────
 
     /// <summary>

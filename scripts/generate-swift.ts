@@ -129,6 +129,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | SearchState | EmptyState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -741,6 +742,8 @@ const STATE_ENUMS = [
   'AutomationDisableConditionKind',
   'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'SearchTargetKind', 'SearchResultKind',
+  'SearchLifecycleStatus', 'SearchCompletionReason',
 ];
 
 const STATE_STRUCTS = [
@@ -818,6 +821,12 @@ const STATE_STRUCTS = [
   'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
   'AutomationRunSummary', 'AutomationRunState',
+  'SearchCapability', 'SearchQuery',
+  'FileNamesSearchTarget', 'FileTextSearchTarget', 'SessionsSearchTarget', 'ChatMessagesSearchTarget',
+  'SearchHighlight', 'SearchMatch',
+  'FileNameSearchResult', 'FileTextSearchResult', 'SessionSearchResult', 'ChatMessageSearchResult',
+  'SearchPendingLifecycleState', 'SearchRunningLifecycleState', 'SearchCompletedLifecycleState', 'SearchFailedLifecycleState',
+  'SearchState',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1052,6 +1061,46 @@ const BACKGROUND_WORK_UNION: UnionConfig = {
   ],
 };
 
+const SEARCH_TARGET_UNION: UnionConfig = {
+  name: 'SearchTarget',
+  discriminantField: 'kind',
+  // Open union: future protocol versions may add new search target kinds.
+  allowUnknown: true,
+  variants: [
+    { caseName: 'fileNames', structName: 'FileNamesSearchTarget', discriminantValue: 'fileNames' },
+    { caseName: 'fileText', structName: 'FileTextSearchTarget', discriminantValue: 'fileText' },
+    { caseName: 'sessions', structName: 'SessionsSearchTarget', discriminantValue: 'sessions' },
+    { caseName: 'chatMessages', structName: 'ChatMessagesSearchTarget', discriminantValue: 'chatMessages' },
+  ],
+};
+
+const SEARCH_RESULT_UNION: UnionConfig = {
+  name: 'SearchResult',
+  discriminantField: 'kind',
+  // Open union: future protocol versions may add new search result kinds.
+  allowUnknown: true,
+  variants: [
+    { caseName: 'fileName', structName: 'FileNameSearchResult', discriminantValue: 'fileName' },
+    { caseName: 'fileText', structName: 'FileTextSearchResult', discriminantValue: 'fileText' },
+    { caseName: 'session', structName: 'SessionSearchResult', discriminantValue: 'session' },
+    { caseName: 'chatMessage', structName: 'ChatMessageSearchResult', discriminantValue: 'chatMessage' },
+  ],
+};
+
+const SEARCH_LIFECYCLE_UNION: UnionConfig = {
+  name: 'SearchLifecycleState',
+  discriminantField: 'status',
+  // Open union: future protocol versions may add new search statuses.
+  allowUnknown: true,
+  variants: [
+    { caseName: 'pending', structName: 'SearchPendingLifecycleState', discriminantValue: 'pending' },
+    { caseName: 'running', structName: 'SearchRunningLifecycleState', discriminantValue: 'running' },
+    { caseName: 'completed', structName: 'SearchCompletedLifecycleState', discriminantValue: 'completed' },
+    { caseName: 'failed', structName: 'SearchFailedLifecycleState', discriminantValue: 'failed' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
+
 function generateToolResultContentUnion(): string {
   return `public enum ToolResultContent: Codable, Sendable, Equatable {
     case text(ToolResultTextContent)
@@ -1185,6 +1234,7 @@ public enum SnapshotState: Codable, Sendable, Equatable {
     case annotations(AnnotationsState)
     case automations(AutomationState)
     case automationRun(AutomationRunState)
+    case search(SearchState)
     /// A state that this version does not recognize, kept as raw JSON so it
     /// re-encodes unchanged.
     case unknown(AnyCodable)
@@ -1215,6 +1265,7 @@ ${branches}
         case .annotations(let state): try state.encode(to: encoder)
         case .automations(let state): try state.encode(to: encoder)
         case .automationRun(let state): try state.encode(to: encoder)
+        case .search(let state): try state.encode(to: encoder)
         case .unknown(let raw): try raw.encode(to: encoder)
         }
     }
@@ -1572,6 +1623,12 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_TARGET_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_RESULT_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_LIFECYCLE_UNION));
+  lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1684,6 +1741,9 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'terminal/commandExecuted', caseName: 'terminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', caseName: 'terminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', caseName: 'resourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'search/queryChanged', caseName: 'searchQueryChanged', tsInterface: 'SearchQueryChangedAction' },
+  { type: 'search/resultsChanged', caseName: 'searchResultsChanged', tsInterface: 'SearchResultsChangedAction' },
+  { type: 'search/lifecycleChanged', caseName: 'searchLifecycleChanged', tsInterface: 'SearchLifecycleChangedAction' },
   { type: 'automation/createRequested', caseName: 'automationCreateRequested', tsInterface: 'AutomationCreateRequestedAction' },
   { type: 'automation/updateRequested', caseName: 'automationUpdateRequested', tsInterface: 'AutomationUpdateRequestedAction' },
   { type: 'automation/set', caseName: 'automationSet', tsInterface: 'AutomationSetAction' },
@@ -1921,6 +1981,7 @@ const COMMAND_STRUCTS = [
   'ResourceMkdirParams', 'ResourceMkdirResult',
   'ResourceRequestParams', 'ResourceRequestResult',
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
+  'CreateSearchParams', 'CreateSearchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
   'McpServerAuthenticateTarget',
@@ -2762,6 +2823,11 @@ function checkExhaustiveness(project: Project): void {
     'TerminalLifecycleState',       // TERMINAL_LIFECYCLE_STATE_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
     'BackgroundWork',               // BACKGROUND_WORK_UNION discriminated union
+    'SearchTarget',                 // SEARCH_TARGET_UNION discriminated union
+    'SearchResult',                 // SEARCH_RESULT_UNION discriminated union
+    'SearchLifecycleState',              // SEARCH_LIFECYCLE_UNION discriminated union
+    'FileSearchTargetBase',         // base interface, flattened into the file search target structs via `extends`
+    'SearchResultBase',             // base interface, flattened into the search result structs via `extends`
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()

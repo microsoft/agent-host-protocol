@@ -30,6 +30,7 @@ import type {
 } from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
 import type { TcpConnectionsCapability } from '../channels-tcp/state.js';
+import type { SearchCapability } from '../channels-search/state.js';
 
 // ─── BaseParams ──────────────────────────────────────────────────────────────
 
@@ -376,6 +377,13 @@ export interface InitializeResult {
    * @see {@link /specification/tcp-channel | TCP Channel}
    */
   tcpConnections?: TcpConnectionsCapability;
+  /**
+   * Present when the host supports `createSearch`, which searches files,
+   * sessions, and chats and streams the results on an `ahp-search:` channel.
+   * @stability 1.0
+   * @see {@link /specification/search-channel | Search Channel}
+   */
+  search?: SearchCapability;
   /**
    * Present when chats in one session may be backed by different agent
    * providers (see {@link CreateChatParams.provider} and

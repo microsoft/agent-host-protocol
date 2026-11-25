@@ -15,6 +15,7 @@ export const SNAPSHOT_CHANNELS = [
   { scheme: 'ahp-resource-watch', variant: 'ResourceWatch', type: 'ResourceWatchState' },
   { scheme: 'ahp-annotations', variant: 'Annotations', type: 'AnnotationsState' },
   { scheme: 'ahp-automation-run', variant: 'AutomationRun', type: 'AutomationRunState' },
+  { scheme: 'ahp-search', variant: 'Search', type: 'SearchState' },
   { scheme: 'ahp-tcp', variant: 'Empty', type: 'EmptyState' },
   { scheme: 'ahp-otlp', variant: 'Empty', type: 'EmptyState' },
 ] as const;

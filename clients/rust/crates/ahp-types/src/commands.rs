@@ -18,8 +18,9 @@ use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
     AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits,
     ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription,
-    SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot,
-    SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    SearchCapability, SearchQuery, SessionActiveClient, SessionConfigSchema, SessionSummary,
+    SideChatSelection, Snapshot, SnapshotState, TcpConnectionsCapability, TelemetryCapabilities,
+    TerminalClaim, TextRange, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -445,6 +446,12 @@ pub struct InitializeResult {
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tcp_connections: Option<TcpConnectionsCapability>,
+    /// Present when the host supports `createSearch`, which searches files,
+    /// sessions, and chats and streams the results on an `ahp-search:` channel.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search: Option<SearchCapability>,
     /// Present when chats in one session may be backed by different agent
     /// providers (see {@link CreateChatParams.provider} and
     /// {@link ChatState.provider}).
@@ -1733,6 +1740,40 @@ pub struct CreateResourceWatchResult {
     /// unsubscribes to release the watcher.
     pub channel: Uri,
 }
+
+/// Starts a search on the host.
+///
+/// The client chooses the channel URI and then subscribes to it to receive the
+/// search's {@link SearchState} and its results. The client replaces the query
+/// by dispatching {@link SearchQueryChangedAction | `search/queryChanged`},
+/// and cancels the search by unsubscribing.
+///
+/// The client MUST NOT send this command unless `InitializeResult.search` is
+/// present, and MUST NOT include a target whose kind is not listed in
+/// {@link SearchCapability.targets}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSearchParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// What to search for and where.
+    pub query: SearchQuery,
+}
+
+/// Result of the `createSearch` command.
+///
+/// An empty object on success.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSearchResult {}
 
 /// Requests that the host load older historical turns into a chat state.
 ///

@@ -34,6 +34,7 @@ function readChannelSources(baseName: string): string {
     'channels-changeset',
     'channels-annotations',
     'channels-resource-watch',
+    'channels-search',
     'channels-otlp',
     'channels-tcp',
     'channels-automation',

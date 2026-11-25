@@ -610,6 +610,63 @@ const (
 	AutomationRunOriginKindTrigger AutomationRunOriginKind = "trigger"
 )
 
+// Discriminant for {@link SearchTarget}.
+//
+// Stability: 1.0 - Early development.
+type SearchTargetKind string
+
+const (
+	// File paths.
+	SearchTargetKindFileNames SearchTargetKind = "fileNames"
+	// The text content of files.
+	SearchTargetKindFileText SearchTargetKind = "fileText"
+	// The host's sessions.
+	SearchTargetKindSessions SearchTargetKind = "sessions"
+	// The text of chat requests and responses.
+	SearchTargetKindChatMessages SearchTargetKind = "chatMessages"
+)
+
+// Discriminant for {@link SearchResult}.
+//
+// Stability: 1.0 - Early development.
+type SearchResultKind string
+
+const (
+	SearchResultKindFileName    SearchResultKind = "fileName"
+	SearchResultKindFileText    SearchResultKind = "fileText"
+	SearchResultKindSession     SearchResultKind = "session"
+	SearchResultKindChatMessage SearchResultKind = "chatMessage"
+)
+
+// Lifecycle status of a search.
+//
+// Stability: 1.0 - Early development.
+type SearchLifecycleStatus string
+
+const (
+	// The query changed and the host has not replaced the results yet.
+	// {@link SearchState.results} belong to the previous query.
+	SearchLifecycleStatusPending SearchLifecycleStatus = "pending"
+	// The host is searching.
+	SearchLifecycleStatusRunning SearchLifecycleStatus = "running"
+	// The host found every result for the query.
+	SearchLifecycleStatusCompleted SearchLifecycleStatus = "completed"
+	// The search failed.
+	SearchLifecycleStatusFailed SearchLifecycleStatus = "failed"
+)
+
+// Why a search completed.
+//
+// Stability: 1.0 - Early development.
+type SearchCompletionReason string
+
+const (
+	// The host searched every target.
+	SearchCompletionReasonExhausted SearchCompletionReason = "exhausted"
+	// The host stopped at the result limit. More results may exist.
+	SearchCompletionReasonLimitReached SearchCompletionReason = "limitReached"
+)
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 // Present when the host supports `createTcpConnection`.
@@ -5403,6 +5460,313 @@ type AutomationRunState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
+// Present when the host supports `createSearch`.
+//
+// Stability: 1.0 - Early development.
+type SearchCapability struct {
+	// The target kinds the host can search. A client MUST NOT send a
+	// {@link SearchTarget} whose kind is not listed here.
+	Targets []SearchTargetKind `json:"targets"`
+}
+
+// What a search looks for and where.
+//
+// The client sends a query in `createSearch` and replaces it with
+// {@link SearchQueryChangedAction | `search/queryChanged`}.
+//
+// Stability: 1.0 - Early development.
+type SearchQuery struct {
+	// The text to search for. Its meaning depends on the target: see
+	// {@link SearchTarget}. An empty `text` matches nothing; the host completes
+	// the search with no results.
+	Text string `json:"text"`
+	// Match case. Defaults to `false`.
+	MatchCase *bool `json:"matchCase,omitempty"`
+	// Match only whole words. Defaults to `false`.
+	WholeWord *bool `json:"wholeWord,omitempty"`
+	// Treat `text` as a regular expression. Defaults to `false`.
+	IsRegex *bool `json:"isRegex,omitempty"`
+	// A hint that precise matching isn't expected, for example because the
+	// search powers a quick-find picker. The host MAY then match loosely, rank
+	// results by how well they match, and ignore {@link isRegex} and
+	// {@link wholeWord}. Defaults to `false`.
+	Fuzzy *bool `json:"fuzzy,omitempty"`
+	// Where to search. MUST contain at least one target.
+	Targets []SearchTarget `json:"targets"`
+	// The maximum number of results. The host MAY apply a lower limit, and
+	// completes the search with {@link SearchCompletionReason.LimitReached}
+	// when it reaches the limit that applies.
+	MaxResults *int64 `json:"maxResults,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *SearchQuery) UnmarshalJSON(data []byte) error {
+	type wire SearchQuery
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "text", "matchCase", "wholeWord", "isRegex", "fuzzy", "targets", "maxResults")
+}
+
+func (v SearchQuery) MarshalJSON() ([]byte, error) {
+	type wire SearchQuery
+	return marshalWithExtra(wire(v), v.Extra, "text", "matchCase", "wholeWord", "isRegex", "fuzzy", "targets", "maxResults")
+}
+
+// Searches file paths under {@link FileSearchTargetBase.roots}.
+//
+// The host decides how to match {@link SearchQuery.text} against file paths,
+// for example with fuzzy matching, and which query options apply. Results
+// are {@link FileNameSearchResult}s.
+//
+// Stability: 1.0 - Early development.
+type FileNamesSearchTarget struct {
+	// The folders to search. MUST contain at least one URI.
+	Roots []URI `json:"roots"`
+	// Glob patterns relative to a root. When present, only matching files are searched.
+	Includes []string `json:"includes,omitempty"`
+	// Glob patterns relative to a root. Matching files are not searched.
+	Excludes []string `json:"excludes,omitempty"`
+	// Also search files that the host's ignore rules, such as `.gitignore`
+	// files, would otherwise skip. Defaults to `false`. `excludes` still apply.
+	IncludeIgnored *bool            `json:"includeIgnored,omitempty"`
+	Kind           SearchTargetKind `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *FileNamesSearchTarget) UnmarshalJSON(data []byte) error {
+	type wire FileNamesSearchTarget
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "roots", "includes", "excludes", "includeIgnored", "kind")
+}
+
+func (v FileNamesSearchTarget) MarshalJSON() ([]byte, error) {
+	type wire FileNamesSearchTarget
+	return marshalWithExtra(wire(v), v.Extra, "roots", "includes", "excludes", "includeIgnored", "kind")
+}
+
+// Searches the text content of files under {@link FileSearchTargetBase.roots}.
+// Results are {@link FileTextSearchResult}s.
+//
+// Stability: 1.0 - Early development.
+type FileTextSearchTarget struct {
+	// The folders to search. MUST contain at least one URI.
+	Roots []URI `json:"roots"`
+	// Glob patterns relative to a root. When present, only matching files are searched.
+	Includes []string `json:"includes,omitempty"`
+	// Glob patterns relative to a root. Matching files are not searched.
+	Excludes []string `json:"excludes,omitempty"`
+	// Also search files that the host's ignore rules, such as `.gitignore`
+	// files, would otherwise skip. Defaults to `false`. `excludes` still apply.
+	IncludeIgnored *bool            `json:"includeIgnored,omitempty"`
+	Kind           SearchTargetKind `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *FileTextSearchTarget) UnmarshalJSON(data []byte) error {
+	type wire FileTextSearchTarget
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "roots", "includes", "excludes", "includeIgnored", "kind")
+}
+
+func (v FileTextSearchTarget) MarshalJSON() ([]byte, error) {
+	type wire FileTextSearchTarget
+	return marshalWithExtra(wire(v), v.Extra, "roots", "includes", "excludes", "includeIgnored", "kind")
+}
+
+// Searches the host's sessions, the same sessions that `listSessions`
+// returns. The host decides which session content it matches, for example
+// titles or requests. Results are {@link SessionSearchResult}s.
+//
+// Stability: 1.0 - Early development.
+type SessionsSearchTarget struct {
+	Kind SearchTargetKind `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *SessionsSearchTarget) UnmarshalJSON(data []byte) error {
+	type wire SessionsSearchTarget
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v SessionsSearchTarget) MarshalJSON() ([]byte, error) {
+	type wire SessionsSearchTarget
+	return marshalWithExtra(wire(v), v.Extra, "kind")
+}
+
+// Searches the visible text of chat requests and responses, including the
+// responses of deferred turns. Results are
+// {@link ChatMessageSearchResult}s.
+//
+// Stability: 1.0 - Early development.
+type ChatMessagesSearchTarget struct {
+	Kind SearchTargetKind `json:"kind"`
+	// The chats to search. MUST contain at least one chat URI.
+	Chats []URI `json:"chats"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ChatMessagesSearchTarget) UnmarshalJSON(data []byte) error {
+	type wire ChatMessagesSearchTarget
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "chats")
+}
+
+func (v ChatMessagesSearchTarget) MarshalJSON() ([]byte, error) {
+	type wire ChatMessagesSearchTarget
+	return marshalWithExtra(wire(v), v.Extra, "kind", "chats")
+}
+
+// A matched span within {@link SearchMatch.text}: the half-open interval
+// `[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code
+// units, as in {@link CompletionItem.rangeStart}.
+//
+// Stability: 1.0 - Early development.
+type SearchHighlight struct {
+	// The start of the span.
+	RangeStart int64 `json:"rangeStart"`
+	// The end of the span, exclusive. MUST be greater than {@link rangeStart}
+	// and at most the length of {@link SearchMatch.text}.
+	RangeEnd int64 `json:"rangeEnd"`
+}
+
+// The matched text of a result, with the matched spans highlighted. The host
+// chooses how much text around the match to include.
+//
+// Stability: 1.0 - Early development.
+type SearchMatch struct {
+	// The text to display.
+	Text string `json:"text"`
+	// The matched spans, in order. Spans MUST NOT overlap.
+	Highlights []SearchHighlight `json:"highlights"`
+}
+
+// A file whose path matches. {@link SearchResultBase.resource} is the file;
+// the match text is its path, usually relative to the root that contains it.
+//
+// Stability: 1.0 - Early development.
+type FileNameSearchResult struct {
+	// The resource that contains the match.
+	Resource URI `json:"resource"`
+	// The text to display, with the matched spans highlighted.
+	Match SearchMatch `json:"match"`
+	// How well the result matches; higher is better. Scores have no fixed
+	// range, and are comparable across all results of one search. Clients
+	// SHOULD show results in descending score order. A host that does not rank
+	// results omits the score.
+	Score *float64         `json:"score,omitempty"`
+	Kind  SearchResultKind `json:"kind"`
+}
+
+// A match in the text of a file. {@link SearchResultBase.resource} is the
+// file; the match text is the text around the match, usually its line.
+//
+// Stability: 1.0 - Early development.
+type FileTextSearchResult struct {
+	// The resource that contains the match.
+	Resource URI `json:"resource"`
+	// The text to display, with the matched spans highlighted.
+	Match SearchMatch `json:"match"`
+	// How well the result matches; higher is better. Scores have no fixed
+	// range, and are comparable across all results of one search. Clients
+	// SHOULD show results in descending score order. A host that does not rank
+	// results omits the score.
+	Score *float64         `json:"score,omitempty"`
+	Kind  SearchResultKind `json:"kind"`
+	// The location of the match in the file.
+	Range TextRange `json:"range"`
+}
+
+// A session whose content matches. {@link SearchResultBase.resource} is the
+// session URI.
+//
+// Stability: 1.0 - Early development.
+type SessionSearchResult struct {
+	// The resource that contains the match.
+	Resource URI `json:"resource"`
+	// The text to display, with the matched spans highlighted.
+	Match SearchMatch `json:"match"`
+	// How well the result matches; higher is better. Scores have no fixed
+	// range, and are comparable across all results of one search. Clients
+	// SHOULD show results in descending score order. A host that does not rank
+	// results omits the score.
+	Score *float64         `json:"score,omitempty"`
+	Kind  SearchResultKind `json:"kind"`
+	// The session's title.
+	Title string `json:"title"`
+}
+
+// A match in a chat request or response. {@link SearchResultBase.resource}
+// is the chat URI.
+//
+// Stability: 1.0 - Early development.
+type ChatMessageSearchResult struct {
+	// The resource that contains the match.
+	Resource URI `json:"resource"`
+	// The text to display, with the matched spans highlighted.
+	Match SearchMatch `json:"match"`
+	// How well the result matches; higher is better. Scores have no fixed
+	// range, and are comparable across all results of one search. Clients
+	// SHOULD show results in descending score order. A host that does not rank
+	// results omits the score.
+	Score *float64         `json:"score,omitempty"`
+	Kind  SearchResultKind `json:"kind"`
+	// The chat's title.
+	Title string `json:"title"`
+	// The ID of the turn that contains the match.
+	TurnId string `json:"turnId"`
+}
+
+// The query changed and the host has not replaced the results yet. Clients
+// MAY show the previous query's results differently, for example dimmed.
+//
+// Stability: 1.0 - Early development.
+type SearchPendingLifecycleState struct {
+	Status SearchLifecycleStatus `json:"status"`
+}
+
+// The host is searching and may add more results.
+//
+// Stability: 1.0 - Early development.
+type SearchRunningLifecycleState struct {
+	Status SearchLifecycleStatus `json:"status"`
+}
+
+// The host found every result for the query. A host that watches the
+// searched files, sessions, or chats MAY still change the results later.
+//
+// Stability: 1.0 - Early development.
+type SearchCompletedLifecycleState struct {
+	Status SearchLifecycleStatus `json:"status"`
+	// Why the search completed.
+	Reason SearchCompletionReason `json:"reason"`
+}
+
+// The search failed. Results found before the failure remain in
+// {@link SearchState.results}.
+//
+// Stability: 1.0 - Early development.
+type SearchFailedLifecycleState struct {
+	Status SearchLifecycleStatus `json:"status"`
+	// Why the search failed, for example an invalid regular expression.
+	Error ErrorInfo `json:"error"`
+}
+
+// Full state for one search, returned when a client subscribes to its
+// `ahp-search:` URI.
+//
+// Stability: 1.0 - Early development.
+type SearchState struct {
+	// The current query.
+	Query SearchQuery `json:"query"`
+	// Results in the order the host found them. Sort by
+	// {@link SearchResultBase.score} to rank them. While {@link lifecycle} is
+	// {@link SearchLifecycleStatus.Pending | pending}, these are results for the
+	// previous query.
+	Results []SearchResult `json:"results"`
+	// Where the search is in its lifecycle.
+	Lifecycle SearchLifecycleState `json:"lifecycle"`
+}
+
 // ─── Customization Enablement Union ───────────────────────────────────────
 
 // CustomizationEnablement is a single explicit customization enablement decision.
@@ -7339,6 +7703,249 @@ func (u AutomationRunLifecycle) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// SearchTarget is one place to search.
+type SearchTarget struct {
+	Value isSearchTarget
+}
+
+// isSearchTarget is the marker interface implemented by every
+// concrete variant of SearchTarget.
+type isSearchTarget interface{ isSearchTarget() }
+
+func (*FileNamesSearchTarget) isSearchTarget()    {}
+func (*FileTextSearchTarget) isSearchTarget()     {}
+func (*SessionsSearchTarget) isSearchTarget()     {}
+func (*ChatMessagesSearchTarget) isSearchTarget() {}
+
+// SearchTargetUnknown carries an unrecognized SearchTarget variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type SearchTargetUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*SearchTargetUnknown) isSearchTarget() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *SearchTarget) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "fileNames":
+		var value FileNamesSearchTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "fileText":
+		var value FileTextSearchTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "sessions":
+		var value SessionsSearchTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chatMessages":
+		var value ChatMessagesSearchTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &SearchTargetUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u SearchTarget) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*SearchTargetUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// SearchResult is one search match.
+type SearchResult struct {
+	Value isSearchResult
+}
+
+// isSearchResult is the marker interface implemented by every
+// concrete variant of SearchResult.
+type isSearchResult interface{ isSearchResult() }
+
+func (*FileNameSearchResult) isSearchResult()    {}
+func (*FileTextSearchResult) isSearchResult()    {}
+func (*SessionSearchResult) isSearchResult()     {}
+func (*ChatMessageSearchResult) isSearchResult() {}
+
+// SearchResultUnknown carries an unrecognized SearchResult variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type SearchResultUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*SearchResultUnknown) isSearchResult() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *SearchResult) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "fileName":
+		var value FileNameSearchResult
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "fileText":
+		var value FileTextSearchResult
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session":
+		var value SessionSearchResult
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chatMessage":
+		var value ChatMessageSearchResult
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &SearchResultUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u SearchResult) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*SearchResultUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// SearchLifecycleState is the lifecycle of a search.
+type SearchLifecycleState struct {
+	Value isSearchLifecycleState
+}
+
+// isSearchLifecycleState is the marker interface implemented by every
+// concrete variant of SearchLifecycleState.
+type isSearchLifecycleState interface{ isSearchLifecycleState() }
+
+func (*SearchPendingLifecycleState) isSearchLifecycleState()   {}
+func (*SearchRunningLifecycleState) isSearchLifecycleState()   {}
+func (*SearchCompletedLifecycleState) isSearchLifecycleState() {}
+func (*SearchFailedLifecycleState) isSearchLifecycleState()    {}
+
+// SearchLifecycleStateUnknown carries an unrecognized SearchLifecycleState variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type SearchLifecycleStateUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*SearchLifecycleStateUnknown) isSearchLifecycleState() {}
+
+// UnmarshalJSON decodes the variant indicated by the "status" discriminator.
+func (u *SearchLifecycleState) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "status")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "pending":
+		var value SearchPendingLifecycleState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "running":
+		var value SearchRunningLifecycleState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "completed":
+		var value SearchCompletedLifecycleState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "failed":
+		var value SearchFailedLifecycleState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &SearchLifecycleStateUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u SearchLifecycleState) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*SearchLifecycleStateUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	if object == nil {
+		return data, nil
+	}
+	switch u.Value.(type) {
+	case *SearchPendingLifecycleState:
+		object["status"] = json.RawMessage("\"pending\"")
+	case *SearchRunningLifecycleState:
+		object["status"] = json.RawMessage("\"running\"")
+	case *SearchCompletedLifecycleState:
+		object["status"] = json.RawMessage("\"completed\"")
+	case *SearchFailedLifecycleState:
+		object["status"] = json.RawMessage("\"failed\"")
+	}
+	return json.Marshal(object)
+}
+
 // MarshalJSON encodes the deferred turn with its `"isDeferred": true` marker.
 func (v DeferredTurn) MarshalJSON() ([]byte, error) {
 	type wire DeferredTurn
@@ -7516,11 +8123,11 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 
 // SnapshotState is the state payload of a snapshot — root, session,
 // chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-// automation-run, or empty state. The active
+// automation-run, search, or empty state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (empty → automationRun → automations → session → chat → canvas → terminal →
-// changeset → resourceWatch → annotations → root). An object with no members
+// (empty → automationRun → automations → search → session → chat → canvas →
+// terminal → changeset → resourceWatch → annotations → root). An object with no members
 // is an empty state, used by channels whose state has no fields. A state that
 // matches none of these, such as the state of a channel added in a later
 // protocol version, is kept as raw JSON in Unknown.
@@ -7537,6 +8144,7 @@ type SnapshotState struct {
 	Annotations   *AnnotationsState   `json:"-"`
 	Automations   *AutomationState    `json:"-"`
 	AutomationRun *AutomationRunState `json:"-"`
+	Search        *SearchState        `json:"-"`
 }
 
 // MarshalJSON encodes whichever variant is currently populated.
@@ -7554,6 +8162,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 		return json.Marshal(s.Chat)
 	case s.Canvas != nil:
 		return json.Marshal(s.Canvas)
+	case s.Search != nil:
+		return json.Marshal(s.Search)
 	case s.Terminal != nil:
 		return json.Marshal(s.Terminal)
 	case s.Changeset != nil:
@@ -7594,6 +8204,13 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.Automations = &v
+	// SearchState also has a required `lifecycle`, so probe it before SessionState.
+	case containsAll(probe, "query", "results"):
+		var v SearchState
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		s.Search = &v
 	case containsAll(probe, "lifecycle"):
 		var v SessionState
 		if err := json.Unmarshal(data, &v); err != nil {

@@ -1620,6 +1620,187 @@ pub enum AutomationRunOriginKind {
     Trigger,
 }
 
+/// Discriminant for {@link SearchTarget}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SearchTargetKind {
+    /// File paths.
+    FileNames,
+    /// The text content of files.
+    FileText,
+    /// The host's sessions.
+    Sessions,
+    /// The text of chat requests and responses.
+    ChatMessages,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for SearchTargetKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::FileNames => serializer.serialize_str("fileNames"),
+            Self::FileText => serializer.serialize_str("fileText"),
+            Self::Sessions => serializer.serialize_str("sessions"),
+            Self::ChatMessages => serializer.serialize_str("chatMessages"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SearchTargetKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "fileNames" => Self::FileNames,
+            "fileText" => Self::FileText,
+            "sessions" => Self::Sessions,
+            "chatMessages" => Self::ChatMessages,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Discriminant for {@link SearchResult}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SearchResultKind {
+    FileName,
+    FileText,
+    Session,
+    ChatMessage,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for SearchResultKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::FileName => serializer.serialize_str("fileName"),
+            Self::FileText => serializer.serialize_str("fileText"),
+            Self::Session => serializer.serialize_str("session"),
+            Self::ChatMessage => serializer.serialize_str("chatMessage"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SearchResultKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "fileName" => Self::FileName,
+            "fileText" => Self::FileText,
+            "session" => Self::Session,
+            "chatMessage" => Self::ChatMessage,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Lifecycle status of a search.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SearchLifecycleStatus {
+    /// The query changed and the host has not replaced the results yet.
+    /// {@link SearchState.results} belong to the previous query.
+    Pending,
+    /// The host is searching.
+    Running,
+    /// The host found every result for the query.
+    Completed,
+    /// The search failed.
+    Failed,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for SearchLifecycleStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Pending => serializer.serialize_str("pending"),
+            Self::Running => serializer.serialize_str("running"),
+            Self::Completed => serializer.serialize_str("completed"),
+            Self::Failed => serializer.serialize_str("failed"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SearchLifecycleStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "pending" => Self::Pending,
+            "running" => Self::Running,
+            "completed" => Self::Completed,
+            "failed" => Self::Failed,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Why a search completed.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SearchCompletionReason {
+    /// The host searched every target.
+    Exhausted,
+    /// The host stopped at the result limit. More results may exist.
+    LimitReached,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for SearchCompletionReason {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Exhausted => serializer.serialize_str("exhausted"),
+            Self::LimitReached => serializer.serialize_str("limitReached"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SearchCompletionReason {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "exhausted" => Self::Exhausted,
+            "limitReached" => Self::LimitReached,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 fn deserialize_extra_without_type<'de, D>(
     deserializer: D,
 ) -> Result<serde_json::Map<String, serde_json::Value>, D::Error>
@@ -6875,6 +7056,303 @@ pub struct AutomationRunState {
     pub meta: Option<JsonObject>,
 }
 
+/// Present when the host supports `createSearch`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchCapability {
+    /// The target kinds the host can search. A client MUST NOT send a
+    /// {@link SearchTarget} whose kind is not listed here.
+    pub targets: Vec<SearchTargetKind>,
+}
+
+/// What a search looks for and where.
+///
+/// The client sends a query in `createSearch` and replaces it with
+/// {@link SearchQueryChangedAction | `search/queryChanged`}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchQuery {
+    /// The text to search for. Its meaning depends on the target: see
+    /// {@link SearchTarget}. An empty `text` matches nothing; the host completes
+    /// the search with no results.
+    pub text: String,
+    /// Match case. Defaults to `false`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub match_case: Option<bool>,
+    /// Match only whole words. Defaults to `false`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub whole_word: Option<bool>,
+    /// Treat `text` as a regular expression. Defaults to `false`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_regex: Option<bool>,
+    /// A hint that precise matching isn't expected, for example because the
+    /// search powers a quick-find picker. The host MAY then match loosely, rank
+    /// results by how well they match, and ignore {@link isRegex} and
+    /// {@link wholeWord}. Defaults to `false`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fuzzy: Option<bool>,
+    /// Where to search. MUST contain at least one target.
+    pub targets: Vec<SearchTarget>,
+    /// The maximum number of results. The host MAY apply a lower limit, and
+    /// completes the search with {@link SearchCompletionReason.LimitReached}
+    /// when it reaches the limit that applies.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_results: Option<i64>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Searches file paths under {@link FileSearchTargetBase.roots}.
+///
+/// The host decides how to match {@link SearchQuery.text} against file paths,
+/// for example with fuzzy matching, and which query options apply. Results
+/// are {@link FileNameSearchResult}s.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileNamesSearchTarget {
+    /// The folders to search. MUST contain at least one URI.
+    pub roots: Vec<Uri>,
+    /// Glob patterns relative to a root. When present, only matching files are searched.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub includes: Option<Vec<String>>,
+    /// Glob patterns relative to a root. Matching files are not searched.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub excludes: Option<Vec<String>>,
+    /// Also search files that the host's ignore rules, such as `.gitignore`
+    /// files, would otherwise skip. Defaults to `false`. `excludes` still apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub include_ignored: Option<bool>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Searches the text content of files under {@link FileSearchTargetBase.roots}.
+/// Results are {@link FileTextSearchResult}s.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileTextSearchTarget {
+    /// The folders to search. MUST contain at least one URI.
+    pub roots: Vec<Uri>,
+    /// Glob patterns relative to a root. When present, only matching files are searched.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub includes: Option<Vec<String>>,
+    /// Glob patterns relative to a root. Matching files are not searched.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub excludes: Option<Vec<String>>,
+    /// Also search files that the host's ignore rules, such as `.gitignore`
+    /// files, would otherwise skip. Defaults to `false`. `excludes` still apply.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub include_ignored: Option<bool>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Searches the host's sessions, the same sessions that `listSessions`
+/// returns. The host decides which session content it matches, for example
+/// titles or requests. Results are {@link SessionSearchResult}s.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionsSearchTarget {
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Searches the visible text of chat requests and responses, including the
+/// responses of deferred turns. Results are
+/// {@link ChatMessageSearchResult}s.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessagesSearchTarget {
+    /// The chats to search. MUST contain at least one chat URI.
+    pub chats: Vec<Uri>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// A matched span within {@link SearchMatch.text}: the half-open interval
+/// `[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code
+/// units, as in {@link CompletionItem.rangeStart}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHighlight {
+    /// The start of the span.
+    pub range_start: i64,
+    /// The end of the span, exclusive. MUST be greater than {@link rangeStart}
+    /// and at most the length of {@link SearchMatch.text}.
+    pub range_end: i64,
+}
+
+/// The matched text of a result, with the matched spans highlighted. The host
+/// chooses how much text around the match to include.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchMatch {
+    /// The text to display.
+    pub text: String,
+    /// The matched spans, in order. Spans MUST NOT overlap.
+    pub highlights: Vec<SearchHighlight>,
+}
+
+/// A file whose path matches. {@link SearchResultBase.resource} is the file;
+/// the match text is its path, usually relative to the root that contains it.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileNameSearchResult {
+    /// The resource that contains the match.
+    pub resource: Uri,
+    /// The text to display, with the matched spans highlighted.
+    pub r#match: SearchMatch,
+    /// How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score: Option<f64>,
+}
+
+/// A match in the text of a file. {@link SearchResultBase.resource} is the
+/// file; the match text is the text around the match, usually its line.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileTextSearchResult {
+    /// The resource that contains the match.
+    pub resource: Uri,
+    /// The text to display, with the matched spans highlighted.
+    pub r#match: SearchMatch,
+    /// How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score: Option<f64>,
+    /// The location of the match in the file.
+    pub range: TextRange,
+}
+
+/// A session whose content matches. {@link SearchResultBase.resource} is the
+/// session URI.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSearchResult {
+    /// The resource that contains the match.
+    pub resource: Uri,
+    /// The text to display, with the matched spans highlighted.
+    pub r#match: SearchMatch,
+    /// How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score: Option<f64>,
+    /// The session's title.
+    pub title: String,
+}
+
+/// A match in a chat request or response. {@link SearchResultBase.resource}
+/// is the chat URI.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessageSearchResult {
+    /// The resource that contains the match.
+    pub resource: Uri,
+    /// The text to display, with the matched spans highlighted.
+    pub r#match: SearchMatch,
+    /// How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score: Option<f64>,
+    /// The chat's title.
+    pub title: String,
+    /// The ID of the turn that contains the match.
+    pub turn_id: String,
+}
+
+/// The query changed and the host has not replaced the results yet. Clients
+/// MAY show the previous query's results differently, for example dimmed.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchPendingLifecycleState {}
+
+/// The host is searching and may add more results.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchRunningLifecycleState {}
+
+/// The host found every result for the query. A host that watches the
+/// searched files, sessions, or chats MAY still change the results later.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchCompletedLifecycleState {
+    /// Why the search completed.
+    pub reason: SearchCompletionReason,
+}
+
+/// The search failed. Results found before the failure remain in
+/// {@link SearchState.results}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchFailedLifecycleState {
+    /// Why the search failed, for example an invalid regular expression.
+    pub error: ErrorInfo,
+}
+
+/// Full state for one search, returned when a client subscribes to its
+/// `ahp-search:` URI.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchState {
+    /// The current query.
+    pub query: SearchQuery,
+    /// Results in the order the host found them. Sort by
+    /// {@link SearchResultBase.score} to rank them. While {@link lifecycle} is
+    /// {@link SearchLifecycleStatus.Pending | pending}, these are results for the
+    /// previous query.
+    pub results: Vec<SearchResult>,
+    /// Where the search is in its lifecycle.
+    pub lifecycle: SearchLifecycleState,
+}
+
 // ─── Customization Enablement Union ───────────────────────────────────────
 
 /// A single explicit customization enablement decision.
@@ -7432,6 +7910,60 @@ pub enum AutomationRunLifecycle {
     Cancelled(AutomationCancelledRunLifecycle),
 }
 
+/// One place to search.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum SearchTarget {
+    #[serde(rename = "fileNames")]
+    FileNames(FileNamesSearchTarget),
+    #[serde(rename = "fileText")]
+    FileText(FileTextSearchTarget),
+    #[serde(rename = "sessions")]
+    Sessions(SessionsSearchTarget),
+    #[serde(rename = "chatMessages")]
+    ChatMessages(ChatMessagesSearchTarget),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+/// One search match.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum SearchResult {
+    #[serde(rename = "fileName")]
+    FileName(FileNameSearchResult),
+    #[serde(rename = "fileText")]
+    FileText(FileTextSearchResult),
+    #[serde(rename = "session")]
+    Session(SessionSearchResult),
+    #[serde(rename = "chatMessage")]
+    ChatMessage(ChatMessageSearchResult),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+/// Lifecycle of a search.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status")]
+pub enum SearchLifecycleState {
+    #[serde(rename = "pending")]
+    Pending(SearchPendingLifecycleState),
+    #[serde(rename = "running")]
+    Running(SearchRunningLifecycleState),
+    #[serde(rename = "completed")]
+    Completed(SearchCompletedLifecycleState),
+    #[serde(rename = "failed")]
+    Failed(SearchFailedLifecycleState),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
 /// The state payload of a snapshot, selected by its resource's URI scheme.
 ///
 /// Standalone deserialization preserves any JSON value as Unknown. Use Snapshot
@@ -7449,6 +7981,7 @@ pub enum SnapshotState {
     Annotations(Box<AnnotationsState>),
     Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
+    Search(Box<SearchState>),
     Root(Box<RootState>),
     /// A state that this version does not recognize, kept as raw JSON so it
     /// re-encodes unchanged.
@@ -7496,6 +8029,9 @@ impl SnapshotState {
             "ahp-automation-run" => serde_json::from_value::<AutomationRunState>(value)
                 .map(Box::new)
                 .map(Self::AutomationRun),
+            "ahp-search" => serde_json::from_value::<SearchState>(value)
+                .map(Box::new)
+                .map(Self::Search),
             "ahp-tcp" => serde_json::from_value::<EmptyState>(value).map(Self::Empty),
             "ahp-otlp" => serde_json::from_value::<EmptyState>(value).map(Self::Empty),
             _ => Ok(Self::Unknown(value)),

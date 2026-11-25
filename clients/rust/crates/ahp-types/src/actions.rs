@@ -20,11 +20,11 @@ use crate::state::{
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
     ErrorResponsePart, FileEditCollection, MaterializedTurn, McpAuthRequirement, McpServerState,
-    Message, ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient,
-    SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo,
-    TextRange, ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor,
-    ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn,
-    UsageInfo,
+    Message, ModelSelection, PendingMessageKind, ResponsePart, SearchLifecycleState, SearchQuery,
+    SearchResult, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection,
+    TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
+    ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput,
+    ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -132,6 +132,9 @@ pub enum ActionType {
     TerminalCommandExecuted,
     TerminalCommandFinished,
     ResourceWatchChanged,
+    SearchQueryChanged,
+    SearchResultsChanged,
+    SearchLifecycleChanged,
     AutomationCreateRequested,
     AutomationUpdateRequested,
     AutomationSet,
@@ -303,6 +306,9 @@ impl serde::Serialize for ActionType {
             Self::TerminalCommandExecuted => serializer.serialize_str("terminal/commandExecuted"),
             Self::TerminalCommandFinished => serializer.serialize_str("terminal/commandFinished"),
             Self::ResourceWatchChanged => serializer.serialize_str("resourceWatch/changed"),
+            Self::SearchQueryChanged => serializer.serialize_str("search/queryChanged"),
+            Self::SearchResultsChanged => serializer.serialize_str("search/resultsChanged"),
+            Self::SearchLifecycleChanged => serializer.serialize_str("search/lifecycleChanged"),
             Self::AutomationCreateRequested => {
                 serializer.serialize_str("automation/createRequested")
             }
@@ -436,6 +442,9 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "terminal/commandExecuted" => Self::TerminalCommandExecuted,
             "terminal/commandFinished" => Self::TerminalCommandFinished,
             "resourceWatch/changed" => Self::ResourceWatchChanged,
+            "search/queryChanged" => Self::SearchQueryChanged,
+            "search/resultsChanged" => Self::SearchResultsChanged,
+            "search/lifecycleChanged" => Self::SearchLifecycleChanged,
             "automation/createRequested" => Self::AutomationCreateRequested,
             "automation/updateRequested" => Self::AutomationUpdateRequested,
             "automation/set" => Self::AutomationSet,
@@ -2291,6 +2300,72 @@ pub struct ResourceWatchChangedAction {
     pub changes: AnyValue,
 }
 
+/// Replaces the search's query and restarts the search.
+///
+/// Keeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to
+/// {@link SearchLifecycleStatus.Pending | pending}. The old results stay
+/// visible until the host replaces them, so the client does not flash an empty
+/// list.
+///
+/// After the host applies this action, it stops the previous search and drops
+/// any of its results that it has not dispatched yet. The host MUST then
+/// dispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with
+/// `replace: true` before any other search action. The replacement can keep
+/// old results that still match the new query, and can be empty. If the new
+/// query is not valid,
+/// for example because it contains an invalid regular expression, the host
+/// replaces the results with an empty list and then changes the lifecycle to
+/// {@link SearchLifecycleStatus.Failed | failed}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchQueryChangedAction {
+    /// The new query.
+    pub query: SearchQuery,
+}
+
+/// Adds results to {@link SearchState.results}, or replaces them.
+///
+/// By default, the reducer appends `results`. Set `replace` to `true` to
+/// replace every result instead; if {@link SearchState.lifecycle} is
+/// {@link SearchLifecycleStatus.Pending | pending}, a replacement also changes
+/// it to {@link SearchLifecycleStatus.Running | running}.
+///
+/// The host MUST dispatch a replacement first after a
+/// {@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also
+/// replace the results at other times, for example to re-rank them, to remove
+/// duplicates, or to update a completed search when a watched file changes.
+/// The host MUST NOT dispatch an empty `results` list unless `replace` is
+/// `true`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResultsChangedAction {
+    /// The results to append, in the order the host found them, or the replacement results.
+    pub results: Vec<SearchResult>,
+    /// When `true`, replaces every result instead of appending.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replace: Option<bool>,
+}
+
+/// Replaces {@link SearchState.lifecycle}.
+///
+/// The host dispatches this to complete or fail a search, or to move a
+/// completed search back to {@link SearchLifecycleStatus.Running | running} when it
+/// searches again, for example after a watched file changes. The host MUST NOT
+/// change the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only
+/// {@link SearchQueryChangedAction | `search/queryChanged`} does that.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchLifecycleChangedAction {
+    /// The new lifecycle.
+    pub lifecycle: SearchLifecycleState,
+}
+
 /// Ask the host to create a durable automation at a client-chosen resource.
 ///
 /// Clients may dispatch this action only when the host advertises its `create`
@@ -2677,6 +2752,12 @@ pub enum StateAction {
     TerminalCommandFinished(TerminalCommandFinishedAction),
     #[serde(rename = "resourceWatch/changed")]
     ResourceWatchChanged(ResourceWatchChangedAction),
+    #[serde(rename = "search/queryChanged")]
+    SearchQueryChanged(SearchQueryChangedAction),
+    #[serde(rename = "search/resultsChanged")]
+    SearchResultsChanged(SearchResultsChangedAction),
+    #[serde(rename = "search/lifecycleChanged")]
+    SearchLifecycleChanged(SearchLifecycleChangedAction),
     #[serde(rename = "automation/createRequested")]
     AutomationCreateRequested(Box<AutomationCreateRequestedAction>),
     #[serde(rename = "automation/updateRequested")]

@@ -21,10 +21,10 @@ import kotlinx.serialization.json.JsonPrimitive
  *
  * The companion top-level functions ([rootReducer], [sessionReducer], [chatReducer], [canvasReducer],
  * [terminalReducer], [changesetReducer], [annotationsReducer], [resourceWatchReducer],
- * [automationReducer], and [automationRunReducer]) are the canonical implementations.
+ * [searchReducer], [automationReducer], and [automationRunReducer]) are the canonical implementations.
  * The object instances on this interface ([RootReducer], [SessionReducer], [ChatReducer], [CanvasReducer],
  * [TerminalReducer], [ChangesetReducer], [AnnotationsReducer], [ResourceWatchReducer],
- * [AutomationReducer], and [AutomationRunReducer]) wrap them for use as values where an
+ * [SearchReducer], [AutomationReducer], and [AutomationRunReducer]) wrap them for use as values where an
  * instance is needed.
  */
 public fun interface Reducer<S, A> {
@@ -77,6 +77,12 @@ public object AnnotationsReducer : Reducer<AnnotationsState, StateAction> {
 public object ResourceWatchReducer : Reducer<ResourceWatchState, StateAction> {
     override fun reduce(state: ResourceWatchState, action: StateAction): ResourceWatchState =
         resourceWatchReducer(state, action)
+}
+
+/** Pure search reducer as a [Reducer] instance. Delegates to [searchReducer]. */
+public object SearchReducer : Reducer<SearchState, StateAction> {
+    override fun reduce(state: SearchState, action: StateAction): SearchState =
+        searchReducer(state, action)
 }
 
 /** Pure automation reducer as a [Reducer] instance. Delegates to [automationReducer]. */
@@ -2017,6 +2023,34 @@ public fun annotationsReducer(state: AnnotationsState, action: StateAction): Ann
  */
 public fun resourceWatchReducer(state: ResourceWatchState, action: StateAction): ResourceWatchState = when (action) {
     is StateActionResourceWatchChanged -> state
+    else -> state
+}
+
+// ─── Search Reducer ─────────────────────────────────────────────────────────
+
+/**
+ * Pure reducer for [SearchState]. Handles the search-channel action variants;
+ * actions belonging to other channels (or unknown variants) return [state]
+ * unchanged.
+ */
+public fun searchReducer(state: SearchState, action: StateAction): SearchState = when (action) {
+    is StateActionSearchQueryChanged -> state.copy(
+        query = action.value.query,
+        lifecycle = SearchLifecycleStatePending(SearchPendingLifecycleState(status = SearchLifecycleStatus.PENDING)),
+    )
+    is StateActionSearchResultsChanged -> if (action.value.replace != true) {
+        state.copy(results = state.results + action.value.results)
+    } else {
+        state.copy(
+            results = action.value.results,
+            lifecycle = if (state.lifecycle is SearchLifecycleStatePending) {
+                SearchLifecycleStateRunning(SearchRunningLifecycleState(status = SearchLifecycleStatus.RUNNING))
+            } else {
+                state.lifecycle
+            },
+        )
+    }
+    is StateActionSearchLifecycleChanged -> state.copy(lifecycle = action.value.lifecycle)
     else -> state
 }
 

@@ -179,6 +179,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | SearchState | EmptyState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -767,6 +768,8 @@ const STATE_ENUMS = [
   'AutomationDisableConditionKind',
   'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'SearchTargetKind', 'SearchResultKind',
+  'SearchLifecycleStatus', 'SearchCompletionReason',
 ];
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string; omitProps?: string[] }[] = [
@@ -945,6 +948,23 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationCancelledRunLifecycle' },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState' },
+  { name: 'SearchCapability' },
+  { name: 'SearchQuery' },
+  { name: 'FileNamesSearchTarget' },
+  { name: 'FileTextSearchTarget' },
+  { name: 'SessionsSearchTarget' },
+  { name: 'ChatMessagesSearchTarget' },
+  { name: 'SearchHighlight' },
+  { name: 'SearchMatch' },
+  { name: 'FileNameSearchResult' },
+  { name: 'FileTextSearchResult' },
+  { name: 'SessionSearchResult' },
+  { name: 'ChatMessageSearchResult' },
+  { name: 'SearchPendingLifecycleState' },
+  { name: 'SearchRunningLifecycleState' },
+  { name: 'SearchCompletedLifecycleState' },
+  { name: 'SearchFailedLifecycleState' },
+  { name: 'SearchState' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1262,6 +1282,46 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   injectDiscriminantOnMarshal: true,
 };
 
+const SEARCH_TARGET_UNION: UnionConfig = {
+  name: 'SearchTarget',
+  discriminantField: 'kind',
+  doc: 'SearchTarget is one place to search.',
+  variants: [
+    { variantName: 'FileNames', innerType: 'FileNamesSearchTarget', wireValue: 'fileNames' },
+    { variantName: 'FileText', innerType: 'FileTextSearchTarget', wireValue: 'fileText' },
+    { variantName: 'Sessions', innerType: 'SessionsSearchTarget', wireValue: 'sessions' },
+    { variantName: 'ChatMessages', innerType: 'ChatMessagesSearchTarget', wireValue: 'chatMessages' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_RESULT_UNION: UnionConfig = {
+  name: 'SearchResult',
+  discriminantField: 'kind',
+  doc: 'SearchResult is one search match.',
+  variants: [
+    { variantName: 'FileName', innerType: 'FileNameSearchResult', wireValue: 'fileName' },
+    { variantName: 'FileText', innerType: 'FileTextSearchResult', wireValue: 'fileText' },
+    { variantName: 'Session', innerType: 'SessionSearchResult', wireValue: 'session' },
+    { variantName: 'ChatMessage', innerType: 'ChatMessageSearchResult', wireValue: 'chatMessage' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_LIFECYCLE_UNION: UnionConfig = {
+  name: 'SearchLifecycleState',
+  discriminantField: 'status',
+  doc: 'SearchLifecycleState is the lifecycle of a search.',
+  variants: [
+    { variantName: 'Pending', innerType: 'SearchPendingLifecycleState', wireValue: 'pending' },
+    { variantName: 'Running', innerType: 'SearchRunningLifecycleState', wireValue: 'running' },
+    { variantName: 'Completed', innerType: 'SearchCompletedLifecycleState', wireValue: 'completed' },
+    { variantName: 'Failed', innerType: 'SearchFailedLifecycleState', wireValue: 'failed' },
+  ],
+  unknown: true,
+  injectDiscriminantOnMarshal: true,
+};
+
 /**
  * `Turn = MaterializedTurn | DeferredTurn` is discriminated by the boolean
  * `isDeferred`, which the string-discriminant union emitter cannot express:
@@ -1451,11 +1511,11 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
 // chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-// automation-run, or empty state. The active
+// automation-run, search, or empty state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (empty → automationRun → automations → session → chat → canvas → terminal →
-// changeset → resourceWatch → annotations → root). An object with no members
+// (empty → automationRun → automations → search → session → chat → canvas →
+// terminal → changeset → resourceWatch → annotations → root). An object with no members
 // is an empty state, used by channels whose state has no fields. A state that
 // matches none of these, such as the state of a channel added in a later
 // protocol version, is kept as raw JSON in Unknown.
@@ -1472,6 +1532,7 @@ type SnapshotState struct {
 \tAnnotations   *AnnotationsState   \`json:"-"\`
 \tAutomations   *AutomationState       \`json:"-"\`
 \tAutomationRun *AutomationRunState \`json:"-"\`
+\tSearch        *SearchState        \`json:"-"\`
 }
 
 // MarshalJSON encodes whichever variant is currently populated.
@@ -1489,6 +1550,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \t\treturn json.Marshal(s.Chat)
 \tcase s.Canvas != nil:
 \t\treturn json.Marshal(s.Canvas)
+\tcase s.Search != nil:
+\t\treturn json.Marshal(s.Search)
 \tcase s.Terminal != nil:
 \t\treturn json.Marshal(s.Terminal)
 \tcase s.Changeset != nil:
@@ -1529,6 +1592,13 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.Automations = &v
+\t// SearchState also has a required \`lifecycle\`, so probe it before SessionState.
+\tcase containsAll(probe, "query", "results"):
+\t\tvar v SearchState
+\t\tif err := json.Unmarshal(data, &v); err != nil {
+\t\t\treturn err
+\t\t}
+\t\ts.Search = &v
 \tcase containsAll(probe, "lifecycle"):
 \t\tvar v SessionState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1713,6 +1783,12 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_TARGET_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_RESULT_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_LIFECYCLE_UNION));
+  lines.push('');
   lines.push(generateTurnUnion());
   lines.push('');
   lines.push(generateChatOriginGo());
@@ -1830,6 +1906,9 @@ const ACTION_VARIANTS: {
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'search/queryChanged', variantName: 'SearchQueryChanged', tsInterface: 'SearchQueryChangedAction' },
+  { type: 'search/resultsChanged', variantName: 'SearchResultsChanged', tsInterface: 'SearchResultsChangedAction' },
+  { type: 'search/lifecycleChanged', variantName: 'SearchLifecycleChanged', tsInterface: 'SearchLifecycleChangedAction' },
   { type: 'automation/createRequested', variantName: 'AutomationCreateRequested', tsInterface: 'AutomationCreateRequestedAction' },
   { type: 'automation/updateRequested', variantName: 'AutomationUpdateRequested', tsInterface: 'AutomationUpdateRequestedAction' },
   { type: 'automation/set', variantName: 'AutomationSet', tsInterface: 'AutomationSetAction' },
@@ -1979,6 +2058,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'ResourceMkdirParams' }, { name: 'ResourceMkdirResult' },
   { name: 'ResourceRequestParams' }, { name: 'ResourceRequestResult' },
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
+  { name: 'CreateSearchParams' }, { name: 'CreateSearchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget' },
@@ -2679,6 +2759,11 @@ function checkExhaustiveness(project: Project): void {
     'TerminalLifecycleState',
     'SessionInputRequest',
     'BackgroundWork',
+    'SearchTarget',
+    'SearchResult',
+    'SearchLifecycleState',
+    'FileSearchTargetBase',
+    'SearchResultBase',
     'ToolCallConfirmationState',
     'ReconnectResult',
     'SessionOrigin',

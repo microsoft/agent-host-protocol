@@ -23,6 +23,7 @@ public actor AHPStateMirror {
     public private(set) var automationCatalog = AutomationState(entries: [])
     public private(set) var automations: [String: AutomationEntry] = [:]
     public private(set) var automationRuns: [String: AutomationRunState] = [:]
+    public private(set) var searches: [String: SearchState] = [:]
 
     public init() {}
 
@@ -53,6 +54,10 @@ public actor AHPStateMirror {
         }
         if channel.hasPrefix("ahp-canvas:"), let canvas = canvases[channel] {
             canvases[channel] = canvasReducer(state: canvas, action: action)
+            return
+        }
+        if channel.hasPrefix("ahp-search:"), let search = searches[channel] {
+            searches[channel] = searchReducer(state: search, action: action)
             return
         }
         if channel.hasPrefix("ahp-terminal:"), var terminal = terminals[channel] {
@@ -115,6 +120,8 @@ public actor AHPStateMirror {
             rebuildAutomationIndex()
         case .automationRun(let state):
             automationRuns[snapshot.resource] = state
+        case .search(let state):
+            searches[snapshot.resource] = state
         }
     }
 
@@ -139,5 +146,6 @@ public actor AHPStateMirror {
         automationCatalog = AutomationState(entries: [])
         automations.removeAll()
         automationRuns.removeAll()
+        searches.removeAll()
     }
 }

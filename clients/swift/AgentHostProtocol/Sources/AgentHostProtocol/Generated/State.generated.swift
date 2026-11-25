@@ -1204,6 +1204,151 @@ public enum AutomationRunOriginKind: String, Codable, Sendable {
     case trigger = "trigger"
 }
 
+/// Discriminant for {@link SearchTarget}.
+///
+/// Stability: 1.0 - Early development.
+public enum SearchTargetKind: Codable, Sendable, Equatable {
+    /// File paths.
+    case fileNames
+    /// The text content of files.
+    case fileText
+    /// The host's sessions.
+    case sessions
+    /// The text of chat requests and responses.
+    case chatMessages
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "fileNames": self = .fileNames
+        case "fileText": self = .fileText
+        case "sessions": self = .sessions
+        case "chatMessages": self = .chatMessages
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .fileNames: try container.encode("fileNames")
+        case .fileText: try container.encode("fileText")
+        case .sessions: try container.encode("sessions")
+        case .chatMessages: try container.encode("chatMessages")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Discriminant for {@link SearchResult}.
+///
+/// Stability: 1.0 - Early development.
+public enum SearchResultKind: Codable, Sendable, Equatable {
+    case fileName
+    case fileText
+    case session
+    case chatMessage
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "fileName": self = .fileName
+        case "fileText": self = .fileText
+        case "session": self = .session
+        case "chatMessage": self = .chatMessage
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .fileName: try container.encode("fileName")
+        case .fileText: try container.encode("fileText")
+        case .session: try container.encode("session")
+        case .chatMessage: try container.encode("chatMessage")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Lifecycle status of a search.
+///
+/// Stability: 1.0 - Early development.
+public enum SearchLifecycleStatus: Codable, Sendable, Equatable {
+    /// The query changed and the host has not replaced the results yet.
+    /// {@link SearchState.results} belong to the previous query.
+    case pending
+    /// The host is searching.
+    case running
+    /// The host found every result for the query.
+    case completed
+    /// The search failed.
+    case failed
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "pending": self = .pending
+        case "running": self = .running
+        case "completed": self = .completed
+        case "failed": self = .failed
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .pending: try container.encode("pending")
+        case .running: try container.encode("running")
+        case .completed: try container.encode("completed")
+        case .failed: try container.encode("failed")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Why a search completed.
+///
+/// Stability: 1.0 - Early development.
+public enum SearchCompletionReason: Codable, Sendable, Equatable {
+    /// The host searched every target.
+    case exhausted
+    /// The host stopped at the result limit. More results may exist.
+    case limitReached
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "exhausted": self = .exhausted
+        case "limitReached": self = .limitReached
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .exhausted: try container.encode("exhausted")
+        case .limitReached: try container.encode("limitReached")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 // MARK: - State Types
 
 /// Present when the host supports `createTcpConnection`.
@@ -8855,6 +9000,574 @@ public struct AutomationRunState: Codable, Sendable, Equatable {
     }
 }
 
+/// Present when the host supports `createSearch`.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchCapability: Codable, Sendable, Equatable {
+    /// The target kinds the host can search. A client MUST NOT send a
+    /// {@link SearchTarget} whose kind is not listed here.
+    public var targets: [SearchTargetKind]
+
+    public init(
+        targets: [SearchTargetKind]
+    ) {
+        self.targets = targets
+    }
+}
+
+/// What a search looks for and where.
+///
+/// The client sends a query in `createSearch` and replaces it with
+/// {@link SearchQueryChangedAction | `search/queryChanged`}.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchQuery: Codable, Sendable, Equatable {
+    /// The text to search for. Its meaning depends on the target: see
+    /// {@link SearchTarget}. An empty `text` matches nothing; the host completes
+    /// the search with no results.
+    public var text: String
+    /// Match case. Defaults to `false`.
+    public var matchCase: Bool?
+    /// Match only whole words. Defaults to `false`.
+    public var wholeWord: Bool?
+    /// Treat `text` as a regular expression. Defaults to `false`.
+    public var isRegex: Bool?
+    /// A hint that precise matching isn't expected, for example because the
+    /// search powers a quick-find picker. The host MAY then match loosely, rank
+    /// results by how well they match, and ignore {@link isRegex} and
+    /// {@link wholeWord}. Defaults to `false`.
+    public var fuzzy: Bool?
+    /// Where to search. MUST contain at least one target.
+    public var targets: [SearchTarget]
+    /// The maximum number of results. The host MAY apply a lower limit, and
+    /// completes the search with {@link SearchCompletionReason.LimitReached}
+    /// when it reaches the limit that applies.
+    public var maxResults: Int?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case text
+        case matchCase
+        case wholeWord
+        case isRegex
+        case fuzzy
+        case targets
+        case maxResults
+    }
+
+    public init(
+        text: String,
+        matchCase: Bool? = nil,
+        wholeWord: Bool? = nil,
+        isRegex: Bool? = nil,
+        fuzzy: Bool? = nil,
+        targets: [SearchTarget],
+        maxResults: Int? = nil,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.text = text
+        self.matchCase = matchCase
+        self.wholeWord = wholeWord
+        self.isRegex = isRegex
+        self.fuzzy = fuzzy
+        self.targets = targets
+        self.maxResults = maxResults
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.text = try container.decode(String.self, forKey: .text)
+        self.matchCase = try container.decodeIfPresent(Bool.self, forKey: .matchCase)
+        self.wholeWord = try container.decodeIfPresent(Bool.self, forKey: .wholeWord)
+        self.isRegex = try container.decodeIfPresent(Bool.self, forKey: .isRegex)
+        self.fuzzy = try container.decodeIfPresent(Bool.self, forKey: .fuzzy)
+        self.targets = try container.decode([SearchTarget].self, forKey: .targets)
+        self.maxResults = try container.decodeIfPresent(Int.self, forKey: .maxResults)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.text, forKey: .text)
+        try container.encodeIfPresent(self.matchCase, forKey: .matchCase)
+        try container.encodeIfPresent(self.wholeWord, forKey: .wholeWord)
+        try container.encodeIfPresent(self.isRegex, forKey: .isRegex)
+        try container.encodeIfPresent(self.fuzzy, forKey: .fuzzy)
+        try container.encode(self.targets, forKey: .targets)
+        try container.encodeIfPresent(self.maxResults, forKey: .maxResults)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
+/// Searches file paths under {@link FileSearchTargetBase.roots}.
+///
+/// The host decides how to match {@link SearchQuery.text} against file paths,
+/// for example with fuzzy matching, and which query options apply. Results
+/// are {@link FileNameSearchResult}s.
+///
+/// Stability: 1.0 - Early development.
+public struct FileNamesSearchTarget: Codable, Sendable, Equatable {
+    /// The folders to search. MUST contain at least one URI.
+    public var roots: [String]
+    /// Glob patterns relative to a root. When present, only matching files are searched.
+    public var includes: [String]?
+    /// Glob patterns relative to a root. Matching files are not searched.
+    public var excludes: [String]?
+    /// Also search files that the host's ignore rules, such as `.gitignore`
+    /// files, would otherwise skip. Defaults to `false`. `excludes` still apply.
+    public var includeIgnored: Bool?
+    public var kind: SearchTargetKind
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case roots
+        case includes
+        case excludes
+        case includeIgnored
+        case kind
+    }
+
+    public init(
+        roots: [String],
+        includes: [String]? = nil,
+        excludes: [String]? = nil,
+        includeIgnored: Bool? = nil,
+        kind: SearchTargetKind,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.roots = roots
+        self.includes = includes
+        self.excludes = excludes
+        self.includeIgnored = includeIgnored
+        self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.roots = try container.decode([String].self, forKey: .roots)
+        self.includes = try container.decodeIfPresent([String].self, forKey: .includes)
+        self.excludes = try container.decodeIfPresent([String].self, forKey: .excludes)
+        self.includeIgnored = try container.decodeIfPresent(Bool.self, forKey: .includeIgnored)
+        self.kind = try container.decode(SearchTargetKind.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.roots, forKey: .roots)
+        try container.encodeIfPresent(self.includes, forKey: .includes)
+        try container.encodeIfPresent(self.excludes, forKey: .excludes)
+        try container.encodeIfPresent(self.includeIgnored, forKey: .includeIgnored)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
+/// Searches the text content of files under {@link FileSearchTargetBase.roots}.
+/// Results are {@link FileTextSearchResult}s.
+///
+/// Stability: 1.0 - Early development.
+public struct FileTextSearchTarget: Codable, Sendable, Equatable {
+    /// The folders to search. MUST contain at least one URI.
+    public var roots: [String]
+    /// Glob patterns relative to a root. When present, only matching files are searched.
+    public var includes: [String]?
+    /// Glob patterns relative to a root. Matching files are not searched.
+    public var excludes: [String]?
+    /// Also search files that the host's ignore rules, such as `.gitignore`
+    /// files, would otherwise skip. Defaults to `false`. `excludes` still apply.
+    public var includeIgnored: Bool?
+    public var kind: SearchTargetKind
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case roots
+        case includes
+        case excludes
+        case includeIgnored
+        case kind
+    }
+
+    public init(
+        roots: [String],
+        includes: [String]? = nil,
+        excludes: [String]? = nil,
+        includeIgnored: Bool? = nil,
+        kind: SearchTargetKind,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.roots = roots
+        self.includes = includes
+        self.excludes = excludes
+        self.includeIgnored = includeIgnored
+        self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.roots = try container.decode([String].self, forKey: .roots)
+        self.includes = try container.decodeIfPresent([String].self, forKey: .includes)
+        self.excludes = try container.decodeIfPresent([String].self, forKey: .excludes)
+        self.includeIgnored = try container.decodeIfPresent(Bool.self, forKey: .includeIgnored)
+        self.kind = try container.decode(SearchTargetKind.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.roots, forKey: .roots)
+        try container.encodeIfPresent(self.includes, forKey: .includes)
+        try container.encodeIfPresent(self.excludes, forKey: .excludes)
+        try container.encodeIfPresent(self.includeIgnored, forKey: .includeIgnored)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
+/// Searches the host's sessions, the same sessions that `listSessions`
+/// returns. The host decides which session content it matches, for example
+/// titles or requests. Results are {@link SessionSearchResult}s.
+///
+/// Stability: 1.0 - Early development.
+public struct SessionsSearchTarget: Codable, Sendable, Equatable {
+    public var kind: SearchTargetKind
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
+
+    public init(
+        kind: SearchTargetKind,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(SearchTargetKind.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
+/// Searches the visible text of chat requests and responses, including the
+/// responses of deferred turns. Results are
+/// {@link ChatMessageSearchResult}s.
+///
+/// Stability: 1.0 - Early development.
+public struct ChatMessagesSearchTarget: Codable, Sendable, Equatable {
+    public var kind: SearchTargetKind
+    /// The chats to search. MUST contain at least one chat URI.
+    public var chats: [String]
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case chats
+    }
+
+    public init(
+        kind: SearchTargetKind,
+        chats: [String],
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.kind = kind
+        self.chats = chats
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(SearchTargetKind.self, forKey: .kind)
+        self.chats = try container.decode([String].self, forKey: .chats)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.chats, forKey: .chats)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
+/// A matched span within {@link SearchMatch.text}: the half-open interval
+/// `[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code
+/// units, as in {@link CompletionItem.rangeStart}.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchHighlight: Codable, Sendable, Equatable {
+    /// The start of the span.
+    public var rangeStart: Int
+    /// The end of the span, exclusive. MUST be greater than {@link rangeStart}
+    /// and at most the length of {@link SearchMatch.text}.
+    public var rangeEnd: Int
+
+    public init(
+        rangeStart: Int,
+        rangeEnd: Int
+    ) {
+        self.rangeStart = rangeStart
+        self.rangeEnd = rangeEnd
+    }
+}
+
+/// The matched text of a result, with the matched spans highlighted. The host
+/// chooses how much text around the match to include.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchMatch: Codable, Sendable, Equatable {
+    /// The text to display.
+    public var text: String
+    /// The matched spans, in order. Spans MUST NOT overlap.
+    public var highlights: [SearchHighlight]
+
+    public init(
+        text: String,
+        highlights: [SearchHighlight]
+    ) {
+        self.text = text
+        self.highlights = highlights
+    }
+}
+
+/// A file whose path matches. {@link SearchResultBase.resource} is the file;
+/// the match text is its path, usually relative to the root that contains it.
+///
+/// Stability: 1.0 - Early development.
+public struct FileNameSearchResult: Codable, Sendable, Equatable {
+    /// The resource that contains the match.
+    public var resource: String
+    /// The text to display, with the matched spans highlighted.
+    public var match: SearchMatch
+    /// How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.
+    public var score: Double?
+    public var kind: SearchResultKind
+
+    public init(
+        resource: String,
+        match: SearchMatch,
+        score: Double? = nil,
+        kind: SearchResultKind
+    ) {
+        self.resource = resource
+        self.match = match
+        self.score = score
+        self.kind = kind
+    }
+}
+
+/// A match in the text of a file. {@link SearchResultBase.resource} is the
+/// file; the match text is the text around the match, usually its line.
+///
+/// Stability: 1.0 - Early development.
+public struct FileTextSearchResult: Codable, Sendable, Equatable {
+    /// The resource that contains the match.
+    public var resource: String
+    /// The text to display, with the matched spans highlighted.
+    public var match: SearchMatch
+    /// How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.
+    public var score: Double?
+    public var kind: SearchResultKind
+    /// The location of the match in the file.
+    public var range: TextRange
+
+    public init(
+        resource: String,
+        match: SearchMatch,
+        score: Double? = nil,
+        kind: SearchResultKind,
+        range: TextRange
+    ) {
+        self.resource = resource
+        self.match = match
+        self.score = score
+        self.kind = kind
+        self.range = range
+    }
+}
+
+/// A session whose content matches. {@link SearchResultBase.resource} is the
+/// session URI.
+///
+/// Stability: 1.0 - Early development.
+public struct SessionSearchResult: Codable, Sendable, Equatable {
+    /// The resource that contains the match.
+    public var resource: String
+    /// The text to display, with the matched spans highlighted.
+    public var match: SearchMatch
+    /// How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.
+    public var score: Double?
+    public var kind: SearchResultKind
+    /// The session's title.
+    public var title: String
+
+    public init(
+        resource: String,
+        match: SearchMatch,
+        score: Double? = nil,
+        kind: SearchResultKind,
+        title: String
+    ) {
+        self.resource = resource
+        self.match = match
+        self.score = score
+        self.kind = kind
+        self.title = title
+    }
+}
+
+/// A match in a chat request or response. {@link SearchResultBase.resource}
+/// is the chat URI.
+///
+/// Stability: 1.0 - Early development.
+public struct ChatMessageSearchResult: Codable, Sendable, Equatable {
+    /// The resource that contains the match.
+    public var resource: String
+    /// The text to display, with the matched spans highlighted.
+    public var match: SearchMatch
+    /// How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.
+    public var score: Double?
+    public var kind: SearchResultKind
+    /// The chat's title.
+    public var title: String
+    /// The ID of the turn that contains the match.
+    public var turnId: String
+
+    public init(
+        resource: String,
+        match: SearchMatch,
+        score: Double? = nil,
+        kind: SearchResultKind,
+        title: String,
+        turnId: String
+    ) {
+        self.resource = resource
+        self.match = match
+        self.score = score
+        self.kind = kind
+        self.title = title
+        self.turnId = turnId
+    }
+}
+
+/// The query changed and the host has not replaced the results yet. Clients
+/// MAY show the previous query's results differently, for example dimmed.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchPendingLifecycleState: Codable, Sendable, Equatable {
+    public var status: SearchLifecycleStatus
+
+    public init(
+        status: SearchLifecycleStatus
+    ) {
+        self.status = status
+    }
+}
+
+/// The host is searching and may add more results.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchRunningLifecycleState: Codable, Sendable, Equatable {
+    public var status: SearchLifecycleStatus
+
+    public init(
+        status: SearchLifecycleStatus
+    ) {
+        self.status = status
+    }
+}
+
+/// The host found every result for the query. A host that watches the
+/// searched files, sessions, or chats MAY still change the results later.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchCompletedLifecycleState: Codable, Sendable, Equatable {
+    public var status: SearchLifecycleStatus
+    /// Why the search completed.
+    public var reason: SearchCompletionReason
+
+    public init(
+        status: SearchLifecycleStatus,
+        reason: SearchCompletionReason
+    ) {
+        self.status = status
+        self.reason = reason
+    }
+}
+
+/// The search failed. Results found before the failure remain in
+/// {@link SearchState.results}.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchFailedLifecycleState: Codable, Sendable, Equatable {
+    public var status: SearchLifecycleStatus
+    /// Why the search failed, for example an invalid regular expression.
+    public var error: ErrorInfo
+
+    public init(
+        status: SearchLifecycleStatus,
+        error: ErrorInfo
+    ) {
+        self.status = status
+        self.error = error
+    }
+}
+
+/// Full state for one search, returned when a client subscribes to its
+/// `ahp-search:` URI.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchState: Codable, Sendable, Equatable {
+    /// The current query.
+    public var query: SearchQuery
+    /// Results in the order the host found them. Sort by
+    /// {@link SearchResultBase.score} to rank them. While {@link lifecycle} is
+    /// {@link SearchLifecycleStatus.Pending | pending}, these are results for the
+    /// previous query.
+    public var results: [SearchResult]
+    /// Where the search is in its lifecycle.
+    public var lifecycle: SearchLifecycleState
+
+    public init(
+        query: SearchQuery,
+        results: [SearchResult],
+        lifecycle: SearchLifecycleState
+    ) {
+        self.query = query
+        self.results = results
+        self.lifecycle = lifecycle
+    }
+}
+
 // MARK: - Customization Enablement Union
 
 /// A single explicit customization enablement decision.
@@ -10297,6 +11010,146 @@ public enum AutomationRunLifecycle: Codable, Sendable, Equatable {
     }
 }
 
+public enum SearchTarget: Codable, Sendable, Equatable {
+    case fileNames(FileNamesSearchTarget)
+    case fileText(FileTextSearchTarget)
+    case sessions(SessionsSearchTarget)
+    case chatMessages(ChatMessagesSearchTarget)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "fileNames":
+            self = .fileNames(try FileNamesSearchTarget(from: decoder))
+        case "fileText":
+            self = .fileText(try FileTextSearchTarget(from: decoder))
+        case "sessions":
+            self = .sessions(try SessionsSearchTarget(from: decoder))
+        case "chatMessages":
+            self = .chatMessages(try ChatMessagesSearchTarget(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .fileNames(let value): try value.encode(to: encoder)
+        case .fileText(let value): try value.encode(to: encoder)
+        case .sessions(let value): try value.encode(to: encoder)
+        case .chatMessages(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum SearchResult: Codable, Sendable, Equatable {
+    case fileName(FileNameSearchResult)
+    case fileText(FileTextSearchResult)
+    case session(SessionSearchResult)
+    case chatMessage(ChatMessageSearchResult)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "fileName":
+            self = .fileName(try FileNameSearchResult(from: decoder))
+        case "fileText":
+            self = .fileText(try FileTextSearchResult(from: decoder))
+        case "session":
+            self = .session(try SessionSearchResult(from: decoder))
+        case "chatMessage":
+            self = .chatMessage(try ChatMessageSearchResult(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .fileName(let value): try value.encode(to: encoder)
+        case .fileText(let value): try value.encode(to: encoder)
+        case .session(let value): try value.encode(to: encoder)
+        case .chatMessage(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum SearchLifecycleState: Codable, Sendable, Equatable {
+    case pending(SearchPendingLifecycleState)
+    case running(SearchRunningLifecycleState)
+    case completed(SearchCompletedLifecycleState)
+    case failed(SearchFailedLifecycleState)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "status"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "pending":
+            self = .pending(try SearchPendingLifecycleState(from: decoder))
+        case "running":
+            self = .running(try SearchRunningLifecycleState(from: decoder))
+        case "completed":
+            self = .completed(try SearchCompletedLifecycleState(from: decoder))
+        case "failed":
+            self = .failed(try SearchFailedLifecycleState(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .pending(var value):
+            value.status = .pending
+            try value.encode(to: encoder)
+        case .running(var value):
+            value.status = .running
+            try value.encode(to: encoder)
+        case .completed(var value):
+            value.status = .completed
+            try value.encode(to: encoder)
+        case .failed(var value):
+            value.status = .failed
+            try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
 public enum ToolResultContent: Codable, Sendable, Equatable {
     case text(ToolResultTextContent)
     case embeddedResource(ToolResultEmbeddedResourceContent)
@@ -10367,6 +11220,7 @@ public enum SnapshotState: Codable, Sendable, Equatable {
     case annotations(AnnotationsState)
     case automations(AutomationState)
     case automationRun(AutomationRunState)
+    case search(SearchState)
     /// A state that this version does not recognize, kept as raw JSON so it
     /// re-encodes unchanged.
     case unknown(AnyCodable)
@@ -10389,6 +11243,7 @@ public enum SnapshotState: Codable, Sendable, Equatable {
         case "ahp-resource-watch": return .resourceWatch(try ResourceWatchState(from: decoder))
         case "ahp-annotations": return .annotations(try AnnotationsState(from: decoder))
         case "ahp-automation-run": return .automationRun(try AutomationRunState(from: decoder))
+        case "ahp-search": return .search(try SearchState(from: decoder))
         case "ahp-tcp": return .empty(try EmptyState(from: decoder))
         case "ahp-otlp": return .empty(try EmptyState(from: decoder))
         default: return .unknown(try AnyCodable(from: decoder))
@@ -10408,6 +11263,7 @@ public enum SnapshotState: Codable, Sendable, Equatable {
         case .annotations(let state): try state.encode(to: encoder)
         case .automations(let state): try state.encode(to: encoder)
         case .automationRun(let state): try state.encode(to: encoder)
+        case .search(let state): try state.encode(to: encoder)
         case .unknown(let raw): try raw.encode(to: encoder)
         }
     }

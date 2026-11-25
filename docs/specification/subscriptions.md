@@ -30,6 +30,7 @@ All channels use the same `subscribe` and `unsubscribe` messages.
 | `ahp-canvas:/<id>` | `CanvasState` | Experimental. One canvas. The URI is listed in `ChatState.canvases`. See [Canvas Channel](/reference/canvas). |
 | `ahp-terminal:/<id>` | `TerminalState` | One terminal. See [Terminal Channel](/specification/terminal-channel). |
 | `ahp-tcp:/<id>` | `EmptyState` | Experimental. One TCP connection that the host opened with `createTcpConnection`. Private to the client that created it. See [TCP Channel](/specification/tcp-channel). |
+| `ahp-search:/<id>` | `SearchState` | Experimental. One search that a client started with `createSearch`. See [Search Channel](/specification/search-channel). |
 | `ahp-changeset:/<id>` | `ChangesetState` | One changeset. The client builds the URI from the `Changeset.uriTemplate` of a session or chat. |
 | `ahp-resource-watch:/<id>` | `ResourceWatchState` | One file watch. The URI is returned by `createResourceWatch`. |
 | `ahp-otlp:` | `EmptyState` | OpenTelemetry logs, traces, or metrics. The URIs are listed in `InitializeResult.telemetry`. See [Telemetry Channel](/specification/telemetry-channel). |
@@ -57,6 +58,7 @@ route any message using only its `method` and `params.channel`.
 | `moveChat` | The URI of the chat to move |
 | `createTerminal`, `disposeTerminal` | The terminal URI. For `createTerminal`, this is the URI of the new terminal. |
 | `createTcpConnection` | The URI of the new TCP channel |
+| `createSearch` | The URI of the new search channel |
 | `invokeChangesetOperation` | The changeset URI |
 | `subscribe`, `unsubscribe` | The URI of the channel being subscribed to or released |
 | `dispatchAction`, `action` | The URI of the channel that the action changes |
