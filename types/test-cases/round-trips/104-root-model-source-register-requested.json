@@ -1,14 +1,14 @@
 {
-  "name": "root-model-source-set",
+  "name": "root-model-source-register-requested",
   "group": "A",
-  "description": "A client registers a model source with root/modelSourceSet: the source with its definition, in the suggested openaiCompatible shape plus a member the agent defines, a nonce for it, requested retention, and no host-reported fields.",
+  "description": "A client asks the host to register a model source with root/modelSourceRegisterRequested, giving its registration: the format, a definition in a common shape plus a member the agent defines, and the requested retention.",
   "type": "StateAction",
   "input": {
-    "type": "root/modelSourceSet",
-    "modelSource": {
-      "id": "source-new",
-      "provider": "example",
-      "displayName": "OpenRouter",
+    "type": "root/modelSourceRegisterRequested",
+    "modelSourceId": "source-new",
+    "provider": "example",
+    "displayName": "OpenRouter",
+    "registration": {
       "format": "openaiCompatible",
       "definition": {
         "endpoint": "https://openrouter.ai/api/v1",
@@ -28,17 +28,16 @@
           "x-title": "Example"
         }
       },
-      "nonce": "sha256-new-1",
       "retention": "host"
     }
   },
   "acceptableOutputs": [
     {
-      "type": "root/modelSourceSet",
-      "modelSource": {
-        "id": "source-new",
-        "provider": "example",
-        "displayName": "OpenRouter",
+      "type": "root/modelSourceRegisterRequested",
+      "modelSourceId": "source-new",
+      "provider": "example",
+      "displayName": "OpenRouter",
+      "registration": {
         "format": "openaiCompatible",
         "definition": {
           "endpoint": "https://openrouter.ai/api/v1",
@@ -58,7 +57,6 @@
             "x-title": "Example"
           }
         },
-        "nonce": "sha256-new-1",
         "retention": "host"
       }
     }

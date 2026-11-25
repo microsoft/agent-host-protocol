@@ -49,17 +49,26 @@
             {
               "id": "source-a",
               "provider": "example",
-              "displayName": "Service A"
+              "displayName": "Service A",
+              "state": {
+                "kind": "ready"
+              }
             },
             {
               "id": "source-b",
               "provider": "example",
-              "displayName": "Service B"
+              "displayName": "Service B",
+              "state": {
+                "kind": "ready"
+              }
             },
             {
               "id": "source-c",
               "provider": "example",
-              "displayName": "Service C"
+              "displayName": "Service C",
+              "state": {
+                "kind": "ready"
+              }
             }
           ]
         }
@@ -113,17 +122,26 @@
               {
                 "id": "source-a",
                 "provider": "example",
-                "displayName": "Service A"
+                "displayName": "Service A",
+                "state": {
+                  "kind": "ready"
+                }
               },
               {
                 "id": "source-b",
                 "provider": "example",
-                "displayName": "Service B"
+                "displayName": "Service B",
+                "state": {
+                  "kind": "ready"
+                }
               },
               {
                 "id": "source-c",
                 "provider": "example",
-                "displayName": "Service C"
+                "displayName": "Service C",
+                "state": {
+                  "kind": "ready"
+                }
               }
             ]
           }

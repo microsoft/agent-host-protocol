@@ -94,9 +94,9 @@ public enum ActionType: Codable, Sendable, Equatable {
     case annotationsEntryRemoved
     case rootTerminalsChanged
     case rootConfigChanged
+    case rootModelSourceRegisterRequested
     case rootModelSourceSet
     case rootModelSourceRemoved
-    case rootModelSourceStateChanged
     case terminalData
     case terminalInput
     case terminalResized
@@ -216,9 +216,9 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "annotations/entryRemoved": self = .annotationsEntryRemoved
         case "root/terminalsChanged": self = .rootTerminalsChanged
         case "root/configChanged": self = .rootConfigChanged
+        case "root/modelSourceRegisterRequested": self = .rootModelSourceRegisterRequested
         case "root/modelSourceSet": self = .rootModelSourceSet
         case "root/modelSourceRemoved": self = .rootModelSourceRemoved
-        case "root/modelSourceStateChanged": self = .rootModelSourceStateChanged
         case "terminal/data": self = .terminalData
         case "terminal/input": self = .terminalInput
         case "terminal/resized": self = .terminalResized
@@ -338,9 +338,9 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .annotationsEntryRemoved: try container.encode("annotations/entryRemoved")
         case .rootTerminalsChanged: try container.encode("root/terminalsChanged")
         case .rootConfigChanged: try container.encode("root/configChanged")
+        case .rootModelSourceRegisterRequested: try container.encode("root/modelSourceRegisterRequested")
         case .rootModelSourceSet: try container.encode("root/modelSourceSet")
         case .rootModelSourceRemoved: try container.encode("root/modelSourceRemoved")
-        case .rootModelSourceStateChanged: try container.encode("root/modelSourceStateChanged")
         case .terminalData: try container.encode("terminal/data")
         case .terminalInput: try container.encode("terminal/input")
         case .terminalResized: try container.encode("terminal/resized")
@@ -2339,24 +2339,14 @@ public struct RootConfigChangedAction: Codable, Sendable, Equatable {
     }
 }
 
-/// Adds a model source, or updates the one with the same `id`:
-///
-/// - **Add.** When no model source has the `id`, appends `modelSource`.
-/// - **Re-register.** When one has, with the same `provider`, `format`, and
-/// `nonce`, keeps its host-reported fields (`state`, `credentialResource`,
-/// and `accountId`) and takes everything else from the action.
-/// - **Update.** When any of the three differs, replaces the source. Its
-/// host-reported fields are absent until the host reports again with
-/// {@link RootModelSourceStateChangedAction}.
-///
-/// A client registers a source with its `format`, `definition`, and `nonce`,
-/// and without any host-reported field. The host learns which client
-/// registered it from the envelope's `origin`.
+/// Adds a model source, or replaces the one with the same `id`. Only the host
+/// dispatches it, to publish a registration, a source an agent provides
+/// itself, or a change in a source's status.
 ///
 /// Stability: 1.0 - Early development.
 public struct RootModelSourceSetAction: Codable, Sendable, Equatable {
     public var type: ActionType
-    /// The model source to add or update, matched by `id`.
+    /// The model source to add or replace, matched by `id`.
     public var modelSource: ModelSource
 
     public init(
@@ -2386,36 +2376,56 @@ public struct RootModelSourceRemovedAction: Codable, Sendable, Equatable {
     }
 }
 
-/// Updates a model source's host-reported fields together: `state`,
-/// `credentialResource`, and `accountId`. A no-op when no model source has
-/// `modelSourceId`. Other fields of the source are preserved. Only the host
-/// dispatches it.
+/// Asks the host to register a model source, or to update the one with the
+/// same `modelSourceId`. The reducer leaves state unchanged. The host counts
+/// the dispatching client as a contributing client, validates the
+/// registration, and publishes the result with
+/// {@link RootModelSourceSetAction | `root/modelSourceSet`}. It keeps the
+/// source's status and credential when the registration is unchanged.
 ///
 /// Stability: 1.0 - Early development.
-public struct RootModelSourceStateChangedAction: Codable, Sendable, Equatable {
+public struct RootModelSourceRegisterRequestedAction: Codable, Sendable, Equatable {
     public var type: ActionType
-    /// The model source's `id`.
+    /// The model source's `id`, chosen by the client.
     public var modelSourceId: String
-    /// The new status.
-    public var state: ModelSourceState
-    /// Replaces the source's `credentialResource`. Absent clears it, for a
-    /// source that needs no credential.
-    public var credentialResource: ProtectedResourceMetadata?
-    /// Replaces the source's `accountId`. Absent clears it.
-    public var accountId: String?
+    /// Agent provider whose agent serves the source's models.
+    public var provider: String
+    /// Human-readable name.
+    public var displayName: String
+    /// Icons for UI display.
+    public var icons: [Icon]?
+    /// The source's format, definition, and retention.
+    public var registration: ModelSourceRegistration
+    /// Additional implementation-defined metadata for this model source.
+    /// MUST NOT contain a credential.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case modelSourceId
+        case provider
+        case displayName
+        case icons
+        case registration
+        case meta = "_meta"
+    }
 
     public init(
         type: ActionType,
         modelSourceId: String,
-        state: ModelSourceState,
-        credentialResource: ProtectedResourceMetadata? = nil,
-        accountId: String? = nil
+        provider: String,
+        displayName: String,
+        icons: [Icon]? = nil,
+        registration: ModelSourceRegistration,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.type = type
         self.modelSourceId = modelSourceId
-        self.state = state
-        self.credentialResource = credentialResource
-        self.accountId = accountId
+        self.provider = provider
+        self.displayName = displayName
+        self.icons = icons
+        self.registration = registration
+        self.meta = meta
     }
 }
 
@@ -2979,7 +2989,7 @@ public enum StateAction: Codable, Sendable, Equatable {
     case rootConfigChanged(RootConfigChangedAction)
     case rootModelSourceSet(RootModelSourceSetAction)
     case rootModelSourceRemoved(RootModelSourceRemovedAction)
-    case rootModelSourceStateChanged(RootModelSourceStateChangedAction)
+    case rootModelSourceRegisterRequested(RootModelSourceRegisterRequestedAction)
     case terminalData(TerminalDataAction)
     case terminalInput(TerminalInputAction)
     case terminalResized(TerminalResizedAction)
@@ -3196,8 +3206,8 @@ public enum StateAction: Codable, Sendable, Equatable {
             self = .rootModelSourceSet(try RootModelSourceSetAction(from: decoder))
         case "root/modelSourceRemoved":
             self = .rootModelSourceRemoved(try RootModelSourceRemovedAction(from: decoder))
-        case "root/modelSourceStateChanged":
-            self = .rootModelSourceStateChanged(try RootModelSourceStateChangedAction(from: decoder))
+        case "root/modelSourceRegisterRequested":
+            self = .rootModelSourceRegisterRequested(try RootModelSourceRegisterRequestedAction(from: decoder))
         case "terminal/data":
             self = .terminalData(try TerminalDataAction(from: decoder))
         case "terminal/input":
@@ -3343,7 +3353,7 @@ public enum StateAction: Codable, Sendable, Equatable {
         case .rootConfigChanged(let v): try v.encode(to: encoder)
         case .rootModelSourceSet(let v): try v.encode(to: encoder)
         case .rootModelSourceRemoved(let v): try v.encode(to: encoder)
-        case .rootModelSourceStateChanged(let v): try v.encode(to: encoder)
+        case .rootModelSourceRegisterRequested(let v): try v.encode(to: encoder)
         case .terminalData(let v): try v.encode(to: encoder)
         case .terminalInput(let v): try v.encode(to: encoder)
         case .terminalResized(let v): try v.encode(to: encoder)

@@ -1171,7 +1171,7 @@
       "properties": {
         "format": {
           "type": "string",
-          "description": "A {@link ModelSource.format} value."
+          "description": "A {@link ModelSourceRegistration.format} value."
         }
       },
       "required": [
@@ -1201,34 +1201,21 @@
           },
           "description": "Icons for UI display."
         },
-        "format": {
-          "type": "string",
-          "description": "The format of `definition`: the `format` of one of the agent's\n{@link ModelSourceRegistrationCapability.formats}. Present on a\nregistered source.\n\nAgents choose the formats they read. Some may read these common names:\n\n- `'openaiCompatible'`: an endpoint that implements OpenAI's API.\n- `'anthropic'`: an endpoint that implements Anthropic's Messages API.\n- `'azureOpenai'`: an Azure OpenAI deployment.\n- `'gemini'`: Google's Gemini API.\n\nOther formats are named with a namespace, such as\n`example.com/model-source@1`, so they don't collide."
-        },
-        "definition": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "How to reach the source, in `format`: endpoint, wire API, models, and so\non. The agent reads it. Every client can read it, so it MUST NOT contain\na credential. Present on a registered source.\n\nAn agent that reads one of the common format names might expect a shape\nlike `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is\nthe API's base URI and each `models` entry is `{ id, name?,\nmaxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,\nnamed as in {@link SessionModelInfo}."
-        },
-        "nonce": {
-          "type": "string",
-          "description": "Opaque version token for `definition`, such as a hash of it, chosen by\nwhoever registers the source. Present on a registered source. Reducers\ncompare it, instead of the definition, to tell an update from a\nre-registration of the same definition."
-        },
-        "retention": {
-          "$ref": "#/$defs/ModelSourceRetentionPolicy",
-          "description": "What happens when the last contributing client leaves. Absent means `contributingClient`."
+        "registration": {
+          "$ref": "#/$defs/ModelSourceRegistration",
+          "description": "How the source was registered. Absent on a source the agent provides\nitself."
         },
         "state": {
           "$ref": "#/$defs/ModelSourceState",
-          "description": "Host-reported status, set with {@link RootModelSourceStateChangedAction}.\nAbsent until the host reports one, and after an update replaces the\ndefinition until the host reports again."
+          "description": "The source's status."
         },
         "credentialResource": {
           "$ref": "#/$defs/ProtectedResourceMetadata",
-          "description": "RFC 9728 metadata for the endpoint a registered source's credential is\nfor. Present whenever the source takes a credential, in every state, so\nany client can deliver or rotate one. Set with `state`.\n\n`credentialResource.resource` is the endpoint URL as the definition\nnames it, in any scheme the agent supports (for example\n`http://localhost:11434/v1`). It's the value a client passes back as\n`authenticate({ resource })`."
+          "description": "RFC 9728 metadata for the endpoint a registered source's credential is\nfor. Present whenever the source takes a credential, in every state, so\nany client can deliver or rotate one.\n\n`credentialResource.resource` is the endpoint URL as the definition\nnames it, in any scheme the agent supports (for example\n`http://localhost:11434/v1`). It's the value a client passes back as\n`authenticate({ resource })`."
         },
         "accountId": {
           "type": "string",
-          "description": "The {@link AuthenticateParams.accountId} sent with the credential the\nhost most recently accepted. Set with `state`."
+          "description": "The {@link AuthenticateParams.accountId} sent with the credential the\nhost most recently accepted."
         },
         "_meta": {
           "type": "object",
@@ -1239,7 +1226,31 @@
       "required": [
         "id",
         "provider",
-        "displayName"
+        "displayName",
+        "state"
+      ]
+    },
+    "ModelSourceRegistration": {
+      "type": "object",
+      "description": "How a client, or the host from its own configuration, registered a model\nsource.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "format": {
+          "type": "string",
+          "description": "The format of `definition`: the `format` of one of the agent's\n{@link ModelSourceRegistrationCapability.formats}.\n\nAgents choose the formats they read. Some may read these common names:\n\n- `'openaiCompatible'`: an endpoint that implements OpenAI's API.\n- `'anthropic'`: an endpoint that implements Anthropic's Messages API.\n- `'azureOpenai'`: an Azure OpenAI deployment.\n- `'gemini'`: Google's Gemini API.\n\nOther formats are named with a namespace, such as\n`example.com/model-source@1`, so they don't collide."
+        },
+        "definition": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "How to reach the source, in `format`: endpoint, wire API, models, and so\non. The agent reads it. Every client can read it, so it MUST NOT contain\na credential.\n\nAn agent that reads one of the common format names might expect a shape\nlike `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is\nthe API's base URI and each `models` entry is `{ id, name?,\nmaxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,\nnamed as in {@link SessionModelInfo}."
+        },
+        "retention": {
+          "$ref": "#/$defs/ModelSourceRetentionPolicy",
+          "description": "What happens when the last contributing client leaves. Absent means `contributingClient`."
+        }
+      },
+      "required": [
+        "format",
+        "definition"
       ]
     },
     "ModelSourceStartingState": {
@@ -7345,14 +7356,6 @@
       "type": "string",
       "description": "Policy configuration state for a model."
     },
-    "ModelSourceRetentionPolicy": {
-      "enum": [
-        "contributingClient",
-        "host"
-      ],
-      "type": "string",
-      "description": "How long a registered model source lasts once its last contributing client\nleaves."
-    },
     "ModelSourceState": {
       "oneOf": [
         {
@@ -7369,6 +7372,14 @@
         }
       ],
       "description": "Lifecycle state of a {@link ModelSource}, discriminated by\n`kind` (a {@link ModelSourceStatus} value)."
+    },
+    "ModelSourceRetentionPolicy": {
+      "enum": [
+        "contributingClient",
+        "host"
+      ],
+      "type": "string",
+      "description": "How long a registered model source lasts once its last contributing client\nleaves."
     },
     "ModelSourceAuthRequiredReason": {
       "enum": [

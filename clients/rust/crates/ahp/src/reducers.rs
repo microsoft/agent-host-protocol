@@ -62,7 +62,7 @@ use ahp_types::state::{
     ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatConfigState, ChatInputRequest,
     ChatState, ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
     ErrorResponsePart, InputRequestResponsePart, MaterializedTurn, McpServerCustomization,
-    McpServerStartingState, McpServerState, McpServerStoppedState, ModelSource, PendingMessage,
+    McpServerStartingState, McpServerState, McpServerStoppedState, PendingMessage,
     PendingMessageKind, ResourceWatchState, ResponsePart, RootState, SearchLifecycleState,
     SearchPendingLifecycleState, SearchRunningLifecycleState, SearchState, SessionInputRequest,
     SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart, TerminalContentPart,
@@ -721,20 +721,12 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
             }
             ReduceOutcome::Applied
         }
+        StateAction::RootModelSourceRegisterRequested(_) => ReduceOutcome::NoOp,
         StateAction::RootModelSourceSet(a) => {
             let list = state.model_sources.get_or_insert_with(Vec::new);
-            let idx = list.iter().position(|s| s.id == a.model_source.id);
-            let mut updated = a.model_source.clone();
-            match idx
-                .map(|i| &list[i])
-                .filter(|existing| same_model_source_version(existing, &a.model_source))
-            {
-                Some(existing) => copy_model_source_host_fields(&mut updated, existing),
-                None => clear_model_source_host_fields(&mut updated),
-            }
-            match idx {
-                Some(i) => list[i] = updated,
-                None => list.push(updated),
+            match list.iter().position(|s| s.id == a.model_source.id) {
+                Some(i) => list[i] = a.model_source.clone(),
+                None => list.push(a.model_source.clone()),
             }
             ReduceOutcome::Applied
         }
@@ -748,41 +740,8 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
             list.remove(idx);
             ReduceOutcome::Applied
         }
-        StateAction::RootModelSourceStateChanged(a) => {
-            let Some(source) = state
-                .model_sources
-                .as_mut()
-                .and_then(|list| list.iter_mut().find(|s| s.id == a.model_source_id))
-            else {
-                return ReduceOutcome::NoOp;
-            };
-            source.state = Some(a.state.clone());
-            source.credential_resource = a.credential_resource.clone();
-            source.account_id = a.account_id.clone();
-            ReduceOutcome::Applied
-        }
         _ => ReduceOutcome::OutOfScope,
     }
-}
-
-/// Whether two model sources have the same `provider`, `format`, and
-/// definition `nonce`.
-fn same_model_source_version(a: &ModelSource, b: &ModelSource) -> bool {
-    a.provider == b.provider && a.format == b.format && a.nonce == b.nonce
-}
-
-/// Copies the host-reported fields of `from` onto `to`.
-fn copy_model_source_host_fields(to: &mut ModelSource, from: &ModelSource) {
-    to.state = from.state.clone();
-    to.credential_resource = from.credential_resource.clone();
-    to.account_id = from.account_id.clone();
-}
-
-/// Clears the host-reported fields of `source`.
-fn clear_model_source_host_fields(source: &mut ModelSource) {
-    source.state = None;
-    source.credential_resource = None;
-    source.account_id = None;
 }
 
 // ─── Session Reducer ──────────────────────────────────────────────────

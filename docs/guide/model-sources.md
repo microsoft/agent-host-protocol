@@ -13,14 +13,14 @@ Reading the definition, validating endpoints, discovering models, and the wire p
 
 ## Where model sources appear
 
-Every source is an entry in `RootState.modelSources`, naming the agent `provider` it serves. There are two kinds:
+Every source is an entry in `RootState.modelSources`, naming the agent `provider` it serves and its `state`. There are two kinds:
 
-1. **Built-in sources** that an agent provides itself, such as a first-party subscription. The host lists them without a `format` or `definition`, and their sign-in uses [`AgentInfo.protectedResources`](/specification/authentication#discovery).
-2. **Registered sources** that a client registered, or that the host registered from its own configuration. They carry a `format`, a `definition`, and a `nonce`, and the host reports their status.
+1. **Built-in sources** that an agent provides itself, such as a first-party subscription. The host lists them without a `registration`, and their sign-in uses [`AgentInfo.protectedResources`](/specification/authentication#discovery).
+2. **Registered sources** that a client registered, or that the host registered from its own configuration. Their `registration` carries the definition the agent reads.
 
 ```typescript
 const sources = state.modelSources?.filter(s => s.provider === agent.provider) ?? [];
-const registered = sources.filter(s => s.definition !== undefined);
+const registered = sources.filter(s => s.registration !== undefined);
 ```
 
 ## Shape
@@ -31,13 +31,12 @@ ModelSource {
   provider: string                      // agent provider that serves its models
   displayName: string
   icons?: Icon[]
-  format?: string                       // registered sources only
-  definition?: Record<string, unknown>  // how the agent reaches the source; never a credential
-  nonce?: string                        // version token for definition
-  retention?: 'contributingClient' | 'host'
-
-  // Host-reported, set together by root/modelSourceStateChanged
-  state?: ModelSourceState              // starting | ready | authRequired | error
+  registration?: {                      // absent on built-in sources
+    format: string
+    definition: Record<string, unknown> // how the agent reaches the source; never a credential
+    retention?: 'contributingClient' | 'host'
+  }
+  state: ModelSourceState               // starting | ready | authRequired | error
   credentialResource?: ProtectedResourceMetadata
   accountId?: string
 }
@@ -45,25 +44,22 @@ ModelSource {
 
 ## Registering a source
 
-An agent that serves models from client-registered sources advertises [`AgentCapabilities.modelSourceRegistration`](/reference/root#modelsourceregistrationcapability) with the formats it reads, most preferred first. Each agent decides which formats it reads. `ModelSource.format` notes a few common names that some agents may read, such as `openaiCompatible` and `anthropic`. Other formats are named with a namespace, such as `example.com/model-source@1`.
+An agent that serves models from client-registered sources advertises [`AgentCapabilities.modelSourceRegistration`](/reference/root#modelsourceregistrationcapability) with the formats it reads, most preferred first. Each agent decides which formats it reads. `ModelSourceRegistration.format` notes a few common names that some agents may read, such as `openaiCompatible` and `anthropic`. Other formats are named with a namespace, such as `example.com/model-source@1`.
 
-A client registers a source with [`root/modelSourceSet`](/reference/root#rootmodelsourcesetaction), giving its `format`, a `definition` that tells the agent how to reach it, and a `nonce` that versions the definition, such as a hash of it. Every client can read a definition, so it MUST NOT contain a credential.
+Registration follows the same pattern as automations: the client asks, and the host publishes the result.
 
-`Set` adds the source, or replaces the one with the same `id`:
+1. A client dispatches [`root/modelSourceRegisterRequested`](/reference/root#rootmodelsourceregisterrequestedaction) with the source's `modelSourceId`, `provider`, `displayName`, and a `registration` holding its `format` and a `definition` that tells the agent how to reach it. Every client can read a definition, so it MUST NOT contain a credential. The request doesn't change state.
+2. The host validates the request and publishes the source with [`root/modelSourceSet`](/reference/root#rootmodelsourcesetaction), which adds it or replaces the one with the same `id`. When the registration is unchanged, the host keeps the source's status and credential. When the definition changes, it drops the credential and the source goes back to `starting`.
 
-- **Add.** No source has the `id`.
-- **Re-register.** One has, with the same `provider`, `format`, and `nonce`. The source keeps its host-reported fields and takes everything else from the action, so re-registering doesn't disturb a working source.
-- **Update.** Any of the three differs. The source is replaced, its host-reported fields stay absent until the host reports again, and the host drops its credential.
+[`root/modelSourceRemoved`](/reference/root#rootmodelsourceremovedaction) removes a source for every client. The host rejects either client action when it breaks the rules in [Server Validation of Client Actions](/specification/root-channel#server-validation-of-client-actions).
 
-[`root/modelSourceRemoved`](/reference/root#rootmodelsourceremovedaction) removes a source for every client. The host rejects either action when it breaks the rules in [Server Validation of Client Actions](/specification/root-channel#server-validation-of-client-actions).
+A client registers its sources when it starts or reconnects, and when the user changes one. It SHOULD derive `id` from a stable key in its own configuration, so every window and device with the same source shares one. It SHOULD NOT replace a source whose definition differs from its own copy unless the user changed that source; otherwise two clients with different configurations replace each other's source indefinitely.
 
-A client registers its sources when it starts or reconnects, and when the user changes one. It SHOULD derive `id` from a stable key in its own configuration, so every window and device with the same source shares one. It SHOULD NOT replace a source whose `nonce` differs from its own copy unless the user changed that source; otherwise two clients with different configurations replace each other's source indefinitely.
-
-Each client that registers a source is a **contributing client**. The host tracks contributing clients itself, from `ActionEnvelope.origin`, so they aren't in state. Every connected client may change, supply credentials for, and select every source. A host that can verify principals MAY restrict a source to clients of the principal that registered it.
+Each client that requests a registration is a **contributing client**. The host tracks contributing clients itself, from `ActionEnvelope.origin`, so they aren't in state. Every connected client may change, supply credentials for, and select every source. A host that can verify principals MAY restrict a source to clients of the principal that registered it.
 
 ## Status
 
-The host reports a registered source's status with [`root/modelSourceStateChanged`](/reference/root#rootmodelsourcestatechangedaction), which sets `state`, `credentialResource`, and `accountId` together. The reducer ignores an unknown `modelSourceId`, so a late report can't bring back a removed source.
+Only the host dispatches `root/modelSourceSet`, and it uses it for every change to a source, including its `state`, `credentialResource`, and `accountId`.
 
 ```mermaid
 stateDiagram-v2
@@ -91,13 +87,13 @@ sequenceDiagram
     participant C as Client
     participant H as Agent Host
 
-    C->>H: root/modelSourceSet (format, definition, nonce)
-    H-->>C: root/modelSourceStateChanged (authRequired, credentialResource)
+    C->>H: root/modelSourceRegisterRequested (registration)
+    H-->>C: root/modelSourceSet (authRequired, credentialResource)
 
     C->>H: authenticate({ resource, token, accountId, target: { kind: 'modelSource', modelSourceId } })
     H-->>C: {}
 
-    H-->>C: root/modelSourceStateChanged (ready, accountId)
+    H-->>C: root/modelSourceSet (ready, accountId)
     H-->>C: root/agentsChanged (the source's models join the agent's models)
 ```
 
@@ -110,11 +106,11 @@ The token is whatever the source's definition calls for, such as an API key. The
 | `rejected` | The endpoint refused the credential. `accountId` still names it. | Only a key whose `accountId` differs. |
 | `revoked` | A client revoked the credential. | Nothing, until a user asks. |
 
-Clients MUST NOT cache a model source credential they delivered, or replay one, for example after a reconnect. A client delivers one only in answer to the source's current state, and MUST NOT send a stored secret unless the source's `provider` and `format` match its own copy and every endpoint in the source's `definition` that the key would reach is one its own copy sends the key to.
+Clients MUST NOT cache a model source credential they delivered, or replay one, for example after a reconnect. A client delivers one only in answer to the source's current state, and MUST NOT send a stored secret unless the source's `provider` and `registration.format` match its own copy and every endpoint in its `registration.definition` that the key would reach is one its own copy sends the key to.
 
 ## Retention
 
-A source's `retention` decides what happens when its last contributing client disconnects and doesn't return within a grace period the host chooses:
+A registered source's `registration.retention` decides what happens when its last contributing client disconnects and doesn't return within a grace period the host chooses:
 
 - `contributingClient`, the default: the host stops new work on the source, lets running turns finish, and then removes it.
 - `host`: the source stays until a client removes it or host policy expires it.

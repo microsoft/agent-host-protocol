@@ -1,5 +1,19 @@
 {
   "type": "added",
-  "message": "Model source registry: clients can register bring-your-own-key model sources with the host through the client-dispatchable `root/modelSourceSet` and `root/modelSourceRemoved` actions. A registered `ModelSource` carries its `format`, its `definition`, and a `nonce` for it: re-registering the same `provider`, `format`, and `nonce` keeps the source's status and credential. Agents advertise the formats they read as `ModelSourceFormatInfo` entries in `AgentCapabilities.modelSourceRegistration`. Clients deliver each source's credential with a `modelSource` `authenticate` target, naming the key with `authenticate`'s `accountId`. The host reports status, `credentialResource`, and `accountId` with the host-only `root/modelSourceStateChanged` action, using model-source-specific auth reasons (`required`, `expired`, `rejected`, `revoked`). Requests and turns that need an unavailable source fail with the new `AhpErrorCodes.ModelSourceUnavailable` (`-32013`), which a turn's error part carries in the new optional `ErrorInfo.errorCode`.",
+  "message": "Add a model source registry so clients can register bring-your-own-key model sources with the host, and use their models in any session or automation.",
+  "details": [
+    "```ts",
+    "// A client asks the host to register a source in a format the agent reads.",
+    "dispatch({",
+    "  type: 'root/modelSourceRegisterRequested',",
+    "  modelSourceId: 'byok/openrouter', provider: 'copilot', displayName: 'OpenRouter',",
+    "  registration: { format: 'openaiCompatible', definition: { endpoint: 'https://openrouter.ai/api/v1' } },",
+    "});",
+    "// The host publishes it with root/modelSourceSet. While its state is authRequired,",
+    "// the client delivers the key with an authenticate target of kind 'modelSource'.",
+    "```",
+    "Agents advertise the formats they read in `AgentCapabilities.modelSourceRegistration`. Requests and turns that need an unavailable source fail with `AhpErrorCodes.ModelSourceUnavailable` (`-32013`), which a turn's error part carries in the new optional `ErrorInfo.errorCode`.",
+    "Read more in [Model Sources](https://microsoft.github.io/agent-host-protocol/guide/model-sources)."
+  ],
   "issues": [619]
 }

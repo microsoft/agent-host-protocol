@@ -1,5 +1,5 @@
 {
-  "description": "root/modelSourceSet adds a model source, including its definition, to an absent registry",
+  "description": "root/modelSourceSet adds a model source to an absent registry",
   "reducer": "root",
   "initial": {
     "agents": []
@@ -11,16 +11,20 @@
         "id": "model-source-a",
         "provider": "copilot",
         "displayName": "Source a",
-        "format": "openaiCompatible",
-        "definition": {
-          "endpoint": "https://apia.example.com/v1",
-          "models": [
-            {
-              "id": "model-a"
-            }
-          ]
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v1",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
         },
-        "nonce": "definition-a-v1"
+        "state": {
+          "kind": "starting"
+        }
       }
     }
   ],
@@ -31,16 +35,20 @@
         "id": "model-source-a",
         "provider": "copilot",
         "displayName": "Source a",
-        "format": "openaiCompatible",
-        "definition": {
-          "endpoint": "https://apia.example.com/v1",
-          "models": [
-            {
-              "id": "model-a"
-            }
-          ]
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v1",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
         },
-        "nonce": "definition-a-v1"
+        "state": {
+          "kind": "starting"
+        }
       }
     ]
   }

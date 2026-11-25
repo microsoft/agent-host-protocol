@@ -132,11 +132,6 @@ public func rootReducer(state: RootState, action: StateAction) -> RootState {
         guard applyModelSourceRemoved(&next, id: a.modelSourceId) else { return state }
         return next
 
-    case .rootModelSourceStateChanged(let a):
-        var next = state
-        guard applyModelSourceStateChanged(&next, a) else { return state }
-        return next
-
     default:
         return state
     }

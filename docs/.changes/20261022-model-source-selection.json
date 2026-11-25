@@ -4,7 +4,7 @@
   "details": [
     "```json",
     "{",
-    "  \"modelSources\": [{ \"id\": \"source-a\", \"provider\": \"example\", \"displayName\": \"Service A\" }],",
+    "  \"modelSources\": [{ \"id\": \"source-a\", \"provider\": \"example\", \"displayName\": \"Service A\", \"state\": { \"kind\": \"ready\" } }],",
     "  \"agents\": [{",
     "    \"provider\": \"example\",",
     "    \"models\": [{ \"id\": \"model-a\", \"provider\": \"example\", \"name\": \"Model\", \"modelSourceId\": \"source-a\" }]",

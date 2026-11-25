@@ -4,7 +4,12 @@
 
 ## Status
 
-Implemented by [#627](https://github.com/microsoft/agent-host-protocol/pull/627). The type sketches below show the intended shape; the canonical definitions are in `types/`.
+Implemented by [#627](https://github.com/microsoft/agent-host-protocol/pull/627). The type sketches below show the intended shape; the canonical definitions are in `types/` and the [Model Sources guide](/guide/model-sources). Review of #627 changed the shape in these ways:
+
+- `RootState.modelSources` lists every model source, including an agent's built-in ones, and replaces `ModelSourceInfo` and `AgentInfo.modelSources`. `state` is required.
+- A registered source's `format`, `definition`, and `retention` are grouped in `ModelSource.registration`, and there's no `nonce`: the host compares definitions itself.
+- Clients dispatch `root/modelSourceRegisterRequested`, which doesn't change state. The host publishes every source and status change with `root/modelSourceSet`, which replaces the entry, so there's no `root/modelSourceStateChanged`. `root/modelSourceRemoved` takes a `modelSourceId`.
+- Requests and turns on an unavailable source fail with `AhpErrorCodes.ModelSourceUnavailable`, which a turn carries in `ErrorInfo.errorCode`.
 
 An earlier revision proposed model sources as session-scoped plugin customizations. Review pointed out that BYOK configuration belongs to the user rather than to one session, and that automations and long-running headless sessions need model sources that outlive a client's session. This revision moves them to a host-wide registry. [§11](#_11-alternatives-considered) explains the trade-off.
 

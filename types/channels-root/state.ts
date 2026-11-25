@@ -312,7 +312,7 @@ export interface ModelSourceRegistrationCapability {
  * @stability 1.0
  */
 export interface ModelSourceFormatInfo {
-  /** A {@link ModelSource.format} value. */
+  /** A {@link ModelSourceRegistration.format} value. */
   format: string;
 }
 
@@ -338,52 +338,16 @@ export interface ModelSource {
   /** Icons for UI display. */
   icons?: Icon[];
   /**
-   * The format of `definition`: the `format` of one of the agent's
-   * {@link ModelSourceRegistrationCapability.formats}. Present on a
-   * registered source.
-   *
-   * Agents choose the formats they read. Some may read these common names:
-   *
-   * - `'openaiCompatible'`: an endpoint that implements OpenAI's API.
-   * - `'anthropic'`: an endpoint that implements Anthropic's Messages API.
-   * - `'azureOpenai'`: an Azure OpenAI deployment.
-   * - `'gemini'`: Google's Gemini API.
-   *
-   * Other formats are named with a namespace, such as
-   * `example.com/model-source@1`, so they don't collide.
+   * How the source was registered. Absent on a source the agent provides
+   * itself.
    */
-  format?: string;
-  /**
-   * How to reach the source, in `format`: endpoint, wire API, models, and so
-   * on. The agent reads it. Every client can read it, so it MUST NOT contain
-   * a credential. Present on a registered source.
-   *
-   * An agent that reads one of the common format names might expect a shape
-   * like `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is
-   * the API's base URI and each `models` entry is `{ id, name?,
-   * maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
-   * named as in {@link SessionModelInfo}.
-   */
-  definition?: Record<string, unknown>;
-  /**
-   * Opaque version token for `definition`, such as a hash of it, chosen by
-   * whoever registers the source. Present on a registered source. Reducers
-   * compare it, instead of the definition, to tell an update from a
-   * re-registration of the same definition.
-   */
-  nonce?: string;
-  /** What happens when the last contributing client leaves. Absent means `contributingClient`. */
-  retention?: ModelSourceRetentionPolicy;
-  /**
-   * Host-reported status, set with {@link RootModelSourceStateChangedAction}.
-   * Absent until the host reports one, and after an update replaces the
-   * definition until the host reports again.
-   */
-  state?: ModelSourceState;
+  registration?: ModelSourceRegistration;
+  /** The source's status. */
+  state: ModelSourceState;
   /**
    * RFC 9728 metadata for the endpoint a registered source's credential is
    * for. Present whenever the source takes a credential, in every state, so
-   * any client can deliver or rotate one. Set with `state`.
+   * any client can deliver or rotate one.
    *
    * `credentialResource.resource` is the endpoint URL as the definition
    * names it, in any scheme the agent supports (for example
@@ -395,7 +359,7 @@ export interface ModelSource {
   credentialResource?: ProtectedResourceMetadata;
   /**
    * The {@link AuthenticateParams.accountId} sent with the credential the
-   * host most recently accepted. Set with `state`.
+   * host most recently accepted.
    *
    * @see {@link /specification/authentication#model-source-credentials | Model source credentials}
    */
@@ -405,6 +369,46 @@ export interface ModelSource {
    * MUST NOT contain a credential.
    */
   _meta?: Record<string, unknown>;
+}
+
+/**
+ * How a client, or the host from its own configuration, registered a model
+ * source.
+ *
+ * @category Root State
+ * @stability 1.0
+ * @see {@link /guide/model-sources#registering-a-source | Model Sources guide}
+ */
+export interface ModelSourceRegistration {
+  /**
+   * The format of `definition`: the `format` of one of the agent's
+   * {@link ModelSourceRegistrationCapability.formats}.
+   *
+   * Agents choose the formats they read. Some may read these common names:
+   *
+   * - `'openaiCompatible'`: an endpoint that implements OpenAI's API.
+   * - `'anthropic'`: an endpoint that implements Anthropic's Messages API.
+   * - `'azureOpenai'`: an Azure OpenAI deployment.
+   * - `'gemini'`: Google's Gemini API.
+   *
+   * Other formats are named with a namespace, such as
+   * `example.com/model-source@1`, so they don't collide.
+   */
+  format: string;
+  /**
+   * How to reach the source, in `format`: endpoint, wire API, models, and so
+   * on. The agent reads it. Every client can read it, so it MUST NOT contain
+   * a credential.
+   *
+   * An agent that reads one of the common format names might expect a shape
+   * like `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is
+   * the API's base URI and each `models` entry is `{ id, name?,
+   * maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
+   * named as in {@link SessionModelInfo}.
+   */
+  definition: Record<string, unknown>;
+  /** What happens when the last contributing client leaves. Absent means `contributingClient`. */
+  retention?: ModelSourceRetentionPolicy;
 }
 
 /**

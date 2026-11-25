@@ -44,9 +44,9 @@ An agent provider can offer models from more than one source, such as a service,
 - Model IDs are stable. A host SHOULD keep a model's ID across catalog updates, so saved selections keep working. It MUST NOT reuse an ID for a different source or upstream model, even after the model leaves `models`. A saved selection whose ID is no longer in `models` is unavailable.
 - A source can have no models.
 
-A [`ModelSelection`](/reference/root#modelselection) names a model by its `id`, which also determines the source. The host lists the sources an agent provides itself. They have no `format` or `definition`, and their sign-in uses `AgentInfo.protectedResources`.
+A [`ModelSelection`](/reference/root#modelselection) names a model by its `id`, which also determines the source. The host lists the sources an agent provides itself. They have no `registration`, and their sign-in uses `AgentInfo.protectedResources`.
 
-Clients and hosts can also register sources the agent doesn't have, each with a definition the agent reads. The host reports each registered source's status, and clients deliver its credential with [`authenticate`](/specification/authentication#model-source-credentials). See the [Model Sources guide](/guide/model-sources).
+Clients and hosts can also register sources the agent doesn't have, each with a definition the agent reads. A client asks with `root/modelSourceRegisterRequested`, and the host publishes every source and its status with `root/modelSourceSet`, and clients deliver its credential with [`authenticate`](/specification/authentication#model-source-credentials). See the [Model Sources guide](/guide/model-sources).
 
 ### Paginating the catalogue
 
@@ -99,7 +99,7 @@ target channel instead.
 | `root/sessionSummaryChanged` | server → client notification | Session catalogue entry mutated. |
 | `root/progress` | server → client notification | Generic progress for a long-running operation a client opted into (e.g. an SDK download). |
 | `unsubscribe` | client → server notification | Stop receiving root-channel messages. |
-| `dispatchAction` | client → server notification | Dispatch a root-scoped client action: `root/configChanged`, `root/modelSourceSet`, or `root/modelSourceRemoved`. |
+| `dispatchAction` | client → server notification | Dispatch a root-scoped client action: `root/configChanged`, `root/modelSourceRegisterRequested`, or `root/modelSourceRemoved`. |
 
 `auth/required` may also be emitted on `ahp-root://` when the auth requirement
 is root-scoped; see [Authentication](/specification/authentication).
@@ -110,13 +110,11 @@ When the server receives a client-dispatched action on this channel, it MUST val
 
 | Action | Condition | Server Behavior |
 | --- | --- | --- |
-| `root/modelSourceSet` | The agent named by `provider` doesn't advertise `modelSourceRegistration`, or doesn't list `format` | Server MUST reject the action |
-| `root/modelSourceSet` | `format`, `definition`, or `nonce` is absent, or a host-reported field is present | Server MUST reject the action |
-| `root/modelSourceSet` | `provider`, `format`, and `nonce` match the existing source's, but `definition` differs | Server MUST reject the action |
-| `root/modelSourceSet` | The existing source with that `id` is one the host registered itself | Server MUST reject the action |
-| `root/modelSourceSet` | The host won't honor the requested `retention` | Server MUST reject the action |
+| `root/modelSourceRegisterRequested` | The agent named by `provider` doesn't advertise `modelSourceRegistration`, or doesn't list `registration.format` | Server MUST reject the action |
+| `root/modelSourceRegisterRequested` | The existing source with that `modelSourceId` is one the host registered itself | Server MUST reject the action |
+| `root/modelSourceRegisterRequested` | The host won't honor the requested `registration.retention` | Server MUST reject the action |
 | `root/modelSourceRemoved` | The source is one the host registered itself | Server MAY reject the action |
-| `root/modelSourceSet`, `root/modelSourceRemoved` | The host restricts sources by principal, and the source belongs to another principal | Server MAY reject the action |
+| `root/modelSourceRegisterRequested`, `root/modelSourceRemoved` | The host restricts sources by principal, and the source belongs to another principal | Server MAY reject the action |
 
 ## Actions
 
@@ -128,9 +126,9 @@ Root state is mutated by action envelopes broadcast on this channel. Refer to th
 | `root/activeSessionsChanged` | Server          | Replaces `activeSessions`            |
 | `root/terminalsChanged`      | Server          | Replaces `terminals`                 |
 | `root/configChanged`         | Server / Client | Merges (or replaces) `config.values` |
-| `root/modelSourceSet` | Server / Client | Adds a source to `modelSources`, or replaces the one with the same `id`. Keeps its host-reported fields when `provider`, `format`, and `nonce` are unchanged |
+| `root/modelSourceRegisterRequested` | Client | Asks the host to register or update a source. Doesn't change state |
+| `root/modelSourceSet` | Server | Adds a source to `modelSources`, or replaces the one with the same `id` |
 | `root/modelSourceRemoved` | Server / Client | Removes the source whose `id` is `modelSourceId` |
-| `root/modelSourceStateChanged` | Server | Sets a source's host-reported fields. A no-op for an unknown `modelSourceId` |
 
 All root-scoped action envelopes have `channel: "ahp-root://"`.
 

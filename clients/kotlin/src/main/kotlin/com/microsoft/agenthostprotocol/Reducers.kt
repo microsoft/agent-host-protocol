@@ -581,18 +581,14 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
         }
     }
 
+    is StateActionRootModelSourceRegisterRequested -> state
+
     is StateActionRootModelSourceSet -> {
         val source = action.value.modelSource
         val list = state.modelSources.orEmpty()
         val idx = list.indexOfFirst { it.id == source.id }
-        val existing = list.getOrNull(idx)?.takeIf { sameModelSourceVersion(it, source) }
-        val merged = source.copy(
-            state = existing?.state,
-            credentialResource = existing?.credentialResource,
-            accountId = existing?.accountId,
-        )
         val updated = list.toMutableList()
-        if (idx < 0) updated.add(merged) else updated[idx] = merged
+        if (idx < 0) updated.add(source) else updated[idx] = source
         state.copy(modelSources = updated)
     }
 
@@ -606,28 +602,8 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
         }
     }
 
-    is StateActionRootModelSourceStateChanged -> {
-        val list = state.modelSources
-        val idx = list?.indexOfFirst { it.id == action.value.modelSourceId } ?: -1
-        if (list == null || idx < 0) {
-            state
-        } else {
-            val updated = list.toMutableList()
-            updated[idx] = updated[idx].copy(
-                state = action.value.state,
-                credentialResource = action.value.credentialResource,
-                accountId = action.value.accountId,
-            )
-            state.copy(modelSources = updated)
-        }
-    }
-
     else -> state
 }
-
-/** Whether two model sources have the same `provider`, `format`, and definition `nonce`. */
-private fun sameModelSourceVersion(a: ModelSource, b: ModelSource): Boolean =
-    a.provider == b.provider && a.format == b.format && a.nonce == b.nonce
 
 // ─── Session Reducer ────────────────────────────────────────────────────────
 

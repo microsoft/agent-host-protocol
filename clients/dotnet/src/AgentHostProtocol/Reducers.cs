@@ -680,24 +680,19 @@ public static class Reducers
 
                 state.Config.Values = MergeConfig(state.Config.Values, a.Config, a.Replace);
                 return ReduceOutcome.Applied;
+            case RootModelSourceRegisterRequestedAction:
+                return ReduceOutcome.NoOp;
             case RootModelSourceSetAction a:
                 {
                     List<ModelSource> list = state.ModelSources ??= new List<ModelSource>();
                     int index = list.FindIndex(s => s.Id == a.ModelSource.Id);
-                    ModelSource? existing = index >= 0 && SameModelSourceVersion(list[index], a.ModelSource) ? list[index] : null;
-                    ModelSource merged = a.ModelSource with
-                    {
-                        State = existing?.State,
-                        CredentialResource = existing?.CredentialResource,
-                        AccountId = existing?.AccountId,
-                    };
                     if (index < 0)
                     {
-                        list.Add(merged);
+                        list.Add(a.ModelSource);
                     }
                     else
                     {
-                        list[index] = merged;
+                        list[index] = a.ModelSource;
                     }
 
                     return ReduceOutcome.Applied;
@@ -713,26 +708,10 @@ public static class Reducers
                     state.ModelSources!.RemoveAt(index);
                     return ReduceOutcome.Applied;
                 }
-            case RootModelSourceStateChangedAction a:
-                {
-                    int index = state.ModelSources?.FindIndex(s => s.Id == a.ModelSourceId) ?? -1;
-                    if (index < 0)
-                    {
-                        return ReduceOutcome.NoOp;
-                    }
-
-                    List<ModelSource> list = state.ModelSources!;
-                    list[index] = list[index] with { State = a.State, CredentialResource = a.CredentialResource, AccountId = a.AccountId };
-                    return ReduceOutcome.Applied;
-                }
         }
 
         return ReduceOutcome.OutOfScope;
     }
-
-    // Whether two model sources have the same provider, format, and definition nonce.
-    private static bool SameModelSourceVersion(ModelSource a, ModelSource b) =>
-        a.Provider == b.Provider && a.Format == b.Format && a.Nonce == b.Nonce;
 
     // Shared config merge for the root, session, and chat `configChanged` actions:
     // when `replace` is set (or no values exist yet) start fresh, otherwise
@@ -2758,7 +2737,7 @@ public static class Reducers
     private static readonly string[] s_clientDispatchableActionNames =
     {
         "root/configChanged",
-        "root/modelSourceSet",
+        "root/modelSourceRegisterRequested",
         "root/modelSourceRemoved",
         // Chat-channel actions (post-#213)
         "chat/turnStarted",

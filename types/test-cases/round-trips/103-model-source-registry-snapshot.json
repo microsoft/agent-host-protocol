@@ -1,7 +1,7 @@
 {
   "name": "model-source-registry-snapshot",
   "group": "A",
-  "description": "A root snapshot lists an agent's built-in model source, with no format, definition, or nonce, alongside registered model sources with no reported state and in each lifecycle state and auth reason (required, expired, rejected, and revoked), including an http endpoint, a host-retained source, and a host-registered source in a namespaced format. Each registered source carries its definition, including members an agent defines itself, and a nonce for it. Sources that take a credential carry a host-reported credentialResource in every state, and accountId once the host has accepted a key sent with one. The agent advertises the modelSourceRegistration capability with format objects, and its catalog lists the built-in source's model, the ready source's, and the authRequired one's whose key expired, since models stay listed after a source has been ready.",
+  "description": "A root snapshot lists an agent's built-in model source, with no registration, alongside registered model sources in each lifecycle state and auth reason (required, expired, rejected, and revoked), including an http endpoint, a host-retained source, and a host-registered source in a namespaced format. Each registered source carries its format and definition, including members an agent defines itself, in its registration. Sources that take a credential carry credentialResource in every state, and accountId once the host has accepted a key sent with one. The agent advertises the modelSourceRegistration capability with format objects, and its catalog lists the built-in source's model, the ready source's, and the authRequired one's whose key expired, since models stay listed after a source has been ready.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-root://",
@@ -61,32 +61,26 @@
         {
           "id": "source-builtin",
           "provider": "example",
-          "displayName": "Example subscription"
-        },
-        {
-          "id": "source-unreported",
-          "provider": "example",
-          "displayName": "Unreported",
-          "format": "anthropic",
-          "definition": {
-            "endpoint": "https://api.anthropic.example.com/v1"
-          },
-          "nonce": "sha256-unreported-1"
+          "displayName": "Example subscription",
+          "state": {
+            "kind": "ready"
+          }
         },
         {
           "id": "source-starting",
           "provider": "example",
           "displayName": "Starting",
-          "format": "gemini",
-          "definition": {
-            "endpoint": "https://gemini.example.com/v1beta",
-            "models": [
-              {
-                "id": "gemini-model"
-              }
-            ]
+          "registration": {
+            "format": "gemini",
+            "definition": {
+              "endpoint": "https://gemini.example.com/v1beta",
+              "models": [
+                {
+                  "id": "gemini-model"
+                }
+              ]
+            }
           },
-          "nonce": "sha256-starting-1",
           "state": {
             "kind": "starting"
           }
@@ -95,29 +89,30 @@
           "id": "source-ready",
           "provider": "example",
           "displayName": "OpenRouter",
-          "format": "openaiCompatible",
-          "definition": {
-            "endpoint": "https://api.example.com/v1",
-            "wireApi": "chatCompletions",
-            "models": [
-              {
-                "id": "vendor/model-a",
-                "name": "Example model",
-                "maxContextWindow": 128000,
-                "maxOutputTokens": 16384,
-                "supportsVision": true,
-                "supportsTools": true
-              }
-            ],
-            "fileEndpoint": "https://files.example.com/v1"
-          },
-          "nonce": "sha256-ready-1",
           "icons": [
             {
               "src": "https://example.com/openrouter.svg"
             }
           ],
-          "retention": "host",
+          "registration": {
+            "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "https://api.example.com/v1",
+              "wireApi": "chatCompletions",
+              "models": [
+                {
+                  "id": "vendor/model-a",
+                  "name": "Example model",
+                  "maxContextWindow": 128000,
+                  "maxOutputTokens": 16384,
+                  "supportsVision": true,
+                  "supportsTools": true
+                }
+              ],
+              "fileEndpoint": "https://files.example.com/v1"
+            },
+            "retention": "host"
+          },
           "state": {
             "kind": "ready"
           },
@@ -134,18 +129,19 @@
           "id": "source-auth",
           "provider": "example",
           "displayName": "Azure endpoint",
-          "format": "azureOpenai",
-          "definition": {
-            "endpoint": "https://example.openai.azure.com/openai/v1",
-            "apiVersion": "2024-10-21",
-            "models": [
-              {
-                "id": "example-deployment"
-              }
-            ]
+          "registration": {
+            "format": "azureOpenai",
+            "definition": {
+              "endpoint": "https://example.openai.azure.com/openai/v1",
+              "apiVersion": "2024-10-21",
+              "models": [
+                {
+                  "id": "example-deployment"
+                }
+              ]
+            },
+            "retention": "contributingClient"
           },
-          "nonce": "sha256-auth-1",
-          "retention": "contributingClient",
           "state": {
             "kind": "authRequired",
             "reason": "expired",
@@ -167,12 +163,13 @@
           "id": "source-local",
           "provider": "example",
           "displayName": "Local server",
-          "format": "openaiCompatible",
-          "definition": {
-            "endpoint": "http://localhost:11434/v1",
-            "wireApi": "responses"
+          "registration": {
+            "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "http://localhost:11434/v1",
+              "wireApi": "responses"
+            }
           },
-          "nonce": "sha256-local-1",
           "state": {
             "kind": "authRequired",
             "reason": "required"
@@ -186,22 +183,23 @@
           "id": "source-rejected",
           "provider": "example",
           "displayName": "Rejected key",
-          "format": "openaiCompatible",
-          "definition": {
-            "endpoint": "https://api.example.com/v1",
-            "models": [
-              {
-                "id": "vendor/model-a"
-              }
-            ]
-          },
-          "nonce": "sha256-rejected-1",
           "icons": [
             {
               "src": "https://example.com/openrouter.svg"
             }
           ],
-          "retention": "host",
+          "registration": {
+            "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "https://api.example.com/v1",
+              "models": [
+                {
+                  "id": "vendor/model-a"
+                }
+              ]
+            },
+            "retention": "host"
+          },
           "state": {
             "kind": "authRequired",
             "reason": "rejected",
@@ -217,22 +215,23 @@
           "id": "source-revoked",
           "provider": "example",
           "displayName": "Revoked key",
-          "format": "openaiCompatible",
-          "definition": {
-            "endpoint": "https://api.example.com/v1",
-            "models": [
-              {
-                "id": "vendor/model-a"
-              }
-            ]
-          },
-          "nonce": "sha256-revoked-1",
           "icons": [
             {
               "src": "https://example.com/openrouter.svg"
             }
           ],
-          "retention": "host",
+          "registration": {
+            "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "https://api.example.com/v1",
+              "models": [
+                {
+                  "id": "vendor/model-a"
+                }
+              ]
+            },
+            "retention": "host"
+          },
           "state": {
             "kind": "authRequired",
             "reason": "revoked"
@@ -247,14 +246,15 @@
           "id": "source-host",
           "provider": "example",
           "displayName": "Host-configured",
-          "format": "example.com/model-source@1",
-          "definition": {
-            "endpoint": "https://models.internal.example.com",
-            "routing": {
-              "region": "example-1"
+          "registration": {
+            "format": "example.com/model-source@1",
+            "definition": {
+              "endpoint": "https://models.internal.example.com",
+              "routing": {
+                "region": "example-1"
+              }
             }
           },
-          "nonce": "sha256-host-1",
           "state": {
             "kind": "error",
             "error": {
@@ -325,32 +325,26 @@
           {
             "id": "source-builtin",
             "provider": "example",
-            "displayName": "Example subscription"
-          },
-          {
-            "id": "source-unreported",
-            "provider": "example",
-            "displayName": "Unreported",
-            "format": "anthropic",
-            "definition": {
-              "endpoint": "https://api.anthropic.example.com/v1"
-            },
-            "nonce": "sha256-unreported-1"
+            "displayName": "Example subscription",
+            "state": {
+              "kind": "ready"
+            }
           },
           {
             "id": "source-starting",
             "provider": "example",
             "displayName": "Starting",
-            "format": "gemini",
-            "definition": {
-              "endpoint": "https://gemini.example.com/v1beta",
-              "models": [
-                {
-                  "id": "gemini-model"
-                }
-              ]
+            "registration": {
+              "format": "gemini",
+              "definition": {
+                "endpoint": "https://gemini.example.com/v1beta",
+                "models": [
+                  {
+                    "id": "gemini-model"
+                  }
+                ]
+              }
             },
-            "nonce": "sha256-starting-1",
             "state": {
               "kind": "starting"
             }
@@ -359,29 +353,30 @@
             "id": "source-ready",
             "provider": "example",
             "displayName": "OpenRouter",
-            "format": "openaiCompatible",
-            "definition": {
-              "endpoint": "https://api.example.com/v1",
-              "wireApi": "chatCompletions",
-              "models": [
-                {
-                  "id": "vendor/model-a",
-                  "name": "Example model",
-                  "maxContextWindow": 128000,
-                  "maxOutputTokens": 16384,
-                  "supportsVision": true,
-                  "supportsTools": true
-                }
-              ],
-              "fileEndpoint": "https://files.example.com/v1"
-            },
-            "nonce": "sha256-ready-1",
             "icons": [
               {
                 "src": "https://example.com/openrouter.svg"
               }
             ],
-            "retention": "host",
+            "registration": {
+              "format": "openaiCompatible",
+              "definition": {
+                "endpoint": "https://api.example.com/v1",
+                "wireApi": "chatCompletions",
+                "models": [
+                  {
+                    "id": "vendor/model-a",
+                    "name": "Example model",
+                    "maxContextWindow": 128000,
+                    "maxOutputTokens": 16384,
+                    "supportsVision": true,
+                    "supportsTools": true
+                  }
+                ],
+                "fileEndpoint": "https://files.example.com/v1"
+              },
+              "retention": "host"
+            },
             "state": {
               "kind": "ready"
             },
@@ -398,18 +393,19 @@
             "id": "source-auth",
             "provider": "example",
             "displayName": "Azure endpoint",
-            "format": "azureOpenai",
-            "definition": {
-              "endpoint": "https://example.openai.azure.com/openai/v1",
-              "apiVersion": "2024-10-21",
-              "models": [
-                {
-                  "id": "example-deployment"
-                }
-              ]
+            "registration": {
+              "format": "azureOpenai",
+              "definition": {
+                "endpoint": "https://example.openai.azure.com/openai/v1",
+                "apiVersion": "2024-10-21",
+                "models": [
+                  {
+                    "id": "example-deployment"
+                  }
+                ]
+              },
+              "retention": "contributingClient"
             },
-            "nonce": "sha256-auth-1",
-            "retention": "contributingClient",
             "state": {
               "kind": "authRequired",
               "reason": "expired",
@@ -431,12 +427,13 @@
             "id": "source-local",
             "provider": "example",
             "displayName": "Local server",
-            "format": "openaiCompatible",
-            "definition": {
-              "endpoint": "http://localhost:11434/v1",
-              "wireApi": "responses"
+            "registration": {
+              "format": "openaiCompatible",
+              "definition": {
+                "endpoint": "http://localhost:11434/v1",
+                "wireApi": "responses"
+              }
             },
-            "nonce": "sha256-local-1",
             "state": {
               "kind": "authRequired",
               "reason": "required"
@@ -450,22 +447,23 @@
             "id": "source-rejected",
             "provider": "example",
             "displayName": "Rejected key",
-            "format": "openaiCompatible",
-            "definition": {
-              "endpoint": "https://api.example.com/v1",
-              "models": [
-                {
-                  "id": "vendor/model-a"
-                }
-              ]
-            },
-            "nonce": "sha256-rejected-1",
             "icons": [
               {
                 "src": "https://example.com/openrouter.svg"
               }
             ],
-            "retention": "host",
+            "registration": {
+              "format": "openaiCompatible",
+              "definition": {
+                "endpoint": "https://api.example.com/v1",
+                "models": [
+                  {
+                    "id": "vendor/model-a"
+                  }
+                ]
+              },
+              "retention": "host"
+            },
             "state": {
               "kind": "authRequired",
               "reason": "rejected",
@@ -481,22 +479,23 @@
             "id": "source-revoked",
             "provider": "example",
             "displayName": "Revoked key",
-            "format": "openaiCompatible",
-            "definition": {
-              "endpoint": "https://api.example.com/v1",
-              "models": [
-                {
-                  "id": "vendor/model-a"
-                }
-              ]
-            },
-            "nonce": "sha256-revoked-1",
             "icons": [
               {
                 "src": "https://example.com/openrouter.svg"
               }
             ],
-            "retention": "host",
+            "registration": {
+              "format": "openaiCompatible",
+              "definition": {
+                "endpoint": "https://api.example.com/v1",
+                "models": [
+                  {
+                    "id": "vendor/model-a"
+                  }
+                ]
+              },
+              "retention": "host"
+            },
             "state": {
               "kind": "authRequired",
               "reason": "revoked"
@@ -511,14 +510,15 @@
             "id": "source-host",
             "provider": "example",
             "displayName": "Host-configured",
-            "format": "example.com/model-source@1",
-            "definition": {
-              "endpoint": "https://models.internal.example.com",
-              "routing": {
-                "region": "example-1"
+            "registration": {
+              "format": "example.com/model-source@1",
+              "definition": {
+                "endpoint": "https://models.internal.example.com",
+                "routing": {
+                  "region": "example-1"
+                }
               }
             },
-            "nonce": "sha256-host-1",
             "state": {
               "kind": "error",
               "error": {

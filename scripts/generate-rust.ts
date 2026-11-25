@@ -889,6 +889,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'MultipleWorkingDirectoriesCapability' },
   { name: 'ModelSourceRegistrationCapability' },
   { name: 'ModelSourceFormatInfo' },
+  { name: 'ModelSourceRegistration' },
   { name: 'ModelSource' },
   { name: 'ModelSourceStartingState', omitDiscriminants: true },
   { name: 'ModelSourceReadyState', omitDiscriminants: true },
@@ -1812,7 +1813,7 @@ const ACTION_VARIANTS: {
   { type: 'root/configChanged', variantName: 'RootConfigChanged', tsInterface: 'RootConfigChangedAction' },
   { type: 'root/modelSourceSet', variantName: 'RootModelSourceSet', tsInterface: 'RootModelSourceSetAction', boxed: true },
   { type: 'root/modelSourceRemoved', variantName: 'RootModelSourceRemoved', tsInterface: 'RootModelSourceRemovedAction' },
-  { type: 'root/modelSourceStateChanged', variantName: 'RootModelSourceStateChanged', tsInterface: 'RootModelSourceStateChangedAction' },
+  { type: 'root/modelSourceRegisterRequested', variantName: 'RootModelSourceRegisterRequested', tsInterface: 'RootModelSourceRegisterRequestedAction' },
   { type: 'session/ready', variantName: 'SessionReady', tsInterface: 'SessionReadyAction' },
   { type: 'session/creationFailed', variantName: 'SessionCreationFailed', tsInterface: 'SessionCreationFailedAction' },
   { type: 'session/chatAdded', variantName: 'SessionChatAdded', tsInterface: 'SessionChatAddedAction' },
@@ -1999,7 +2000,7 @@ impl Serialize for ChatErrorAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, MaterializedTurn, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary, SearchQuery, SearchLifecycleState, SearchResult, ModelSource, ModelSourceState, ProtectedResourceMetadata};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, MaterializedTurn, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary, SearchQuery, SearchLifecycleState, SearchResult, ModelSource, ModelSourceRegistration, Icon};');
   lines.push('');
   // ActionType enum
   lines.push('// ─── ActionType ──────────────────────────────────────────────────────\n');

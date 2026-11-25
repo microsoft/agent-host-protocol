@@ -5,7 +5,7 @@ import Foundation
 /// Set of action types that clients are allowed to dispatch.
 public let clientDispatchableActions: Set<String> = [
     "root/configChanged",
-    "root/modelSourceSet",
+    "root/modelSourceRegisterRequested",
     "root/modelSourceRemoved",
     "session/titleChanged",
     "session/activeClientSet",
@@ -61,7 +61,7 @@ public let clientDispatchableActions: Set<String> = [
 public func isClientDispatchable(_ action: StateAction) -> Bool {
     switch action {
     case .rootConfigChanged,
-         .rootModelSourceSet,
+         .rootModelSourceRegisterRequested,
          .rootModelSourceRemoved,
          .sessionTitleChanged,
          .sessionActiveClientSet,

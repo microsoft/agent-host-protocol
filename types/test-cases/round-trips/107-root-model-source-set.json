@@ -1,0 +1,68 @@
+{
+  "name": "root-model-source-set",
+  "group": "A",
+  "description": "The host publishes a model source with root/modelSourceSet after the endpoint rejected a key: the whole source, with its registration, an authRequired state, the credentialResource the key is for, and the rejected key's accountId.",
+  "type": "StateAction",
+  "input": {
+    "type": "root/modelSourceSet",
+    "modelSource": {
+      "id": "source-new",
+      "provider": "example",
+      "displayName": "OpenRouter",
+      "registration": {
+        "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://openrouter.ai/api/v1",
+          "models": [
+            {
+              "id": "vendor/model-a"
+            }
+          ]
+        },
+        "retention": "host"
+      },
+      "state": {
+        "kind": "authRequired",
+        "reason": "rejected",
+        "description": "The endpoint rejected the API key."
+      },
+      "credentialResource": {
+        "resource": "https://openrouter.ai/api/v1",
+        "resource_name": "OpenRouter API key"
+      },
+      "accountId": "keychain-openrouter-1"
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "root/modelSourceSet",
+      "modelSource": {
+        "id": "source-new",
+        "provider": "example",
+        "displayName": "OpenRouter",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://openrouter.ai/api/v1",
+            "models": [
+              {
+                "id": "vendor/model-a"
+              }
+            ]
+          },
+          "retention": "host"
+        },
+        "state": {
+          "kind": "authRequired",
+          "reason": "rejected",
+          "description": "The endpoint rejected the API key."
+        },
+        "credentialResource": {
+          "resource": "https://openrouter.ai/api/v1",
+          "resource_name": "OpenRouter API key"
+        },
+        "accountId": "keychain-openrouter-1"
+      }
+    }
+  ]
+}

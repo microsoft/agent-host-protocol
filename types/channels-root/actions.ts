@@ -4,9 +4,9 @@
  * @module channels-root/actions
  */
 
-import type { AgentInfo, ModelSource, ModelSourceState } from './state.js';
+import type { AgentInfo, ModelSource, ModelSourceRegistration } from './state.js';
 import type { TerminalInfo } from '../channels-terminal/state.js';
-import type { ProtectedResourceMetadata } from '../common/state.js';
+import type { Icon } from '../common/state.js';
 import { ActionType } from '../common/actions.js';
 
 // ─── Root Actions ────────────────────────────────────────────────────────────
@@ -69,28 +69,49 @@ export interface RootConfigChangedAction {
 }
 
 /**
- * Adds a model source, or updates the one with the same `id`:
- *
- * - **Add.** When no model source has the `id`, appends `modelSource`.
- * - **Re-register.** When one has, with the same `provider`, `format`, and
- *   `nonce`, keeps its host-reported fields (`state`, `credentialResource`,
- *   and `accountId`) and takes everything else from the action.
- * - **Update.** When any of the three differs, replaces the source. Its
- *   host-reported fields are absent until the host reports again with
- *   {@link RootModelSourceStateChangedAction}.
- *
- * A client registers a source with its `format`, `definition`, and `nonce`,
- * and without any host-reported field. The host learns which client
- * registered it from the envelope's `origin`.
+ * Asks the host to register a model source, or to update the one with the
+ * same `modelSourceId`. The reducer leaves state unchanged. The host counts
+ * the dispatching client as a contributing client, validates the
+ * registration, and publishes the result with
+ * {@link RootModelSourceSetAction | `root/modelSourceSet`}. It keeps the
+ * source's status and credential when the registration is unchanged.
  *
  * @category Root Actions
  * @stability 1.0
  * @clientDispatchable
  * @see {@link /guide/model-sources#registering-a-source | Model Sources guide}
  */
+export interface RootModelSourceRegisterRequestedAction {
+  type: ActionType.RootModelSourceRegisterRequested;
+  /** The model source's `id`, chosen by the client. */
+  modelSourceId: string;
+  /** Agent provider whose agent serves the source's models. */
+  provider: string;
+  /** Human-readable name. */
+  displayName: string;
+  /** Icons for UI display. */
+  icons?: Icon[];
+  /** The source's format, definition, and retention. */
+  registration: ModelSourceRegistration;
+  /**
+   * Additional implementation-defined metadata for this model source.
+   * MUST NOT contain a credential.
+   */
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Adds a model source, or replaces the one with the same `id`. Only the host
+ * dispatches it, to publish a registration, a source an agent provides
+ * itself, or a change in a source's status.
+ *
+ * @category Root Actions
+ * @stability 1.0
+ * @see {@link /guide/model-sources#status | Model Sources guide}
+ */
 export interface RootModelSourceSetAction {
   type: ActionType.RootModelSourceSet;
-  /** The model source to add or update, matched by `id`. */
+  /** The model source to add or replace, matched by `id`. */
   modelSource: ModelSource;
 }
 
@@ -107,29 +128,4 @@ export interface RootModelSourceRemovedAction {
   type: ActionType.RootModelSourceRemoved;
   /** The model source's `id`. */
   modelSourceId: string;
-}
-
-/**
- * Updates a model source's host-reported fields together: `state`,
- * `credentialResource`, and `accountId`. A no-op when no model source has
- * `modelSourceId`. Other fields of the source are preserved. Only the host
- * dispatches it.
- *
- * @category Root Actions
- * @stability 1.0
- * @see {@link /guide/model-sources#status | Model Sources guide}
- */
-export interface RootModelSourceStateChangedAction {
-  type: ActionType.RootModelSourceStateChanged;
-  /** The model source's `id`. */
-  modelSourceId: string;
-  /** The new status. */
-  state: ModelSourceState;
-  /**
-   * Replaces the source's `credentialResource`. Absent clears it, for a
-   * source that needs no credential.
-   */
-  credentialResource?: ProtectedResourceMetadata;
-  /** Replaces the source's `accountId`. Absent clears it. */
-  accountId?: string;
 }

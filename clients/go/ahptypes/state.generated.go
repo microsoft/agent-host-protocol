@@ -1035,8 +1035,40 @@ type ModelSourceRegistrationCapability struct {
 //
 // Stability: 1.0 - Early development.
 type ModelSourceFormatInfo struct {
-	// A {@link ModelSource.format} value.
+	// A {@link ModelSourceRegistration.format} value.
 	Format string `json:"format"`
+}
+
+// How a client, or the host from its own configuration, registered a model
+// source.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceRegistration struct {
+	// The format of `definition`: the `format` of one of the agent's
+	// {@link ModelSourceRegistrationCapability.formats}.
+	//
+	// Agents choose the formats they read. Some may read these common names:
+	//
+	// - `'openaiCompatible'`: an endpoint that implements OpenAI's API.
+	// - `'anthropic'`: an endpoint that implements Anthropic's Messages API.
+	// - `'azureOpenai'`: an Azure OpenAI deployment.
+	// - `'gemini'`: Google's Gemini API.
+	//
+	// Other formats are named with a namespace, such as
+	// `example.com/model-source@1`, so they don't collide.
+	Format string `json:"format"`
+	// How to reach the source, in `format`: endpoint, wire API, models, and so
+	// on. The agent reads it. Every client can read it, so it MUST NOT contain
+	// a credential.
+	//
+	// An agent that reads one of the common format names might expect a shape
+	// like `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is
+	// the API's base URI and each `models` entry is `{ id, name?,
+	// maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
+	// named as in {@link SessionModelInfo}.
+	Definition map[string]json.RawMessage `json:"definition"`
+	// What happens when the last contributing client leaves. Absent means `contributingClient`.
+	Retention *ModelSourceRetentionPolicy `json:"retention,omitempty"`
 }
 
 // A source that an agent provider offers models from, such as a service,
@@ -1054,44 +1086,14 @@ type ModelSource struct {
 	DisplayName string `json:"displayName"`
 	// Icons for UI display.
 	Icons []Icon `json:"icons,omitempty"`
-	// The format of `definition`: the `format` of one of the agent's
-	// {@link ModelSourceRegistrationCapability.formats}. Present on a
-	// registered source.
-	//
-	// Agents choose the formats they read. Some may read these common names:
-	//
-	// - `'openaiCompatible'`: an endpoint that implements OpenAI's API.
-	// - `'anthropic'`: an endpoint that implements Anthropic's Messages API.
-	// - `'azureOpenai'`: an Azure OpenAI deployment.
-	// - `'gemini'`: Google's Gemini API.
-	//
-	// Other formats are named with a namespace, such as
-	// `example.com/model-source@1`, so they don't collide.
-	Format *string `json:"format,omitempty"`
-	// How to reach the source, in `format`: endpoint, wire API, models, and so
-	// on. The agent reads it. Every client can read it, so it MUST NOT contain
-	// a credential. Present on a registered source.
-	//
-	// An agent that reads one of the common format names might expect a shape
-	// like `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is
-	// the API's base URI and each `models` entry is `{ id, name?,
-	// maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
-	// named as in {@link SessionModelInfo}.
-	Definition map[string]json.RawMessage `json:"definition,omitempty"`
-	// Opaque version token for `definition`, such as a hash of it, chosen by
-	// whoever registers the source. Present on a registered source. Reducers
-	// compare it, instead of the definition, to tell an update from a
-	// re-registration of the same definition.
-	Nonce *string `json:"nonce,omitempty"`
-	// What happens when the last contributing client leaves. Absent means `contributingClient`.
-	Retention *ModelSourceRetentionPolicy `json:"retention,omitempty"`
-	// Host-reported status, set with {@link RootModelSourceStateChangedAction}.
-	// Absent until the host reports one, and after an update replaces the
-	// definition until the host reports again.
-	State *ModelSourceState `json:"state,omitempty"`
+	// How the source was registered. Absent on a source the agent provides
+	// itself.
+	Registration *ModelSourceRegistration `json:"registration,omitempty"`
+	// The source's status.
+	State ModelSourceState `json:"state"`
 	// RFC 9728 metadata for the endpoint a registered source's credential is
 	// for. Present whenever the source takes a credential, in every state, so
-	// any client can deliver or rotate one. Set with `state`.
+	// any client can deliver or rotate one.
 	//
 	// `credentialResource.resource` is the endpoint URL as the definition
 	// names it, in any scheme the agent supports (for example
@@ -1099,7 +1101,7 @@ type ModelSource struct {
 	// `authenticate({ resource })`.
 	CredentialResource *ProtectedResourceMetadata `json:"credentialResource,omitempty"`
 	// The {@link AuthenticateParams.accountId} sent with the credential the
-	// host most recently accepted. Set with `state`.
+	// host most recently accepted.
 	AccountId *string `json:"accountId,omitempty"`
 	// Additional implementation-defined metadata for this model source.
 	// MUST NOT contain a credential.

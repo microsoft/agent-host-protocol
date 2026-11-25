@@ -1,5 +1,5 @@
 {
-  "description": "root/modelSourceRemoved removes the model source with the given id",
+  "description": "root/modelSourceRemoved removes the model source with the given modelSourceId",
   "reducer": "root",
   "initial": {
     "agents": [],
@@ -8,16 +8,17 @@
         "id": "model-source-a",
         "provider": "copilot",
         "displayName": "Source a",
-        "format": "openaiCompatible",
-        "definition": {
-          "endpoint": "https://apia.example.com/v1",
-          "models": [
-            {
-              "id": "model-a"
-            }
-          ]
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v1",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
         },
-        "nonce": "definition-a-v1",
         "state": {
           "kind": "ready"
         },
@@ -31,16 +32,20 @@
         "id": "model-source-b",
         "provider": "copilot",
         "displayName": "Source b",
-        "format": "openaiCompatible",
-        "definition": {
-          "endpoint": "https://apib.example.com/v1",
-          "models": [
-            {
-              "id": "model-b"
-            }
-          ]
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apib.example.com/v1",
+            "models": [
+              {
+                "id": "model-b"
+              }
+            ]
+          }
         },
-        "nonce": "definition-b-v1"
+        "state": {
+          "kind": "starting"
+        }
       }
     ]
   },
@@ -57,16 +62,20 @@
         "id": "model-source-b",
         "provider": "copilot",
         "displayName": "Source b",
-        "format": "openaiCompatible",
-        "definition": {
-          "endpoint": "https://apib.example.com/v1",
-          "models": [
-            {
-              "id": "model-b"
-            }
-          ]
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apib.example.com/v1",
+            "models": [
+              {
+                "id": "model-b"
+              }
+            ]
+          }
         },
-        "nonce": "definition-b-v1"
+        "state": {
+          "kind": "starting"
+        }
       }
     ]
   }

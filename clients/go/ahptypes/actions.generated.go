@@ -107,9 +107,9 @@ const (
 	ActionTypeAnnotationsEntryRemoved             ActionType = "annotations/entryRemoved"
 	ActionTypeRootTerminalsChanged                ActionType = "root/terminalsChanged"
 	ActionTypeRootConfigChanged                   ActionType = "root/configChanged"
+	ActionTypeRootModelSourceRegisterRequested    ActionType = "root/modelSourceRegisterRequested"
 	ActionTypeRootModelSourceSet                  ActionType = "root/modelSourceSet"
 	ActionTypeRootModelSourceRemoved              ActionType = "root/modelSourceRemoved"
-	ActionTypeRootModelSourceStateChanged         ActionType = "root/modelSourceStateChanged"
 	ActionTypeTerminalData                        ActionType = "terminal/data"
 	ActionTypeTerminalInput                       ActionType = "terminal/input"
 	ActionTypeTerminalResized                     ActionType = "terminal/resized"
@@ -183,24 +183,14 @@ type RootConfigChangedAction struct {
 	Replace *bool `json:"replace,omitempty"`
 }
 
-// Adds a model source, or updates the one with the same `id`:
-//
-//   - **Add.** When no model source has the `id`, appends `modelSource`.
-//   - **Re-register.** When one has, with the same `provider`, `format`, and
-//     `nonce`, keeps its host-reported fields (`state`, `credentialResource`,
-//     and `accountId`) and takes everything else from the action.
-//   - **Update.** When any of the three differs, replaces the source. Its
-//     host-reported fields are absent until the host reports again with
-//     {@link RootModelSourceStateChangedAction}.
-//
-// A client registers a source with its `format`, `definition`, and `nonce`,
-// and without any host-reported field. The host learns which client
-// registered it from the envelope's `origin`.
+// Adds a model source, or replaces the one with the same `id`. Only the host
+// dispatches it, to publish a registration, a source an agent provides
+// itself, or a change in a source's status.
 //
 // Stability: 1.0 - Early development.
 type RootModelSourceSetAction struct {
 	Type ActionType `json:"type"`
-	// The model source to add or update, matched by `id`.
+	// The model source to add or replace, matched by `id`.
 	ModelSource ModelSource `json:"modelSource"`
 }
 
@@ -214,23 +204,29 @@ type RootModelSourceRemovedAction struct {
 	ModelSourceId string `json:"modelSourceId"`
 }
 
-// Updates a model source's host-reported fields together: `state`,
-// `credentialResource`, and `accountId`. A no-op when no model source has
-// `modelSourceId`. Other fields of the source are preserved. Only the host
-// dispatches it.
+// Asks the host to register a model source, or to update the one with the
+// same `modelSourceId`. The reducer leaves state unchanged. The host counts
+// the dispatching client as a contributing client, validates the
+// registration, and publishes the result with
+// {@link RootModelSourceSetAction | `root/modelSourceSet`}. It keeps the
+// source's status and credential when the registration is unchanged.
 //
 // Stability: 1.0 - Early development.
-type RootModelSourceStateChangedAction struct {
+type RootModelSourceRegisterRequestedAction struct {
 	Type ActionType `json:"type"`
-	// The model source's `id`.
+	// The model source's `id`, chosen by the client.
 	ModelSourceId string `json:"modelSourceId"`
-	// The new status.
-	State ModelSourceState `json:"state"`
-	// Replaces the source's `credentialResource`. Absent clears it, for a
-	// source that needs no credential.
-	CredentialResource *ProtectedResourceMetadata `json:"credentialResource,omitempty"`
-	// Replaces the source's `accountId`. Absent clears it.
-	AccountId *string `json:"accountId,omitempty"`
+	// Agent provider whose agent serves the source's models.
+	Provider string `json:"provider"`
+	// Human-readable name.
+	DisplayName string `json:"displayName"`
+	// Icons for UI display.
+	Icons []Icon `json:"icons,omitempty"`
+	// The source's format, definition, and retention.
+	Registration ModelSourceRegistration `json:"registration"`
+	// Additional implementation-defined metadata for this model source.
+	// MUST NOT contain a credential.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
 // Session backend initialized successfully.
@@ -2005,7 +2001,7 @@ func (*RootActiveSessionsChangedAction) isStateAction()           {}
 func (*RootConfigChangedAction) isStateAction()                   {}
 func (*RootModelSourceSetAction) isStateAction()                  {}
 func (*RootModelSourceRemovedAction) isStateAction()              {}
-func (*RootModelSourceStateChangedAction) isStateAction()         {}
+func (*RootModelSourceRegisterRequestedAction) isStateAction()    {}
 func (*SessionReadyAction) isStateAction()                        {}
 func (*SessionCreationFailedAction) isStateAction()               {}
 func (*SessionChatAddedAction) isStateAction()                    {}
@@ -2160,8 +2156,8 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
-	case "root/modelSourceStateChanged":
-		var value RootModelSourceStateChangedAction
+	case "root/modelSourceRegisterRequested":
+		var value RootModelSourceRegisterRequestedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

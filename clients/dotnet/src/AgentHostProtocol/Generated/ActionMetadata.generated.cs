@@ -214,13 +214,13 @@ internal static class GeneratedActionMetadata
             case RootConfigChangedAction value:
                 actionType = value.Type;
                 return true;
+            case RootModelSourceRegisterRequestedAction value:
+                actionType = value.Type;
+                return true;
             case RootModelSourceRemovedAction value:
                 actionType = value.Type;
                 return true;
             case RootModelSourceSetAction value:
-                actionType = value.Type;
-                return true;
-            case RootModelSourceStateChangedAction value:
                 actionType = value.Type;
                 return true;
             case RootTerminalsChangedAction value:

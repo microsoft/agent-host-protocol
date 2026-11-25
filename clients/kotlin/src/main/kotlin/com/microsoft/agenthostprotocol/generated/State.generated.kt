@@ -1958,7 +1958,7 @@ data class ModelSourceRegistrationCapability(
 @Serializable
 data class ModelSourceFormatInfo(
     /**
-     * A {@link ModelSource.format} value.
+     * A {@link ModelSourceRegistration.format} value.
      */
     val format: String
 )
@@ -1990,9 +1990,49 @@ data class ModelSource(
      */
     val icons: List<Icon>? = null,
     /**
+     * How the source was registered. Absent on a source the agent provides
+     * itself.
+     */
+    val registration: ModelSourceRegistration? = null,
+    /**
+     * The source's status.
+     */
+    val state: ModelSourceState,
+    /**
+     * RFC 9728 metadata for the endpoint a registered source's credential is
+     * for. Present whenever the source takes a credential, in every state, so
+     * any client can deliver or rotate one.
+     *
+     * `credentialResource.resource` is the endpoint URL as the definition
+     * names it, in any scheme the agent supports (for example
+     * `http://localhost:11434/v1`). It's the value a client passes back as
+     * `authenticate({ resource })`.
+     */
+    val credentialResource: ProtectedResourceMetadata? = null,
+    /**
+     * The {@link AuthenticateParams.accountId} sent with the credential the
+     * host most recently accepted.
+     */
+    val accountId: String? = null,
+    /**
+     * Additional implementation-defined metadata for this model source.
+     * MUST NOT contain a credential.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+/**
+ * How a client, or the host from its own configuration, registered a model
+ * source.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ModelSourceRegistration(
+    /**
      * The format of `definition`: the `format` of one of the agent's
-     * {@link ModelSourceRegistrationCapability.formats}. Present on a
-     * registered source.
+     * {@link ModelSourceRegistrationCapability.formats}.
      *
      * Agents choose the formats they read. Some may read these common names:
      *
@@ -2004,11 +2044,11 @@ data class ModelSource(
      * Other formats are named with a namespace, such as
      * `example.com/model-source@1`, so they don't collide.
      */
-    val format: String? = null,
+    val format: String,
     /**
      * How to reach the source, in `format`: endpoint, wire API, models, and so
      * on. The agent reads it. Every client can read it, so it MUST NOT contain
-     * a credential. Present on a registered source.
+     * a credential.
      *
      * An agent that reads one of the common format names might expect a shape
      * like `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is
@@ -2016,46 +2056,11 @@ data class ModelSource(
      * maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
      * named as in {@link SessionModelInfo}.
      */
-    val definition: Map<String, JsonElement>? = null,
-    /**
-     * Opaque version token for `definition`, such as a hash of it, chosen by
-     * whoever registers the source. Present on a registered source. Reducers
-     * compare it, instead of the definition, to tell an update from a
-     * re-registration of the same definition.
-     */
-    val nonce: String? = null,
+    val definition: Map<String, JsonElement>,
     /**
      * What happens when the last contributing client leaves. Absent means `contributingClient`.
      */
-    val retention: ModelSourceRetentionPolicy? = null,
-    /**
-     * Host-reported status, set with {@link RootModelSourceStateChangedAction}.
-     * Absent until the host reports one, and after an update replaces the
-     * definition until the host reports again.
-     */
-    val state: ModelSourceState? = null,
-    /**
-     * RFC 9728 metadata for the endpoint a registered source's credential is
-     * for. Present whenever the source takes a credential, in every state, so
-     * any client can deliver or rotate one. Set with `state`.
-     *
-     * `credentialResource.resource` is the endpoint URL as the definition
-     * names it, in any scheme the agent supports (for example
-     * `http://localhost:11434/v1`). It's the value a client passes back as
-     * `authenticate({ resource })`.
-     */
-    val credentialResource: ProtectedResourceMetadata? = null,
-    /**
-     * The {@link AuthenticateParams.accountId} sent with the credential the
-     * host most recently accepted. Set with `state`.
-     */
-    val accountId: String? = null,
-    /**
-     * Additional implementation-defined metadata for this model source.
-     * MUST NOT contain a credential.
-     */
-    @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val retention: ModelSourceRetentionPolicy? = null
 )
 
 /**

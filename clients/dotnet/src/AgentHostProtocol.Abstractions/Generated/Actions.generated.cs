@@ -201,11 +201,11 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType RootConfigChanged = new ActionType("root/configChanged");
 
+    public static readonly ActionType RootModelSourceRegisterRequested = new ActionType("root/modelSourceRegisterRequested");
+
     public static readonly ActionType RootModelSourceSet = new ActionType("root/modelSourceSet");
 
     public static readonly ActionType RootModelSourceRemoved = new ActionType("root/modelSourceRemoved");
-
-    public static readonly ActionType RootModelSourceStateChanged = new ActionType("root/modelSourceStateChanged");
 
     public static readonly ActionType TerminalData = new ActionType("terminal/data");
 
@@ -354,26 +354,16 @@ public sealed record RootConfigChangedAction
     public bool? Replace { get; init; }
 }
 
-/// <summary>Adds a model source, or updates the one with the same `id`:
-///
-/// - **Add.** When no model source has the `id`, appends `modelSource`.
-/// - **Re-register.** When one has, with the same `provider`, `format`, and
-///   `nonce`, keeps its host-reported fields (`state`, `credentialResource`,
-///   and `accountId`) and takes everything else from the action.
-/// - **Update.** When any of the three differs, replaces the source. Its
-///   host-reported fields are absent until the host reports again with
-///   {@link RootModelSourceStateChangedAction}.
-///
-/// A client registers a source with its `format`, `definition`, and `nonce`,
-/// and without any host-reported field. The host learns which client
-/// registered it from the envelope's `origin`.
+/// <summary>Adds a model source, or replaces the one with the same `id`. Only the host
+/// dispatches it, to publish a registration, a source an agent provides
+/// itself, or a change in a source's status.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record RootModelSourceSetAction
 {
     public ActionType Type { get; init; } = ActionType.RootModelSourceSet;
 
-    /// <summary>The model source to add or update, matched by `id`.</summary>
+    /// <summary>The model source to add or replace, matched by `id`.</summary>
     public required ModelSource ModelSource { get; init; }
 }
 
@@ -389,30 +379,39 @@ public sealed record RootModelSourceRemovedAction
     public required string ModelSourceId { get; init; }
 }
 
-/// <summary>Updates a model source's host-reported fields together: `state`,
-/// `credentialResource`, and `accountId`. A no-op when no model source has
-/// `modelSourceId`. Other fields of the source are preserved. Only the host
-/// dispatches it.
+/// <summary>Asks the host to register a model source, or to update the one with the
+/// same `modelSourceId`. The reducer leaves state unchanged. The host counts
+/// the dispatching client as a contributing client, validates the
+/// registration, and publishes the result with
+/// {@link RootModelSourceSetAction | `root/modelSourceSet`}. It keeps the
+/// source's status and credential when the registration is unchanged.
 ///
 /// Stability: 1.0 - Early development.</summary>
-public sealed record RootModelSourceStateChangedAction
+public sealed record RootModelSourceRegisterRequestedAction
 {
-    public ActionType Type { get; init; } = ActionType.RootModelSourceStateChanged;
+    public ActionType Type { get; init; } = ActionType.RootModelSourceRegisterRequested;
 
-    /// <summary>The model source's `id`.</summary>
+    /// <summary>The model source's `id`, chosen by the client.</summary>
     public required string ModelSourceId { get; init; }
 
-    /// <summary>The new status.</summary>
-    public required ModelSourceState State { get; init; }
+    /// <summary>Agent provider whose agent serves the source's models.</summary>
+    public required string Provider { get; init; }
 
-    /// <summary>Replaces the source's `credentialResource`. Absent clears it, for a
-    /// source that needs no credential.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public ProtectedResourceMetadata? CredentialResource { get; init; }
+    /// <summary>Human-readable name.</summary>
+    public required string DisplayName { get; init; }
 
-    /// <summary>Replaces the source's `accountId`. Absent clears it.</summary>
+    /// <summary>Icons for UI display.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? AccountId { get; init; }
+    public List<Icon>? Icons { get; init; }
+
+    /// <summary>The source's format, definition, and retention.</summary>
+    public required ModelSourceRegistration Registration { get; init; }
+
+    /// <summary>Additional implementation-defined metadata for this model source.
+    /// MUST NOT contain a credential.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
 }
 
 /// <summary>Session backend initialized successfully.</summary>
@@ -3030,7 +3029,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["root/configChanged"] = typeof(RootConfigChangedAction),
         ["root/modelSourceSet"] = typeof(RootModelSourceSetAction),
         ["root/modelSourceRemoved"] = typeof(RootModelSourceRemovedAction),
-        ["root/modelSourceStateChanged"] = typeof(RootModelSourceStateChangedAction),
+        ["root/modelSourceRegisterRequested"] = typeof(RootModelSourceRegisterRequestedAction),
         ["session/ready"] = typeof(SessionReadyAction),
         ["session/creationFailed"] = typeof(SessionCreationFailedAction),
         ["session/turnStarted"] = typeof(SessionTurnStartedAction),

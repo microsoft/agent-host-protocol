@@ -109,30 +109,19 @@ public struct AHPRootReducer: Reducer {
         case .rootModelSourceRemoved(let a):
             _ = applyModelSourceRemoved(&state, id: a.modelSourceId)
 
-        case .rootModelSourceStateChanged(let a):
-            _ = applyModelSourceStateChanged(&state, a)
-
         default:
             break
         }
     }
 }
 
-/// Adds `source`, re-registers the entry with the same `id`, `provider`,
-/// `format`, and `nonce` (keeping its host-reported fields), or updates an
-/// entry where any of those differ.
+/// Adds `source`, or replaces the entry with the same `id`.
 func applyModelSourceSet(_ state: inout RootState, _ source: ModelSource) {
     var list = state.modelSources ?? []
-    let idx = list.firstIndex(where: { $0.id == source.id })
-    let existing = idx.map { list[$0] }.flatMap { sameModelSourceVersion($0, source) ? $0 : nil }
-    var merged = source
-    merged.state = existing?.state
-    merged.credentialResource = existing?.credentialResource
-    merged.accountId = existing?.accountId
-    if let idx {
-        list[idx] = merged
+    if let idx = list.firstIndex(where: { $0.id == source.id }) {
+        list[idx] = source
     } else {
-        list.append(merged)
+        list.append(source)
     }
     state.modelSources = list
 }
@@ -142,24 +131,6 @@ func applyModelSourceRemoved(_ state: inout RootState, id: String) -> Bool {
     guard var list = state.modelSources,
           let idx = list.firstIndex(where: { $0.id == id }) else { return false }
     list.remove(at: idx)
-    state.modelSources = list
-    return true
-}
-
-/// Whether two model sources have the same `provider`, `format`, and
-/// definition `nonce`.
-private func sameModelSourceVersion(_ a: ModelSource, _ b: ModelSource) -> Bool {
-    a.provider == b.provider && a.format == b.format && a.nonce == b.nonce
-}
-
-/// Updates the host-reported fields of the model source with `action.id`.
-/// Returns `false` when none matches.
-func applyModelSourceStateChanged(_ state: inout RootState, _ action: RootModelSourceStateChangedAction) -> Bool {
-    guard var list = state.modelSources,
-          let idx = list.firstIndex(where: { $0.id == action.modelSourceId }) else { return false }
-    list[idx].state = action.state
-    list[idx].credentialResource = action.credentialResource
-    list[idx].accountId = action.accountId
     state.modelSources = list
     return true
 }

@@ -813,6 +813,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'MultipleWorkingDirectoriesCapability' },
   { name: 'ModelSourceRegistrationCapability' },
   { name: 'ModelSourceFormatInfo' },
+  { name: 'ModelSourceRegistration' },
   { name: 'ModelSource' },
   { name: 'ModelSourceStartingState' },
   { name: 'ModelSourceReadyState' },
@@ -1839,7 +1840,7 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'root/configChanged', variantName: 'RootConfigChanged', tsInterface: 'RootConfigChangedAction' },
   { type: 'root/modelSourceSet', variantName: 'RootModelSourceSet', tsInterface: 'RootModelSourceSetAction' },
   { type: 'root/modelSourceRemoved', variantName: 'RootModelSourceRemoved', tsInterface: 'RootModelSourceRemovedAction' },
-  { type: 'root/modelSourceStateChanged', variantName: 'RootModelSourceStateChanged', tsInterface: 'RootModelSourceStateChangedAction' },
+  { type: 'root/modelSourceRegisterRequested', variantName: 'RootModelSourceRegisterRequested', tsInterface: 'RootModelSourceRegisterRequestedAction' },
   { type: 'session/ready', variantName: 'SessionReady', tsInterface: 'SessionReadyAction' },
   { type: 'session/creationFailed', variantName: 'SessionCreationFailed', tsInterface: 'SessionCreationFailedAction' },
   // Session turn/tool-call/error/usage/reasoning actions have no TypeScript interfaces in

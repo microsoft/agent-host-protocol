@@ -7,9 +7,9 @@ import type {
   RootActiveSessionsChangedAction,
   RootTerminalsChangedAction,
   RootConfigChangedAction,
+  RootModelSourceRegisterRequestedAction,
   RootModelSourceSetAction,
   RootModelSourceRemovedAction,
-  RootModelSourceStateChangedAction,
   SessionReadyAction,
   SessionCreationFailedAction,
   SessionChatAddedAction,
@@ -130,15 +130,15 @@ export type RootAction =
   | RootActiveSessionsChangedAction
   | RootTerminalsChangedAction
   | RootConfigChangedAction
+  | RootModelSourceRegisterRequestedAction
   | RootModelSourceSetAction
   | RootModelSourceRemovedAction
-  | RootModelSourceStateChangedAction
 ;
 
 /** Union of root actions that clients may dispatch. */
 export type ClientRootAction =
   | RootConfigChangedAction
-  | RootModelSourceSetAction
+  | RootModelSourceRegisterRequestedAction
   | RootModelSourceRemovedAction
 ;
 
@@ -147,7 +147,7 @@ export type ServerRootAction =
   | RootAgentsChangedAction
   | RootActiveSessionsChangedAction
   | RootTerminalsChangedAction
-  | RootModelSourceStateChangedAction
+  | RootModelSourceSetAction
 ;
 
 /** Union of all session-scoped actions. */
@@ -500,9 +500,9 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.RootActiveSessionsChanged]: false,
   [ActionType.RootTerminalsChanged]: false,
   [ActionType.RootConfigChanged]: true,
-  [ActionType.RootModelSourceSet]: true,
+  [ActionType.RootModelSourceRegisterRequested]: true,
+  [ActionType.RootModelSourceSet]: false,
   [ActionType.RootModelSourceRemoved]: true,
-  [ActionType.RootModelSourceStateChanged]: false,
   [ActionType.SessionReady]: false,
   [ActionType.SessionCreationFailed]: false,
   [ActionType.SessionChatAdded]: false,

@@ -537,18 +537,14 @@ func ApplyActionToRoot(state *ahptypes.RootState, action ahptypes.StateAction) R
 			state.Config.Values[k] = v
 		}
 		return ReduceOutcomeApplied
+	case *ahptypes.RootModelSourceRegisterRequestedAction:
+		return ReduceOutcomeNoOp
 	case *ahptypes.RootModelSourceSetAction:
-		updated := a.ModelSource
-		idx := modelSourceIndex(state.ModelSources, updated.Id)
-		if idx >= 0 && sameModelSourceVersion(state.ModelSources[idx], updated) {
-			copyModelSourceHostFields(&updated, state.ModelSources[idx])
-		} else {
-			copyModelSourceHostFields(&updated, ahptypes.ModelSource{})
-		}
+		idx := modelSourceIndex(state.ModelSources, a.ModelSource.Id)
 		if idx >= 0 {
-			state.ModelSources[idx] = updated
+			state.ModelSources[idx] = a.ModelSource
 		} else {
-			state.ModelSources = append(state.ModelSources, updated)
+			state.ModelSources = append(state.ModelSources, a.ModelSource)
 		}
 		return ReduceOutcomeApplied
 	case *ahptypes.RootModelSourceRemovedAction:
@@ -557,18 +553,6 @@ func ApplyActionToRoot(state *ahptypes.RootState, action ahptypes.StateAction) R
 			return ReduceOutcomeNoOp
 		}
 		state.ModelSources = append(state.ModelSources[:idx], state.ModelSources[idx+1:]...)
-		return ReduceOutcomeApplied
-	case *ahptypes.RootModelSourceStateChangedAction:
-		idx := modelSourceIndex(state.ModelSources, a.ModelSourceId)
-		if idx < 0 {
-			return ReduceOutcomeNoOp
-		}
-		st := a.State
-		copyModelSourceHostFields(&state.ModelSources[idx], ahptypes.ModelSource{
-			State:              &st,
-			CredentialResource: a.CredentialResource,
-			AccountId:          a.AccountId,
-		})
 		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope
@@ -581,29 +565,6 @@ func modelSourceIndex(list []ahptypes.ModelSource, id string) int {
 		}
 	}
 	return -1
-}
-
-// copyModelSourceHostFields copies the host-reported fields of from onto to,
-// clearing the ones from lacks.
-func copyModelSourceHostFields(to *ahptypes.ModelSource, from ahptypes.ModelSource) {
-	to.State = from.State
-	to.CredentialResource = from.CredentialResource
-	to.AccountId = from.AccountId
-}
-
-// sameModelSourceVersion reports whether two model sources have the same
-// provider, format, and definition nonce.
-func sameModelSourceVersion(a, b ahptypes.ModelSource) bool {
-	return a.Provider == b.Provider && sameOptionalString(a.Format, b.Format) && sameOptionalString(a.Nonce, b.Nonce)
-}
-
-// sameOptionalString reports whether two optional strings are both absent, or
-// both present and equal.
-func sameOptionalString(a, b *string) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return *a == *b
 }
 
 // ─── Chat Reducer ──────────────────────────────────────────────────────

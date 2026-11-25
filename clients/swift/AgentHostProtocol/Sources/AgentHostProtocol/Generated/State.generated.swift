@@ -1971,7 +1971,7 @@ public struct ModelSourceRegistrationCapability: Codable, Sendable, Equatable {
 ///
 /// Stability: 1.0 - Early development.
 public struct ModelSourceFormatInfo: Codable, Sendable, Equatable {
-    /// A {@link ModelSource.format} value.
+    /// A {@link ModelSourceRegistration.format} value.
     public var format: String
 
     public init(
@@ -1996,44 +1996,14 @@ public struct ModelSource: Codable, Sendable, Equatable {
     public var displayName: String
     /// Icons for UI display.
     public var icons: [Icon]?
-    /// The format of `definition`: the `format` of one of the agent's
-    /// {@link ModelSourceRegistrationCapability.formats}. Present on a
-    /// registered source.
-    ///
-    /// Agents choose the formats they read. Some may read these common names:
-    ///
-    /// - `'openaiCompatible'`: an endpoint that implements OpenAI's API.
-    /// - `'anthropic'`: an endpoint that implements Anthropic's Messages API.
-    /// - `'azureOpenai'`: an Azure OpenAI deployment.
-    /// - `'gemini'`: Google's Gemini API.
-    ///
-    /// Other formats are named with a namespace, such as
-    /// `example.com/model-source@1`, so they don't collide.
-    public var format: String?
-    /// How to reach the source, in `format`: endpoint, wire API, models, and so
-    /// on. The agent reads it. Every client can read it, so it MUST NOT contain
-    /// a credential. Present on a registered source.
-    ///
-    /// An agent that reads one of the common format names might expect a shape
-    /// like `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is
-    /// the API's base URI and each `models` entry is `{ id, name?,
-    /// maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
-    /// named as in {@link SessionModelInfo}.
-    public var definition: [String: AnyCodable]?
-    /// Opaque version token for `definition`, such as a hash of it, chosen by
-    /// whoever registers the source. Present on a registered source. Reducers
-    /// compare it, instead of the definition, to tell an update from a
-    /// re-registration of the same definition.
-    public var nonce: String?
-    /// What happens when the last contributing client leaves. Absent means `contributingClient`.
-    public var retention: ModelSourceRetentionPolicy?
-    /// Host-reported status, set with {@link RootModelSourceStateChangedAction}.
-    /// Absent until the host reports one, and after an update replaces the
-    /// definition until the host reports again.
-    public var state: ModelSourceState?
+    /// How the source was registered. Absent on a source the agent provides
+    /// itself.
+    public var registration: ModelSourceRegistration?
+    /// The source's status.
+    public var state: ModelSourceState
     /// RFC 9728 metadata for the endpoint a registered source's credential is
     /// for. Present whenever the source takes a credential, in every state, so
-    /// any client can deliver or rotate one. Set with `state`.
+    /// any client can deliver or rotate one.
     ///
     /// `credentialResource.resource` is the endpoint URL as the definition
     /// names it, in any scheme the agent supports (for example
@@ -2041,7 +2011,7 @@ public struct ModelSource: Codable, Sendable, Equatable {
     /// `authenticate({ resource })`.
     public var credentialResource: ProtectedResourceMetadata?
     /// The {@link AuthenticateParams.accountId} sent with the credential the
-    /// host most recently accepted. Set with `state`.
+    /// host most recently accepted.
     public var accountId: String?
     /// Additional implementation-defined metadata for this model source.
     /// MUST NOT contain a credential.
@@ -2052,10 +2022,7 @@ public struct ModelSource: Codable, Sendable, Equatable {
         case provider
         case displayName
         case icons
-        case format
-        case definition
-        case nonce
-        case retention
+        case registration
         case state
         case credentialResource
         case accountId
@@ -2067,11 +2034,8 @@ public struct ModelSource: Codable, Sendable, Equatable {
         provider: String,
         displayName: String,
         icons: [Icon]? = nil,
-        format: String? = nil,
-        definition: [String: AnyCodable]? = nil,
-        nonce: String? = nil,
-        retention: ModelSourceRetentionPolicy? = nil,
-        state: ModelSourceState? = nil,
+        registration: ModelSourceRegistration? = nil,
+        state: ModelSourceState,
         credentialResource: ProtectedResourceMetadata? = nil,
         accountId: String? = nil,
         meta: [String: AnyCodable]? = nil
@@ -2080,14 +2044,53 @@ public struct ModelSource: Codable, Sendable, Equatable {
         self.provider = provider
         self.displayName = displayName
         self.icons = icons
-        self.format = format
-        self.definition = definition
-        self.nonce = nonce
-        self.retention = retention
+        self.registration = registration
         self.state = state
         self.credentialResource = credentialResource
         self.accountId = accountId
         self.meta = meta
+    }
+}
+
+/// How a client, or the host from its own configuration, registered a model
+/// source.
+///
+/// Stability: 1.0 - Early development.
+public struct ModelSourceRegistration: Codable, Sendable, Equatable {
+    /// The format of `definition`: the `format` of one of the agent's
+    /// {@link ModelSourceRegistrationCapability.formats}.
+    ///
+    /// Agents choose the formats they read. Some may read these common names:
+    ///
+    /// - `'openaiCompatible'`: an endpoint that implements OpenAI's API.
+    /// - `'anthropic'`: an endpoint that implements Anthropic's Messages API.
+    /// - `'azureOpenai'`: an Azure OpenAI deployment.
+    /// - `'gemini'`: Google's Gemini API.
+    ///
+    /// Other formats are named with a namespace, such as
+    /// `example.com/model-source@1`, so they don't collide.
+    public var format: String
+    /// How to reach the source, in `format`: endpoint, wire API, models, and so
+    /// on. The agent reads it. Every client can read it, so it MUST NOT contain
+    /// a credential.
+    ///
+    /// An agent that reads one of the common format names might expect a shape
+    /// like `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is
+    /// the API's base URI and each `models` entry is `{ id, name?,
+    /// maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
+    /// named as in {@link SessionModelInfo}.
+    public var definition: [String: AnyCodable]
+    /// What happens when the last contributing client leaves. Absent means `contributingClient`.
+    public var retention: ModelSourceRetentionPolicy?
+
+    public init(
+        format: String,
+        definition: [String: AnyCodable],
+        retention: ModelSourceRetentionPolicy? = nil
+    ) {
+        self.format = format
+        self.definition = definition
+        self.retention = retention
     }
 }
 
