@@ -66,6 +66,28 @@ mod tests;
 /// lag behind this many messages will drop frames and must resubscribe.
 const DEFAULT_SUBSCRIPTION_BUFFER: usize = 256;
 
+/// Slot type of the client's broadcast rings: the event behind an [`Arc`].
+///
+/// A `broadcast` channel allocates and initializes every slot when it is
+/// created, so a ring occupies `subscription_buffer` slots for as long as
+/// it lives, whether or not anything is ever sent on it. With the event
+/// stored inline each slot is several hundred bytes, for the all-events
+/// ring and again for every subscribed resource. With a pointer an idle
+/// slot is a few words, and an event is only allocated when there is a
+/// receiver to read it. The ring's capacity, and so how far a receiver may
+/// lag before it skips, is unchanged.
+type Slot<T> = Arc<T>;
+
+/// Take the event out of a slot for one receiver.
+///
+/// The ring releases a value once the last receiver it was sent to has
+/// read it, so that receiver gets the event itself and each earlier one a
+/// clone: one clone fewer per event than when `broadcast` clones the value
+/// for every receiver.
+fn take<T: Clone>(slot: Slot<T>) -> T {
+    Arc::try_unwrap(slot).unwrap_or_else(|shared| (*shared).clone())
+}
+
 /// Configuration for a [`Client`].
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -130,7 +152,7 @@ pub struct ClientEvent {
 /// [`ClientConfig::subscription_buffer`] events skip the gap and keep
 /// going, matching [`SessionSubscription`] semantics.
 pub struct ClientEventStream {
-    rx: broadcast::Receiver<ClientEvent>,
+    rx: broadcast::Receiver<Slot<ClientEvent>>,
 }
 
 impl ClientEventStream {
@@ -139,7 +161,7 @@ impl ClientEventStream {
     pub async fn recv(&mut self) -> Option<ClientEvent> {
         loop {
             match self.rx.recv().await {
-                Ok(ev) => return Some(ev),
+                Ok(ev) => return Some(take(ev)),
                 Err(broadcast::error::RecvError::Closed) => return None,
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,
             }
@@ -151,7 +173,7 @@ impl ClientEventStream {
 /// events. The underlying server subscription is released when the last
 /// handle for that URI is dropped and [`Client::unsubscribe`] is called.
 pub struct SessionSubscription {
-    rx: broadcast::Receiver<SubscriptionEvent>,
+    rx: broadcast::Receiver<Slot<SubscriptionEvent>>,
     uri: String,
 }
 
@@ -166,7 +188,7 @@ impl SessionSubscription {
     pub async fn recv(&mut self) -> Option<SubscriptionEvent> {
         loop {
             match self.rx.recv().await {
-                Ok(ev) => return Some(ev),
+                Ok(ev) => return Some(take(ev)),
                 Err(broadcast::error::RecvError::Closed) => return None,
                 // Slow consumer: skip the gap and keep going. Callers
                 // that need strict ordering should use a tighter buffer
@@ -194,7 +216,7 @@ type PendingMap = HashMap<u64, oneshot::Sender<Result<Value, JsonRpcError>>>;
 
 struct Shared {
     pending: std::sync::Mutex<PendingMap>,
-    subscriptions: Mutex<HashMap<String, broadcast::Sender<SubscriptionEvent>>>,
+    subscriptions: Mutex<HashMap<String, broadcast::Sender<Slot<SubscriptionEvent>>>>,
     /// Top-level all-events broadcast.
     ///
     /// Wrapped in a `std::sync::Mutex<Option<_>>` so [`drive_transport`]
@@ -202,7 +224,7 @@ struct Shared {
     /// [`ClientEventStream`] receiver would hang on `recv()` forever
     /// after the underlying transport closes (the `Sender` would stay
     /// alive inside the still-`Arc`-held `Shared`).
-    all_events: std::sync::Mutex<Option<broadcast::Sender<ClientEvent>>>,
+    all_events: std::sync::Mutex<Option<broadcast::Sender<Slot<ClientEvent>>>>,
     outbound: mpsc::Sender<Outbound>,
     next_id: AtomicU64,
     next_client_seq: AtomicU64,
@@ -393,7 +415,8 @@ impl Client {
         config: ClientConfig,
     ) -> Result<Self, ClientError> {
         let (outbound_tx, outbound_rx) = mpsc::channel::<Outbound>(64);
-        let (all_events_tx, _) = broadcast::channel::<ClientEvent>(config.subscription_buffer);
+        let (all_events_tx, _) =
+            broadcast::channel::<Slot<ClientEvent>>(config.subscription_buffer);
         let shared = Arc::new(Shared {
             pending: std::sync::Mutex::new(HashMap::new()),
             subscriptions: Mutex::new(HashMap::new()),
@@ -1039,15 +1062,24 @@ async fn fan_out(shared: &Shared, channel: &Uri, event: SubscriptionEvent) {
     {
         let subs = shared.subscriptions.lock().await;
         if let Some(tx) = subs.get(channel) {
-            let _ = tx.send(event.clone());
+            // `send` stores nothing when there is no receiver, so skip
+            // building the event for it. Receivers are only added while
+            // this lock is held (`attach_subscription`), so none can
+            // appear between the check and the send.
+            if tx.receiver_count() > 0 {
+                let _ = tx.send(Arc::new(event.clone()));
+            }
         }
     }
     if let Ok(guard) = shared.all_events.lock() {
         if let Some(tx) = guard.as_ref() {
-            let _ = tx.send(ClientEvent {
-                channel: channel.clone(),
-                event,
-            });
+            // As above: `events()` subscribes under this same lock.
+            if tx.receiver_count() > 0 {
+                let _ = tx.send(Arc::new(ClientEvent {
+                    channel: channel.clone(),
+                    event,
+                }));
+            }
         }
     }
 }

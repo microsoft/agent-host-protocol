@@ -1,0 +1,5 @@
+{
+  "type": "changed",
+  "message": "`Client` event rings store each event behind an `Arc`, so an idle ring costs a pointer-sized slot per `ClientConfig::subscription_buffer` entry instead of an inline event of several hundred bytes. Delivery order, lag behaviour and the public API are unchanged.",
+  "targets": ["rust"]
+}
