@@ -53,6 +53,7 @@ public actor MultiHostStateMirror {
     public private(set) var automationCatalogs: [HostId: AutomationState] = [:]
     public private(set) var automations: [HostedResourceKey: AutomationEntry] = [:]
     public private(set) var automationRuns: [HostedResourceKey: AutomationRunState] = [:]
+    public private(set) var searches: [HostedResourceKey: SearchState] = [:]
 
     public init() {}
 
@@ -93,6 +94,10 @@ public actor MultiHostStateMirror {
         }
         if channel.hasPrefix("ahp-canvas:"), let canvas = canvases[key] {
             canvases[key] = canvasReducer(state: canvas, action: action)
+            return
+        }
+        if channel.hasPrefix("ahp-search:"), let search = searches[key] {
+            searches[key] = searchReducer(state: search, action: action)
             return
         }
         if channel.hasPrefix("ahp-terminal:"), var terminal = terminals[key] {
@@ -158,6 +163,8 @@ public actor MultiHostStateMirror {
             setAutomationCatalog(host: host, catalog: state)
         case .automationRun(let state):
             automationRuns[key] = state
+        case .search(let state):
+            searches[key] = state
         }
     }
 
@@ -174,6 +181,7 @@ public actor MultiHostStateMirror {
         automationCatalogs.removeValue(forKey: host)
         automations = automations.filter { $0.key.hostId != host }
         automationRuns = automationRuns.filter { $0.key.hostId != host }
+        searches = searches.filter { $0.key.hostId != host }
     }
 
     /// Reset every host's state.
@@ -189,6 +197,7 @@ public actor MultiHostStateMirror {
         automationCatalogs.removeAll()
         automations.removeAll()
         automationRuns.removeAll()
+        searches.removeAll()
     }
 
     private func setAutomationCatalog(host: HostId, catalog: AutomationState) {

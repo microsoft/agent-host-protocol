@@ -61,10 +61,11 @@ use ahp_types::state::{
     ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, BackgroundWork, CanvasState,
     ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatConfigState, ChatInputRequest,
     ChatState, ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
-    ErrorResponsePart, InputRequestResponsePart, McpServerCustomization, McpServerStartingState,
-    McpServerState, McpServerStoppedState, ModelSource, PendingMessage, PendingMessageKind,
-    ResourceWatchState, ResponsePart, RootState, SessionInputRequest, SessionLifecycle,
-    SessionState, SessionStatus, TerminalCommandPart, TerminalContentPart,
+    ErrorResponsePart, InputRequestResponsePart, MaterializedTurn, McpServerCustomization,
+    McpServerStartingState, McpServerState, McpServerStoppedState, ModelSource, PendingMessage,
+    PendingMessageKind, ResourceWatchState, ResponsePart, RootState, SearchLifecycleState,
+    SearchPendingLifecycleState, SearchRunningLifecycleState, SearchState, SessionInputRequest,
+    SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart, TerminalContentPart,
     TerminalExitedLifecycleState, TerminalLifecycleState, TerminalState, TerminalUnclassifiedPart,
     ToolCallAuthRequiredState, ToolCallCancellationReason, ToolCallCancelledState,
     ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
@@ -411,7 +412,7 @@ fn end_turn(
         response_parts.push(ResponsePart::Error(error_part));
     }
 
-    let turn = Turn {
+    let turn = MaterializedTurn {
         id: active.id,
         started_at: Some(active.started_at),
         duration: Some(duration),
@@ -421,7 +422,7 @@ fn end_turn(
         state: turn_state,
     };
 
-    state.turns.push(turn);
+    state.turns.push(Turn::Materialized(turn));
     state.modified_at = modified_at;
     state.status = summary_status(state, terminal_status);
     ReduceOutcome::Applied
@@ -1217,7 +1218,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             if state.active_turn.is_some() {
                 return ReduceOutcome::NoOp;
             }
-            let Some(turn) = state.turns.last_mut() else {
+            let Some(Turn::Materialized(turn)) = state.turns.last() else {
                 return ReduceOutcome::NoOp;
             };
             if turn.id != a.turn_id || turn.state != TurnState::Error {
@@ -1230,7 +1231,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
                 return ReduceOutcome::NoOp;
             }
 
-            let Some(turn) = state.turns.pop() else {
+            let Some(Turn::Materialized(turn)) = state.turns.pop() else {
                 return ReduceOutcome::NoOp;
             };
             state.active_turn = Some(ActiveTurn {
@@ -1396,18 +1397,39 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }),
         StateAction::ChatTruncated(a) => apply_truncated(state, a.turn_id.as_deref()),
         StateAction::ChatTurnsLoaded(a) => {
-            let existing_ids: HashSet<&str> =
-                state.turns.iter().map(|turn| turn.id.as_str()).collect();
+            let existing_ids: HashSet<&str> = state.turns.iter().map(Turn::id).collect();
             let mut older_turns: Vec<Turn> = a
                 .turns
                 .iter()
-                .filter(|turn| !existing_ids.contains(turn.id.as_str()))
+                .filter(|turn| !existing_ids.contains(turn.id()))
                 .cloned()
                 .collect();
             older_turns.append(&mut state.turns);
             state.turns = older_turns;
             state.turns_next_cursor = a.turns_next_cursor.clone();
             ReduceOutcome::Applied
+        }
+        StateAction::ChatTurnsMaterialized(a) => {
+            let materialized: HashMap<&str, &MaterializedTurn> = a
+                .turns
+                .iter()
+                .map(|turn| (turn.id.as_str(), turn))
+                .collect();
+            let mut changed = false;
+            for entry in &mut state.turns {
+                let Turn::Deferred(deferred) = entry else {
+                    continue;
+                };
+                if let Some(turn) = materialized.get(deferred.id.as_str()) {
+                    *entry = Turn::Materialized((*turn).clone());
+                    changed = true;
+                }
+            }
+            if changed {
+                ReduceOutcome::Applied
+            } else {
+                ReduceOutcome::NoOp
+            }
         }
         StateAction::ChatInputRequested(a) => upsert_input_request(state, a.request.clone()),
         StateAction::ChatInputAnswerChanged(a) => apply_input_answer_changed(state, a),
@@ -1959,7 +1981,7 @@ fn apply_truncated(state: &mut ChatState, turn_id: Option<&str>) -> ReduceOutcom
             state.turns_next_cursor = None;
         }
         Some(id) => {
-            let Some(idx) = state.turns.iter().position(|t| t.id == id) else {
+            let Some(idx) = state.turns.iter().position(|t| t.id() == id) else {
                 return ReduceOutcome::NoOp;
             };
             state.turns.truncate(idx + 1);
@@ -2309,6 +2331,38 @@ pub fn apply_action_to_resource_watch(
     }
 }
 
+// ─── Search Reducer ───────────────────────────────────────────────────
+
+/// Apply a [`StateAction`] to a [`SearchState`] in place.
+pub fn apply_action_to_search(state: &mut SearchState, action: &StateAction) -> ReduceOutcome {
+    match action {
+        StateAction::SearchQueryChanged(a) => {
+            state.query = a.query.clone();
+            state.lifecycle = SearchLifecycleState::Pending(SearchPendingLifecycleState {});
+            ReduceOutcome::Applied
+        }
+        StateAction::SearchResultsChanged(a) => {
+            if a.replace != Some(true) {
+                if a.results.is_empty() {
+                    return ReduceOutcome::NoOp;
+                }
+                state.results.extend(a.results.iter().cloned());
+                return ReduceOutcome::Applied;
+            }
+            state.results = a.results.clone();
+            if matches!(state.lifecycle, SearchLifecycleState::Pending(_)) {
+                state.lifecycle = SearchLifecycleState::Running(SearchRunningLifecycleState {});
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::SearchLifecycleChanged(a) => {
+            state.lifecycle = a.lifecycle.clone();
+            ReduceOutcome::Applied
+        }
+        _ => ReduceOutcome::OutOfScope,
+    }
+}
+
 /// Apply a [`StateAction`] to an [`AutomationState`] in place.
 pub fn apply_action_to_automation(
     state: &mut AutomationState,
@@ -2522,7 +2576,10 @@ mod tests {
         assert_eq!(apply_action_to_chat(&mut s, &a), ReduceOutcome::Applied);
         assert!(s.active_turn.is_none());
         assert_eq!(s.turns.len(), 1);
-        assert_eq!(s.turns[0].state, TurnState::Complete);
+        let Turn::Materialized(turn) = &s.turns[0] else {
+            panic!("expected a materialized turn");
+        };
+        assert_eq!(turn.state, TurnState::Complete);
         assert_eq!(s.status, SessionStatus::Idle.bits());
     }
 
@@ -2906,6 +2963,14 @@ mod tests {
                     expected,
                     &parsed_actions,
                     apply_action_to_resource_watch,
+                    &file_name,
+                    description,
+                ),
+                "search" => run_fixture::<SearchState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_search,
                     &file_name,
                     description,
                 ),

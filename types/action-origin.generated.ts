@@ -80,6 +80,7 @@ import type {
   ChatInputCompletedAction,
   ChatTruncatedAction,
   ChatTurnsLoadedAction,
+  ChatTurnsMaterializedAction,
   ChangesetStatusChangedAction,
   ChangesetFileSetAction,
   ChangesetFileRemovedAction,
@@ -105,6 +106,9 @@ import type {
   TerminalCommandExecutedAction,
   TerminalCommandFinishedAction,
   ResourceWatchChangedAction,
+  SearchQueryChangedAction,
+  SearchResultsChangedAction,
+  SearchLifecycleChangedAction,
   AutomationCreateRequestedAction,
   AutomationUpdateRequestedAction,
   AutomationSetAction,
@@ -259,6 +263,7 @@ export type ChatAction =
   | ChatInputCompletedAction
   | ChatTruncatedAction
   | ChatTurnsLoadedAction
+  | ChatTurnsMaterializedAction
 ;
 
 /** Union of chat actions that clients may dispatch. */
@@ -306,6 +311,7 @@ export type ServerChatAction =
   | ChatMovedAction
   | ChatInputRequestedAction
   | ChatTurnsLoadedAction
+  | ChatTurnsMaterializedAction
 ;
 
 /** Union of all canvas-scoped actions. */
@@ -421,6 +427,24 @@ export type ClientResourceWatchAction =
 /** Union of resource-watch actions that only the server may produce. */
 export type ServerResourceWatchAction =
   | ResourceWatchChangedAction
+;
+
+/** Union of all search-scoped actions. */
+export type SearchAction =
+  | SearchQueryChangedAction
+  | SearchResultsChangedAction
+  | SearchLifecycleChangedAction
+;
+
+/** Union of search actions that clients may dispatch. */
+export type ClientSearchAction =
+  | SearchQueryChangedAction
+;
+
+/** Union of search actions that only the server may produce. */
+export type ServerSearchAction =
+  | SearchResultsChangedAction
+  | SearchLifecycleChangedAction
 ;
 
 /** Union of all automation-scoped actions. */
@@ -549,6 +573,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatInputCompleted]: true,
   [ActionType.ChatTruncated]: true,
   [ActionType.ChatTurnsLoaded]: false,
+  [ActionType.ChatTurnsMaterialized]: false,
   [ActionType.ChangesetStatusChanged]: false,
   [ActionType.ChangesetFileSet]: false,
   [ActionType.ChangesetFileRemoved]: false,
@@ -574,6 +599,9 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.TerminalCommandExecuted]: false,
   [ActionType.TerminalCommandFinished]: false,
   [ActionType.ResourceWatchChanged]: false,
+  [ActionType.SearchQueryChanged]: true,
+  [ActionType.SearchResultsChanged]: false,
+  [ActionType.SearchLifecycleChanged]: false,
   [ActionType.AutomationCreateRequested]: true,
   [ActionType.AutomationUpdateRequested]: true,
   [ActionType.AutomationSet]: false,

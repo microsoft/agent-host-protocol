@@ -72,6 +72,7 @@ public enum ActionType: Codable, Sendable, Equatable {
     case sessionMcpServerBackgroundRequested
     case chatTruncated
     case chatTurnsLoaded
+    case chatTurnsMaterialized
     case sessionIsReadChanged
     case sessionIsArchivedChanged
     case sessionActivityChanged
@@ -108,6 +109,9 @@ public enum ActionType: Codable, Sendable, Equatable {
     case terminalCommandExecuted
     case terminalCommandFinished
     case resourceWatchChanged
+    case searchQueryChanged
+    case searchResultsChanged
+    case searchLifecycleChanged
     case automationCreateRequested
     case automationUpdateRequested
     case automationSet
@@ -190,6 +194,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "session/mcpServerBackgroundRequested": self = .sessionMcpServerBackgroundRequested
         case "chat/truncated": self = .chatTruncated
         case "chat/turnsLoaded": self = .chatTurnsLoaded
+        case "chat/turnsMaterialized": self = .chatTurnsMaterialized
         case "session/isReadChanged": self = .sessionIsReadChanged
         case "session/isArchivedChanged": self = .sessionIsArchivedChanged
         case "session/activityChanged": self = .sessionActivityChanged
@@ -226,6 +231,9 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "terminal/commandExecuted": self = .terminalCommandExecuted
         case "terminal/commandFinished": self = .terminalCommandFinished
         case "resourceWatch/changed": self = .resourceWatchChanged
+        case "search/queryChanged": self = .searchQueryChanged
+        case "search/resultsChanged": self = .searchResultsChanged
+        case "search/lifecycleChanged": self = .searchLifecycleChanged
         case "automation/createRequested": self = .automationCreateRequested
         case "automation/updateRequested": self = .automationUpdateRequested
         case "automation/set": self = .automationSet
@@ -308,6 +316,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .sessionMcpServerBackgroundRequested: try container.encode("session/mcpServerBackgroundRequested")
         case .chatTruncated: try container.encode("chat/truncated")
         case .chatTurnsLoaded: try container.encode("chat/turnsLoaded")
+        case .chatTurnsMaterialized: try container.encode("chat/turnsMaterialized")
         case .sessionIsReadChanged: try container.encode("session/isReadChanged")
         case .sessionIsArchivedChanged: try container.encode("session/isArchivedChanged")
         case .sessionActivityChanged: try container.encode("session/activityChanged")
@@ -344,6 +353,9 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .terminalCommandExecuted: try container.encode("terminal/commandExecuted")
         case .terminalCommandFinished: try container.encode("terminal/commandFinished")
         case .resourceWatchChanged: try container.encode("resourceWatch/changed")
+        case .searchQueryChanged: try container.encode("search/queryChanged")
+        case .searchResultsChanged: try container.encode("search/resultsChanged")
+        case .searchLifecycleChanged: try container.encode("search/lifecycleChanged")
         case .automationCreateRequested: try container.encode("automation/createRequested")
         case .automationUpdateRequested: try container.encode("automation/updateRequested")
         case .automationSet: try container.encode("automation/set")
@@ -1976,6 +1988,20 @@ public struct ChatTruncatedAction: Codable, Sendable, Equatable {
     }
 }
 
+/// Loads older completed turns into this chat's state.
+///
+/// Hosts dispatch this before responding to `fetchTurns`, and before applying
+/// any operation that references a turn older than the currently loaded window.
+/// `turns` is ordered oldest-first and is prepended to the current `turns`
+/// window. `turnsNextCursor` replaces the state's cursor; omit it when all
+/// retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+/// only for clients that declared
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// This belongs to the legacy tail-window paging scheme, which deferred turns
+/// replace. See {@link FetchTurnsParams | `fetchTurns`}.
+///
+/// Stability: 3 - Legacy.
 public struct ChatTurnsLoadedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Older completed turns loaded into the state, ordered oldest-first.
@@ -1991,6 +2017,29 @@ public struct ChatTurnsLoadedAction: Codable, Sendable, Equatable {
         self.type = type
         self.turns = turns
         self.turnsNextCursor = turnsNextCursor
+    }
+}
+
+/// Replaces {@link DeferredTurn | deferred turns} in place with their full
+/// {@link MaterializedTurn | turns}.
+///
+/// Hosts dispatch this before responding to `fetchDeferredTurns`, and before
+/// applying any operation that needs a deferred turn's response, such as
+/// `chat/turnResume`. Each entry replaces the deferred turn with the same `id`.
+/// Entries whose `id` does not name a deferred turn in state are ignored.
+///
+/// Stability: 1.0 - Early development.
+public struct ChatTurnsMaterializedAction: Codable, Sendable, Equatable {
+    public var type: ActionType
+    /// Full turns to replace their deferred entries.
+    public var turns: [MaterializedTurn]
+
+    public init(
+        type: ActionType,
+        turns: [MaterializedTurn]
+    ) {
+        self.type = type
+        self.turns = turns
     }
 }
 
@@ -2552,6 +2601,94 @@ public struct ResourceWatchChangedAction: Codable, Sendable, Equatable {
     }
 }
 
+/// Replaces the search's query and restarts the search.
+///
+/// Keeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to
+/// {@link SearchLifecycleStatus.Pending | pending}. The old results stay
+/// visible until the host replaces them, so the client does not flash an empty
+/// list.
+///
+/// After the host applies this action, it stops the previous search and drops
+/// any of its results that it has not dispatched yet. The host MUST then
+/// dispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with
+/// `replace: true` before any other search action. The replacement can keep
+/// old results that still match the new query, and can be empty. If the new
+/// query is not valid,
+/// for example because it contains an invalid regular expression, the host
+/// replaces the results with an empty list and then changes the lifecycle to
+/// {@link SearchLifecycleStatus.Failed | failed}.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchQueryChangedAction: Codable, Sendable, Equatable {
+    public var type: ActionType
+    /// The new query.
+    public var query: SearchQuery
+
+    public init(
+        type: ActionType,
+        query: SearchQuery
+    ) {
+        self.type = type
+        self.query = query
+    }
+}
+
+/// Adds results to {@link SearchState.results}, or replaces them.
+///
+/// By default, the reducer appends `results`. Set `replace` to `true` to
+/// replace every result instead; if {@link SearchState.lifecycle} is
+/// {@link SearchLifecycleStatus.Pending | pending}, a replacement also changes
+/// it to {@link SearchLifecycleStatus.Running | running}.
+///
+/// The host MUST dispatch a replacement first after a
+/// {@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also
+/// replace the results at other times, for example to re-rank them, to remove
+/// duplicates, or to update a completed search when a watched file changes.
+/// The host MUST NOT dispatch an empty `results` list unless `replace` is
+/// `true`.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchResultsChangedAction: Codable, Sendable, Equatable {
+    public var type: ActionType
+    /// The results to append, in the order the host found them, or the replacement results.
+    public var results: [SearchResult]
+    /// When `true`, replaces every result instead of appending.
+    public var replace: Bool?
+
+    public init(
+        type: ActionType,
+        results: [SearchResult],
+        replace: Bool? = nil
+    ) {
+        self.type = type
+        self.results = results
+        self.replace = replace
+    }
+}
+
+/// Replaces {@link SearchState.lifecycle}.
+///
+/// The host dispatches this to complete or fail a search, or to move a
+/// completed search back to {@link SearchLifecycleStatus.Running | running} when it
+/// searches again, for example after a watched file changes. The host MUST NOT
+/// change the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only
+/// {@link SearchQueryChangedAction | `search/queryChanged`} does that.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchLifecycleChangedAction: Codable, Sendable, Equatable {
+    public var type: ActionType
+    /// The new lifecycle.
+    public var lifecycle: SearchLifecycleState
+
+    public init(
+        type: ActionType,
+        lifecycle: SearchLifecycleState
+    ) {
+        self.type = type
+        self.lifecycle = lifecycle
+    }
+}
+
 public struct AutomationCreateRequestedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}.
@@ -2821,6 +2958,7 @@ public enum StateAction: Codable, Sendable, Equatable {
     case sessionMcpServerBackgroundRequested(SessionMcpServerBackgroundRequestedAction)
     case chatTruncated(ChatTruncatedAction)
     case chatTurnsLoaded(ChatTurnsLoadedAction)
+    case chatTurnsMaterialized(ChatTurnsMaterializedAction)
     case sessionConfigChanged(SessionConfigChangedAction)
     case sessionMetaChanged(SessionMetaChangedAction)
     case changesetStatusChanged(ChangesetStatusChangedAction)
@@ -2853,6 +2991,9 @@ public enum StateAction: Codable, Sendable, Equatable {
     case terminalCommandExecuted(TerminalCommandExecutedAction)
     case terminalCommandFinished(TerminalCommandFinishedAction)
     case resourceWatchChanged(ResourceWatchChangedAction)
+    case searchQueryChanged(SearchQueryChangedAction)
+    case searchResultsChanged(SearchResultsChangedAction)
+    case searchLifecycleChanged(SearchLifecycleChangedAction)
     case automationCreateRequested(AutomationCreateRequestedAction)
     case automationUpdateRequested(AutomationUpdateRequestedAction)
     case automationSet(AutomationSetAction)
@@ -3014,6 +3155,8 @@ public enum StateAction: Codable, Sendable, Equatable {
             self = .chatTruncated(try ChatTruncatedAction(from: decoder))
         case "chat/turnsLoaded":
             self = .chatTurnsLoaded(try ChatTurnsLoadedAction(from: decoder))
+        case "chat/turnsMaterialized":
+            self = .chatTurnsMaterialized(try ChatTurnsMaterializedAction(from: decoder))
         case "session/configChanged":
             self = .sessionConfigChanged(try SessionConfigChangedAction(from: decoder))
         case "session/metaChanged":
@@ -3078,6 +3221,12 @@ public enum StateAction: Codable, Sendable, Equatable {
             self = .terminalCommandFinished(try TerminalCommandFinishedAction(from: decoder))
         case "resourceWatch/changed":
             self = .resourceWatchChanged(try ResourceWatchChangedAction(from: decoder))
+        case "search/queryChanged":
+            self = .searchQueryChanged(try SearchQueryChangedAction(from: decoder))
+        case "search/resultsChanged":
+            self = .searchResultsChanged(try SearchResultsChangedAction(from: decoder))
+        case "search/lifecycleChanged":
+            self = .searchLifecycleChanged(try SearchLifecycleChangedAction(from: decoder))
         case "automation/createRequested":
             self = .automationCreateRequested(try AutomationCreateRequestedAction(from: decoder))
         case "automation/updateRequested":
@@ -3173,6 +3322,7 @@ public enum StateAction: Codable, Sendable, Equatable {
         case .sessionMcpServerBackgroundRequested(let v): try v.encode(to: encoder)
         case .chatTruncated(let v): try v.encode(to: encoder)
         case .chatTurnsLoaded(let v): try v.encode(to: encoder)
+        case .chatTurnsMaterialized(let v): try v.encode(to: encoder)
         case .sessionConfigChanged(let v): try v.encode(to: encoder)
         case .sessionMetaChanged(let v): try v.encode(to: encoder)
         case .changesetStatusChanged(let v): try v.encode(to: encoder)
@@ -3205,6 +3355,9 @@ public enum StateAction: Codable, Sendable, Equatable {
         case .terminalCommandExecuted(let v): try v.encode(to: encoder)
         case .terminalCommandFinished(let v): try v.encode(to: encoder)
         case .resourceWatchChanged(let v): try v.encode(to: encoder)
+        case .searchQueryChanged(let v): try v.encode(to: encoder)
+        case .searchResultsChanged(let v): try v.encode(to: encoder)
+        case .searchLifecycleChanged(let v): try v.encode(to: encoder)
         case .automationCreateRequested(let v): try v.encode(to: encoder)
         case .automationUpdateRequested(let v): try v.encode(to: encoder)
         case .automationSet(let v): try v.encode(to: encoder)

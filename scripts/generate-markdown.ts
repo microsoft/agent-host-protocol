@@ -77,6 +77,7 @@ const DIR_TO_PAGE: Record<string, string> = {
   'channels-automation': 'automation',
   'channels-automation-run': 'automation-run',
   'channels-tcp': 'tcp',
+  'channels-search': 'search',
 };
 
 /**
@@ -1207,6 +1208,31 @@ function generateTcpChannelPage(project: Project): string {
   return lines.join('\n');
 }
 
+function generateSearchChannelPage(project: Project): string {
+  currentPage = 'search';
+  const stateSf = findChannelSourceFile(project, 'channels-search', 'state.ts');
+  const actionsSf = findChannelSourceFile(project, 'channels-search', 'actions.ts');
+  const commandsSf = findChannelSourceFile(project, 'channels-search', 'commands.ts');
+  const lines: string[] = [GENERATED_HEADER, '# Search Channel\n', stabilityIndex(stateSf)];
+  lines.push('Reference for `ahp-search:/<id>` channels, which stream the results of a search over files, sessions, and chats. See the [Search Channel specification](/specification/search-channel).\n');
+  lines.push(schemaLink('state.schema.json'));
+  if (stateSf) {
+    lines.push('## State Types\n');
+    lines.push(emitStateTypesSection([stateSf]));
+  }
+  if (actionsSf) {
+    lines.push('## Actions\n');
+    lines.push(schemaLink('actions.schema.json'));
+    lines.push(emitActionsSection([actionsSf]));
+  }
+  if (commandsSf) {
+    lines.push('## Commands\n');
+    lines.push(schemaLink('commands.schema.json'));
+    lines.push(emitCommandsSection(project, [commandsSf]));
+  }
+  return lines.join('\n');
+}
+
 // ─── Error Codes Page ────────────────────────────────────────────────────────
 
 function generateErrorCodesPage(project: Project): string {
@@ -1484,6 +1510,7 @@ export function generateMarkdownDocs(project: Project, outDir: string): void {
     { filename: 'resource-watch.md', generator: generateResourceWatchChannelPage },
     { filename: 'otlp.md', generator: generateOtlpChannelPage },
     { filename: 'tcp.md', generator: generateTcpChannelPage },
+    { filename: 'search.md', generator: generateSearchChannelPage },
     { filename: 'automation.md', generator: generateAutomationChannelPage },
     { filename: 'automation-run.md', generator: generateAutomationRunChannelPage },
     { filename: 'mcp.md', generator: generateMcpChannelPage },

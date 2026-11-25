@@ -17,7 +17,7 @@ const GENERATED_HEADER = `// Generated from types/actions.ts — do not edit
 // Run \`npm run generate\` to regenerate.
 `;
 
-type ActionScope = 'root' | 'session' | 'chat' | 'canvas' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
+type ActionScope = 'root' | 'session' | 'chat' | 'canvas' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'search' | 'automation' | 'automationRun';
 
 interface ActionInfo {
   /** The interface name (e.g. 'RootAgentsChangedAction') */
@@ -156,6 +156,7 @@ export function readActionOrigins(project: Project): ActionInfo[] {
       : category === 'Changeset Actions' ? 'changeset'
       : category === 'Annotations Actions' ? 'annotations'
       : category === 'Resource Watch Actions' ? 'resourceWatch'
+      : category === 'Search Actions' ? 'search'
       : category === 'Automation Actions' ? 'automation'
       : category === 'Automation Run Actions' ? 'automationRun'
       : 'session';
@@ -217,6 +218,7 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   const changesetActions = actions.filter(a => a.scope === 'changeset');
   const annotationsActions = actions.filter(a => a.scope === 'annotations');
   const resourceWatchActions = actions.filter(a => a.scope === 'resourceWatch');
+  const searchActions = actions.filter(a => a.scope === 'search');
   const automationActions = actions.filter(a => a.scope === 'automation');
   const automationRunActions = actions.filter(a => a.scope === 'automationRun');
   const clientRootActions = rootActions.filter(a => a.isClientDispatchable);
@@ -235,6 +237,8 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   const serverAnnotationsActions = annotationsActions.filter(a => !a.isClientDispatchable);
   const clientResourceWatchActions = resourceWatchActions.filter(a => a.isClientDispatchable);
   const serverResourceWatchActions = resourceWatchActions.filter(a => !a.isClientDispatchable);
+  const clientSearchActions = searchActions.filter(a => a.isClientDispatchable);
+  const serverSearchActions = searchActions.filter(a => !a.isClientDispatchable);
   const clientAutomationActions = automationActions.filter(a => a.isClientDispatchable);
   const serverAutomationActions = automationActions.filter(a => !a.isClientDispatchable);
   const clientAutomationRunActions = automationRunActions.filter(a => a.isClientDispatchable);
@@ -508,6 +512,25 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   }
   lines.push(`;`);
   lines.push(``);
+
+  // SearchAction
+  for (const [name, doc, list] of [
+    ['SearchAction', 'Union of all search-scoped actions.', searchActions],
+    ['ClientSearchAction', 'Union of search actions that clients may dispatch.', clientSearchActions],
+    ['ServerSearchAction', 'Union of search actions that only the server may produce.', serverSearchActions],
+  ] as const) {
+    lines.push(`/** ${doc} */`);
+    lines.push(`export type ${name} =`);
+    if (list.length === 0) {
+      lines.push(`  never`);
+    } else {
+      for (const a of list) {
+        lines.push(`  | ${a.name}`);
+      }
+    }
+    lines.push(`;`);
+    lines.push(``);
+  }
 
   // AutomationAction
   lines.push(`/** Union of all automation-scoped actions. */`);

@@ -127,11 +127,20 @@ export interface DisposeSessionParams extends BaseParams {}
  * loaded window, the host MUST eagerly load enough older turns into state for
  * that operation to reduce against valid state.
  *
+ * Hosts MAY load turns as {@link DeferredTurn | deferred} for clients that
+ * declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+ *
+ * Tail-window paging is legacy. It remains supported for 1.x clients, but new
+ * clients SHOULD declare `deferredTurns` and read history with
+ * {@link FetchDeferredTurnsParams | `fetchDeferredTurns`} instead.
+ *
  * @category Commands
  * @method fetchTurns
  * @direction Client → Server
  * @messageType Request
  * @version 1
+ * @deprecated Declare `deferredTurns` and use `fetchDeferredTurns`.
+ * @stability 3
  * @example
  * ```jsonc
  * // Client → Server (load the next page indicated by ChatState.turnsNextCursor)
@@ -157,6 +166,9 @@ export interface FetchTurnsParams extends BaseParams {
 
 /**
  * Result of the `fetchTurns` command.
+ *
+ * @deprecated Declare `deferredTurns` and use `fetchDeferredTurns`.
+ * @stability 3
  */
 export interface FetchTurnsResult {}
 
@@ -262,12 +274,18 @@ export interface CompletionItem {
    * attachment's own `rangeStart`/`rangeEnd` (when present) refer to
    * positions in the final {@link Message.text} after the item is
    * accepted.
+   *
+   * @integer
+   * @minimum 0
    */
   rangeStart?: number;
 
   /**
    * The end of the range in the input's `text` that is replaced by
    * `insertText`. See {@link rangeStart}.
+   *
+   * @integer
+   * @minimum 1
    */
   rangeEnd?: number;
 

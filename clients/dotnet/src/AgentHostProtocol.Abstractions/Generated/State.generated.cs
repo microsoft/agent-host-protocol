@@ -2028,6 +2028,241 @@ public enum AutomationRunOriginKind
     Trigger,
 }
 
+/// <summary>Discriminant for {@link SearchTarget}.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(SearchTargetKindConverter))]
+public readonly struct SearchTargetKind : IEquatable<SearchTargetKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public SearchTargetKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>File paths.</summary>
+    public static readonly SearchTargetKind FileNames = new SearchTargetKind("fileNames");
+
+    /// <summary>The text content of files.</summary>
+    public static readonly SearchTargetKind FileText = new SearchTargetKind("fileText");
+
+    /// <summary>The host's sessions.</summary>
+    public static readonly SearchTargetKind Sessions = new SearchTargetKind("sessions");
+
+    /// <summary>The text of chat requests and responses.</summary>
+    public static readonly SearchTargetKind ChatMessages = new SearchTargetKind("chatMessages");
+
+    /// <inheritdoc />
+    public bool Equals(SearchTargetKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is SearchTargetKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(SearchTargetKind left, SearchTargetKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(SearchTargetKind left, SearchTargetKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="SearchTargetKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class SearchTargetKindConverter : JsonConverter<SearchTargetKind>
+{
+    /// <inheritdoc />
+    public override SearchTargetKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new SearchTargetKind(reader.GetString() ?? throw new JsonException("SearchTargetKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, SearchTargetKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>Discriminant for {@link SearchResult}.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(SearchResultKindConverter))]
+public readonly struct SearchResultKind : IEquatable<SearchResultKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public SearchResultKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly SearchResultKind FileName = new SearchResultKind("fileName");
+
+    public static readonly SearchResultKind FileText = new SearchResultKind("fileText");
+
+    public static readonly SearchResultKind Session = new SearchResultKind("session");
+
+    public static readonly SearchResultKind ChatMessage = new SearchResultKind("chatMessage");
+
+    /// <inheritdoc />
+    public bool Equals(SearchResultKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is SearchResultKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(SearchResultKind left, SearchResultKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(SearchResultKind left, SearchResultKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="SearchResultKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class SearchResultKindConverter : JsonConverter<SearchResultKind>
+{
+    /// <inheritdoc />
+    public override SearchResultKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new SearchResultKind(reader.GetString() ?? throw new JsonException("SearchResultKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, SearchResultKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>Lifecycle status of a search.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(SearchLifecycleStatusConverter))]
+public readonly struct SearchLifecycleStatus : IEquatable<SearchLifecycleStatus>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public SearchLifecycleStatus(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>The query changed and the host has not replaced the results yet.
+    /// {@link SearchState.results} belong to the previous query.</summary>
+    public static readonly SearchLifecycleStatus Pending = new SearchLifecycleStatus("pending");
+
+    /// <summary>The host is searching.</summary>
+    public static readonly SearchLifecycleStatus Running = new SearchLifecycleStatus("running");
+
+    /// <summary>The host found every result for the query.</summary>
+    public static readonly SearchLifecycleStatus Completed = new SearchLifecycleStatus("completed");
+
+    /// <summary>The search failed.</summary>
+    public static readonly SearchLifecycleStatus Failed = new SearchLifecycleStatus("failed");
+
+    /// <inheritdoc />
+    public bool Equals(SearchLifecycleStatus other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is SearchLifecycleStatus other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(SearchLifecycleStatus left, SearchLifecycleStatus right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(SearchLifecycleStatus left, SearchLifecycleStatus right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="SearchLifecycleStatus"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class SearchLifecycleStatusConverter : JsonConverter<SearchLifecycleStatus>
+{
+    /// <inheritdoc />
+    public override SearchLifecycleStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new SearchLifecycleStatus(reader.GetString() ?? throw new JsonException("SearchLifecycleStatus expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, SearchLifecycleStatus value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>Why a search completed.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(SearchCompletionReasonConverter))]
+public readonly struct SearchCompletionReason : IEquatable<SearchCompletionReason>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public SearchCompletionReason(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>The host searched every target.</summary>
+    public static readonly SearchCompletionReason Exhausted = new SearchCompletionReason("exhausted");
+
+    /// <summary>The host stopped at the result limit. More results may exist.</summary>
+    public static readonly SearchCompletionReason LimitReached = new SearchCompletionReason("limitReached");
+
+    /// <inheritdoc />
+    public bool Equals(SearchCompletionReason other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is SearchCompletionReason other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(SearchCompletionReason left, SearchCompletionReason right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(SearchCompletionReason left, SearchCompletionReason right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="SearchCompletionReason"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class SearchCompletionReasonConverter : JsonConverter<SearchCompletionReason>
+{
+    /// <inheritdoc />
+    public override SearchCompletionReason Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new SearchCompletionReason(reader.GetString() ?? throw new JsonException("SearchCompletionReason expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, SearchCompletionReason value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 // ─── Classes ──────────────────────────────────────────────────────────
 
 /// <summary>Present when the host supports `createTcpConnection`.
@@ -3021,7 +3256,10 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatConfigState? Config { get; set; }
 
-    /// <summary>Completed turns</summary>
+    /// <summary>Completed turns, oldest first.
+    ///
+    /// Entries may be {@link DeferredTurn | deferred} only for clients that
+    /// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.</summary>
     public required List<Turn> Turns { get; set; }
 
     /// <summary>Cursor for loading older completed turns into this chat state.
@@ -3029,7 +3267,14 @@ public sealed class ChatState
     /// Presence means `turns` is a tail window and more historical turns are
     /// available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
     /// the loaded turns into state and update or clear this cursor before
-    /// responding. Absence means the state contains all retained turns.</summary>
+    /// responding. Absence means the state contains all retained turns.
+    ///
+    /// Hosts SHOULD NOT set this for clients that declared
+    /// {@link ClientCapabilities.deferredTurns | `deferredTurns`}. Instead, they
+    /// SHOULD send every retained turn and defer the ones the client doesn't need
+    /// yet.
+    ///
+    /// Stability: 3 - Legacy.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? TurnsNextCursor { get; set; }
 
@@ -4019,8 +4264,8 @@ public sealed class ChatConfigState
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
-/// <summary>A completed request/response cycle.</summary>
-public sealed class Turn
+/// <summary>A completed request/response cycle, including its full response.</summary>
+public sealed class MaterializedTurn
 {
     /// <summary>Turn identifier</summary>
     public required string Id { get; set; }
@@ -4036,11 +4281,49 @@ public sealed class Turn
     /// <summary>The message that initiated the turn</summary>
     public required Message Message { get; set; }
 
+    /// <summary>Token usage info</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UsageInfo? Usage { get; set; }
+
+    /// <summary>How the turn ended</summary>
+    public TurnState State { get; set; }
+
     /// <summary>All response content in stream order: text, tool calls, reasoning, and content refs.
     ///
     /// Consumers should derive display text by concatenating markdown parts,
     /// and find tool calls by filtering for `ToolCall` parts.</summary>
     public required List<ResponsePart> ResponseParts { get; set; }
+}
+
+/// <summary>A completed turn whose response the host has not sent yet.
+///
+/// The turn keeps its position in {@link ChatState.turns}, so clients can show
+/// the initiating message and outcome without downloading the response.
+/// Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
+/// the host replaces the entry in place with a {@link MaterializedTurn} via
+/// {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
+///
+/// Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
+/// action, or command result. Those clients receive the corresponding
+/// {@link MaterializedTurn}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed class DeferredTurn
+{
+    /// <summary>Turn identifier</summary>
+    public required string Id { get; set; }
+
+    /// <summary>ISO 8601 timestamp when this turn started.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; set; }
+
+    /// <summary>Turn duration in milliseconds.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; set; }
+
+    /// <summary>The message that initiated the turn</summary>
+    public required Message Message { get; set; }
 
     /// <summary>Token usage info</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -4048,6 +4331,9 @@ public sealed class Turn
 
     /// <summary>How the turn ended</summary>
     public TurnState State { get; set; }
+
+    /// <summary>Marks a turn without `responseParts`.</summary>
+    public bool IsDeferred { get; set; } = true;
 }
 
 /// <summary>An in-progress turn — the assistant is actively streaming.</summary>
@@ -7963,6 +8249,342 @@ public sealed class AutomationRunState
     public Dictionary<string, JsonElement>? Meta { get; set; }
 }
 
+/// <summary>Present when the host supports `createSearch`.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchCapability
+{
+    /// <summary>The target kinds the host can search. A client MUST NOT send a
+    /// {@link SearchTarget} whose kind is not listed here.</summary>
+    public required List<SearchTargetKind> Targets { get; init; }
+}
+
+/// <summary>What a search looks for and where.
+///
+/// The client sends a query in `createSearch` and replaces it with
+/// {@link SearchQueryChangedAction | `search/queryChanged`}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchQuery
+{
+    /// <summary>The text to search for. Its meaning depends on the target: see
+    /// {@link SearchTarget}. An empty `text` matches nothing; the host completes
+    /// the search with no results.</summary>
+    public required string Text { get; init; }
+
+    /// <summary>Match case. Defaults to `false`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? MatchCase { get; init; }
+
+    /// <summary>Match only whole words. Defaults to `false`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? WholeWord { get; init; }
+
+    /// <summary>Treat `text` as a regular expression. Defaults to `false`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IsRegex { get; init; }
+
+    /// <summary>A hint that precise matching isn't expected, for example because the
+    /// search powers a quick-find picker. The host MAY then match loosely, rank
+    /// results by how well they match, and ignore {@link isRegex} and
+    /// {@link wholeWord}. Defaults to `false`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Fuzzy { get; init; }
+
+    /// <summary>Where to search. MUST contain at least one target.</summary>
+    public required List<SearchTarget> Targets { get; init; }
+
+    /// <summary>The maximum number of results. The host MAY apply a lower limit, and
+    /// completes the search with {@link SearchCompletionReason.LimitReached}
+    /// when it reaches the limit that applies.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? MaxResults { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>Searches file paths under {@link FileSearchTargetBase.roots}.
+///
+/// The host decides how to match {@link SearchQuery.text} against file paths,
+/// for example with fuzzy matching, and which query options apply. Results
+/// are {@link FileNameSearchResult}s.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record FileNamesSearchTarget
+{
+    /// <summary>The folders to search. MUST contain at least one URI.</summary>
+    public required List<string> Roots { get; init; }
+
+    /// <summary>Glob patterns relative to a root. When present, only matching files are searched.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Includes { get; init; }
+
+    /// <summary>Glob patterns relative to a root. Matching files are not searched.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Excludes { get; init; }
+
+    /// <summary>Also search files that the host's ignore rules, such as `.gitignore`
+    /// files, would otherwise skip. Defaults to `false`. `excludes` still apply.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IncludeIgnored { get; init; }
+
+    public SearchTargetKind Kind { get; init; } = SearchTargetKind.FileNames;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>Searches the text content of files under {@link FileSearchTargetBase.roots}.
+/// Results are {@link FileTextSearchResult}s.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record FileTextSearchTarget
+{
+    /// <summary>The folders to search. MUST contain at least one URI.</summary>
+    public required List<string> Roots { get; init; }
+
+    /// <summary>Glob patterns relative to a root. When present, only matching files are searched.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Includes { get; init; }
+
+    /// <summary>Glob patterns relative to a root. Matching files are not searched.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Excludes { get; init; }
+
+    /// <summary>Also search files that the host's ignore rules, such as `.gitignore`
+    /// files, would otherwise skip. Defaults to `false`. `excludes` still apply.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IncludeIgnored { get; init; }
+
+    public SearchTargetKind Kind { get; init; } = SearchTargetKind.FileText;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>Searches the host's sessions, the same sessions that `listSessions`
+/// returns. The host decides which session content it matches, for example
+/// titles or requests. Results are {@link SessionSearchResult}s.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SessionsSearchTarget
+{
+    public SearchTargetKind Kind { get; init; } = SearchTargetKind.Sessions;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>Searches the visible text of chat requests and responses, including the
+/// responses of deferred turns. Results are
+/// {@link ChatMessageSearchResult}s.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChatMessagesSearchTarget
+{
+    public SearchTargetKind Kind { get; init; } = SearchTargetKind.ChatMessages;
+
+    /// <summary>The chats to search. MUST contain at least one chat URI.</summary>
+    public required List<string> Chats { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>A matched span within {@link SearchMatch.text}: the half-open interval
+/// `[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code
+/// units, as in {@link CompletionItem.rangeStart}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchHighlight
+{
+    /// <summary>The start of the span.</summary>
+    public long RangeStart { get; init; }
+
+    /// <summary>The end of the span, exclusive. MUST be greater than {@link rangeStart}
+    /// and at most the length of {@link SearchMatch.text}.</summary>
+    public long RangeEnd { get; init; }
+}
+
+/// <summary>The matched text of a result, with the matched spans highlighted. The host
+/// chooses how much text around the match to include.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchMatch
+{
+    /// <summary>The text to display.</summary>
+    public required string Text { get; init; }
+
+    /// <summary>The matched spans, in order. Spans MUST NOT overlap.</summary>
+    public required List<SearchHighlight> Highlights { get; init; }
+}
+
+/// <summary>A file whose path matches. {@link SearchResultBase.resource} is the file;
+/// the match text is its path, usually relative to the root that contains it.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record FileNameSearchResult
+{
+    /// <summary>The resource that contains the match.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>The text to display, with the matched spans highlighted.</summary>
+    public required SearchMatch Match { get; init; }
+
+    /// <summary>How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Score { get; init; }
+
+    public SearchResultKind Kind { get; init; } = SearchResultKind.FileName;
+}
+
+/// <summary>A match in the text of a file. {@link SearchResultBase.resource} is the
+/// file; the match text is the text around the match, usually its line.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record FileTextSearchResult
+{
+    /// <summary>The resource that contains the match.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>The text to display, with the matched spans highlighted.</summary>
+    public required SearchMatch Match { get; init; }
+
+    /// <summary>How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Score { get; init; }
+
+    public SearchResultKind Kind { get; init; } = SearchResultKind.FileText;
+
+    /// <summary>The location of the match in the file.</summary>
+    public required TextRange Range { get; init; }
+}
+
+/// <summary>A session whose content matches. {@link SearchResultBase.resource} is the
+/// session URI.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SessionSearchResult
+{
+    /// <summary>The resource that contains the match.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>The text to display, with the matched spans highlighted.</summary>
+    public required SearchMatch Match { get; init; }
+
+    /// <summary>How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Score { get; init; }
+
+    public SearchResultKind Kind { get; init; } = SearchResultKind.Session;
+
+    /// <summary>The session's title.</summary>
+    public required string Title { get; init; }
+}
+
+/// <summary>A match in a chat request or response. {@link SearchResultBase.resource}
+/// is the chat URI.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChatMessageSearchResult
+{
+    /// <summary>The resource that contains the match.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>The text to display, with the matched spans highlighted.</summary>
+    public required SearchMatch Match { get; init; }
+
+    /// <summary>How well the result matches; higher is better. Scores have no fixed
+    /// range, and are comparable across all results of one search. Clients
+    /// SHOULD show results in descending score order. A host that does not rank
+    /// results omits the score.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Score { get; init; }
+
+    public SearchResultKind Kind { get; init; } = SearchResultKind.ChatMessage;
+
+    /// <summary>The chat's title.</summary>
+    public required string Title { get; init; }
+
+    /// <summary>The ID of the turn that contains the match.</summary>
+    public required string TurnId { get; init; }
+}
+
+/// <summary>The query changed and the host has not replaced the results yet. Clients
+/// MAY show the previous query's results differently, for example dimmed.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchPendingLifecycleState
+{
+    public SearchLifecycleStatus Status { get; init; } = SearchLifecycleStatus.Pending;
+}
+
+/// <summary>The host is searching and may add more results.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchRunningLifecycleState
+{
+    public SearchLifecycleStatus Status { get; init; } = SearchLifecycleStatus.Running;
+}
+
+/// <summary>The host found every result for the query. A host that watches the
+/// searched files, sessions, or chats MAY still change the results later.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchCompletedLifecycleState
+{
+    public SearchLifecycleStatus Status { get; init; } = SearchLifecycleStatus.Completed;
+
+    /// <summary>Why the search completed.</summary>
+    public SearchCompletionReason Reason { get; init; }
+}
+
+/// <summary>The search failed. Results found before the failure remain in
+/// {@link SearchState.results}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchFailedLifecycleState
+{
+    public SearchLifecycleStatus Status { get; init; } = SearchLifecycleStatus.Failed;
+
+    /// <summary>Why the search failed, for example an invalid regular expression.</summary>
+    public required ErrorInfo Error { get; init; }
+}
+
+/// <summary>Full state for one search, returned when a client subscribes to its
+/// `ahp-search:` URI.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed class SearchState
+{
+    /// <summary>The current query.</summary>
+    public required SearchQuery Query { get; set; }
+
+    /// <summary>Results in the order the host found them. Sort by
+    /// {@link SearchResultBase.score} to rank them. While {@link lifecycle} is
+    /// {@link SearchLifecycleStatus.Pending | pending}, these are results for the
+    /// previous query.</summary>
+    public required List<SearchResult> Results { get; set; }
+
+    /// <summary>Where the search is in its lifecycle.</summary>
+    public required SearchLifecycleState Lifecycle { get; set; }
+}
+
 // ─── Discriminated Unions ─────────────────────────────────────────────
 
 /// <summary>A single explicit customization enablement decision.</summary>
@@ -8759,6 +9381,93 @@ internal sealed class AutomationRunLifecycleConverter : UnionConverter<Automatio
     }
 }
 
+/// <summary>SearchTarget is one place to search.</summary>
+[JsonConverter(typeof(SearchTargetConverter))]
+public sealed class SearchTarget : AhpUnion
+{
+    /// <summary>Creates an empty SearchTarget (no active variant).</summary>
+    public SearchTarget() { }
+
+    /// <summary>Creates a SearchTarget wrapping the given variant value.</summary>
+    public SearchTarget(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the SearchTarget discriminated union.</summary>
+internal sealed class SearchTargetConverter : UnionConverter<SearchTarget>
+{
+    public SearchTargetConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["fileNames"] = typeof(FileNamesSearchTarget),
+        ["fileText"] = typeof(FileTextSearchTarget),
+        ["sessions"] = typeof(SessionsSearchTarget),
+        ["chatMessages"] = typeof(ChatMessagesSearchTarget),
+            },
+            allowUnknown: true)
+    {
+    }
+}
+
+/// <summary>SearchResult is one search match.</summary>
+[JsonConverter(typeof(SearchResultConverter))]
+public sealed class SearchResult : AhpUnion
+{
+    /// <summary>Creates an empty SearchResult (no active variant).</summary>
+    public SearchResult() { }
+
+    /// <summary>Creates a SearchResult wrapping the given variant value.</summary>
+    public SearchResult(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the SearchResult discriminated union.</summary>
+internal sealed class SearchResultConverter : UnionConverter<SearchResult>
+{
+    public SearchResultConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["fileName"] = typeof(FileNameSearchResult),
+        ["fileText"] = typeof(FileTextSearchResult),
+        ["session"] = typeof(SessionSearchResult),
+        ["chatMessage"] = typeof(ChatMessageSearchResult),
+            },
+            allowUnknown: true)
+    {
+    }
+}
+
+/// <summary>SearchLifecycleState is the lifecycle of a search.</summary>
+[JsonConverter(typeof(SearchLifecycleStateConverter))]
+public sealed class SearchLifecycleState : AhpUnion
+{
+    /// <summary>Creates an empty SearchLifecycleState (no active variant).</summary>
+    public SearchLifecycleState() { }
+
+    /// <summary>Creates a SearchLifecycleState wrapping the given variant value.</summary>
+    public SearchLifecycleState(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the SearchLifecycleState discriminated union.</summary>
+internal sealed class SearchLifecycleStateConverter : UnionConverter<SearchLifecycleState>
+{
+    public SearchLifecycleStateConverter()
+        : base(
+            discriminator: "status",
+            variants: new Dictionary<string, Type>
+            {
+        ["pending"] = typeof(SearchPendingLifecycleState),
+        ["running"] = typeof(SearchRunningLifecycleState),
+        ["completed"] = typeof(SearchCompletedLifecycleState),
+        ["failed"] = typeof(SearchFailedLifecycleState),
+            },
+            allowUnknown: true)
+    {
+    }
+}
+
 /// <summary>
 /// ChatOrigin describes how a chat came into existence.
 /// </summary>
@@ -8832,6 +9541,68 @@ internal sealed class ChatOriginConverter : UnionConverter<ChatOrigin>
 }
 
 /// <summary>
+/// Turn is a completed turn in ChatState.Turns: either a
+/// <see cref="MaterializedTurn"/> or a <see cref="DeferredTurn"/>,
+/// discriminated by <c>isDeferred</c>.
+/// </summary>
+[JsonConverter(typeof(TurnConverter))]
+public sealed class Turn : AhpUnion
+{
+    /// <summary>Creates an empty Turn (no active variant).</summary>
+    public Turn() { }
+
+    /// <summary>Creates a Turn wrapping a <see cref="MaterializedTurn"/> or <see cref="DeferredTurn"/>.</summary>
+    public Turn(object? value) : base(value) { }
+
+    /// <summary>The materialized variant, or <see langword="null"/> when this turn is not materialized.</summary>
+    [JsonIgnore]
+    public MaterializedTurn? Materialized => Value as MaterializedTurn;
+
+    /// <summary>The deferred variant, or <see langword="null"/> when this turn is not deferred.</summary>
+    [JsonIgnore]
+    public DeferredTurn? Deferred => Value as DeferredTurn;
+}
+
+/// <summary>System.Text.Json converter for the Turn union.</summary>
+internal sealed class TurnConverter : JsonConverter<Turn>
+{
+    public override Turn? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return null;
+        }
+
+        using JsonDocument doc = JsonDocument.ParseValue(ref reader);
+        JsonElement root = doc.RootElement;
+        bool isDeferred = root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("isDeferred", out JsonElement flag)
+            && flag.ValueKind == JsonValueKind.True;
+        return isDeferred
+            ? new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<DeferredTurn>(options)))
+            : new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<MaterializedTurn>(options)));
+    }
+
+    public override void Write(Utf8JsonWriter writer, Turn value, JsonSerializerOptions options)
+    {
+        switch (value.Value)
+        {
+            case MaterializedTurn materialized:
+                JsonSerializer.Serialize(writer, materialized, AhpJsonTypeInfo.Get<MaterializedTurn>(options));
+                return;
+            case DeferredTurn deferred:
+                JsonSerializer.Serialize(writer, deferred, AhpJsonTypeInfo.Get<DeferredTurn>(options));
+                return;
+            case null:
+                writer.WriteNullValue();
+                return;
+            default:
+                throw new JsonException("Turn cannot hold a " + value.Value.GetType().Name + ".");
+        }
+    }
+}
+
+/// <summary>
 /// ToolInput is a tool call's raw input, carried either inline as a string or by
 /// content reference for inputs large enough to be fetched lazily.
 /// </summary>
@@ -8877,9 +9648,9 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
 /// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
   /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// automation-run, or empty state. Read
+  /// automation-run, search, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// (empty → chat → search → session → canvas → terminal → changeset → resource-watch → annotations → root).
 /// An object with no members is an empty state, used by channels whose state has no fields.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
@@ -8918,6 +9689,9 @@ public sealed class SnapshotState
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
 
+    /// <summary>Search state variant, when populated.</summary>
+    public SearchState? Search { get; set; }
+
     /// <summary>
     /// A state that this version does not recognize, such as the state of a channel
     /// added in a later protocol version. Kept as raw JSON so it re-encodes unchanged.
@@ -8951,6 +9725,11 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         else if (root.TryGetProperty("turns", out _))
         {
             result.Chat = root.Deserialize(AhpJsonTypeInfo.Get<ChatState>(options));
+        }
+        // SearchState also has a required `lifecycle`, so probe it before SessionState.
+        else if (root.TryGetProperty("query", out _) && root.TryGetProperty("results", out _))
+        {
+            result.Search = root.Deserialize(AhpJsonTypeInfo.Get<SearchState>(options));
         }
         else if (root.TryGetProperty("lifecycle", out _))
         {
@@ -9000,6 +9779,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
         if (value.Canvas is not null) { JsonSerializer.Serialize(writer, value.Canvas, AhpJsonTypeInfo.Get<CanvasState>(options)); return; }
+        if (value.Search is not null) { JsonSerializer.Serialize(writer, value.Search, AhpJsonTypeInfo.Get<SearchState>(options)); return; }
         if (value.Session is not null) { JsonSerializer.Serialize(writer, value.Session, AhpJsonTypeInfo.Get<SessionState>(options)); return; }
         if (value.Terminal is not null) { JsonSerializer.Serialize(writer, value.Terminal, AhpJsonTypeInfo.Get<TerminalState>(options)); return; }
         if (value.Changeset is not null) { JsonSerializer.Serialize(writer, value.Changeset, AhpJsonTypeInfo.Get<ChangesetState>(options)); return; }

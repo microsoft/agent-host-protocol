@@ -1,0 +1,60 @@
+{
+  "name": "search-failed-snapshot",
+  "group": "A",
+  "description": "A failed search snapshot preserves its failed lifecycle and error.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-search:/q2",
+    "state": {
+      "query": {
+        "text": "(unclosed",
+        "isRegex": true,
+        "targets": [
+          {
+            "kind": "fileText",
+            "roots": [
+              "file:///workspace"
+            ]
+          }
+        ]
+      },
+      "results": [],
+      "lifecycle": {
+        "status": "failed",
+        "error": {
+          "errorType": "invalidRegex",
+          "message": "Unterminated group"
+        }
+      }
+    },
+    "fromSeq": 2
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-search:/q2",
+      "state": {
+        "query": {
+          "text": "(unclosed",
+          "isRegex": true,
+          "targets": [
+            {
+              "kind": "fileText",
+              "roots": [
+                "file:///workspace"
+              ]
+            }
+          ]
+        },
+        "results": [],
+        "lifecycle": {
+          "status": "failed",
+          "error": {
+            "errorType": "invalidRegex",
+            "message": "Unterminated group"
+          }
+        }
+      },
+      "fromSeq": 2
+    }
+  ]
+}

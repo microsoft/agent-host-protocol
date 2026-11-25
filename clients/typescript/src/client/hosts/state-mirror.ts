@@ -35,6 +35,7 @@ import type {
   AutomationAction,
   AutomationRunAction,
   RootAction,
+  SearchAction,
   SessionAction,
   TerminalAction,
 } from '../../types/action-origin.generated.js';
@@ -45,6 +46,7 @@ import type { SessionState } from '../../types/channels-session/state.js';
 import type { TerminalState } from '../../types/channels-terminal/state.js';
 import type { AutomationEntry, AutomationState } from '../../types/channels-automation/state.js';
 import type { AutomationRunState } from '../../types/channels-automation-run/state.js';
+import type { SearchState } from '../../types/channels-search/state.js';
 import { changesetReducer } from '../../types/channels-changeset/reducer.js';
 import { canvasReducer } from '../../types/channels-canvas/reducer.js';
 import { rootReducer } from '../../types/channels-root/reducer.js';
@@ -52,6 +54,7 @@ import { sessionReducer } from '../../types/channels-session/reducer.js';
 import { terminalReducer } from '../../types/channels-terminal/reducer.js';
 import { automationReducer } from '../../types/channels-automation/reducer.js';
 import { automationRunReducer } from '../../types/channels-automation-run/reducer.js';
+import { searchReducer } from '../../types/channels-search/reducer.js';
 import { ROOT_RESOURCE_URI, type HostId, type HostSubscriptionEvent } from './types.js';
 import { isCanvasState } from '../canvas-state.js';
 
@@ -112,6 +115,7 @@ export class MultiHostStateMirror {
   private readonly automationCatalogsMap = new Map<HostId, AutomationState>();
   private readonly automationsMap = new Map<string, AutomationEntry>();
   private readonly automationRunsMap = new Map<string, AutomationRunState>();
+  private readonly searchesMap = new Map<string, SearchState>();
 
   /** All known root states keyed by host. */
   get rootStates(): ReadonlyMap<HostId, RootState> {
@@ -152,6 +156,11 @@ export class MultiHostStateMirror {
     return this.automationRunsMap;
   }
 
+  /** Searches keyed by `hostedResourceKey(hostId, uri)`. */
+  get searches(): ReadonlyMap<string, SearchState> {
+    return this.searchesMap;
+  }
+
 
   /** Look up the root state for `hostId`. */
   getRoot(hostId: HostId): RootState | undefined {
@@ -180,6 +189,11 @@ export class MultiHostStateMirror {
   /** Look up a catalogued automation by `(hostId, uri)`. */
   getAutomation(hostId: HostId, uri: URI): AutomationEntry | undefined {
     return this.automationsMap.get(hostedResourceKey(hostId, uri));
+  }
+
+  /** Look up a search by `(hostId, uri)`. */
+  getSearch(hostId: HostId, uri: URI): SearchState | undefined {
+    return this.searchesMap.get(hostedResourceKey(hostId, uri));
   }
 
   /**
@@ -250,6 +264,13 @@ export class MultiHostStateMirror {
       this.automationRunsMap.set(key, automationRunReducer(current, action as AutomationRunAction));
       return;
     }
+    if (channel.startsWith('ahp-search:')) {
+      const key = hostedResourceKey(hostId, channel);
+      const current = this.searchesMap.get(key);
+      if (!current) return;
+      this.searchesMap.set(key, searchReducer(current, action as SearchAction));
+      return;
+    }
   }
 
   /**
@@ -291,6 +312,10 @@ export class MultiHostStateMirror {
       this.automationRunsMap.set(key, snapshot.state as AutomationRunState);
       return;
     }
+    if (resource.startsWith('ahp-search:')) {
+      this.searchesMap.set(key, snapshot.state as SearchState);
+      return;
+    }
   }
 
   /** Drop every slot keyed under `hostId` — root, sessions, terminals, changesets. */
@@ -316,6 +341,9 @@ export class MultiHostStateMirror {
     for (const key of this.automationRunsMap.keys()) {
       if (key.startsWith(prefix)) this.automationRunsMap.delete(key);
     }
+    for (const key of this.searchesMap.keys()) {
+      if (key.startsWith(prefix)) this.searchesMap.delete(key);
+    }
   }
 
   /** Drop every host's state. */
@@ -328,6 +356,7 @@ export class MultiHostStateMirror {
     this.automationCatalogsMap.clear();
     this.automationsMap.clear();
     this.automationRunsMap.clear();
+    this.searchesMap.clear();
   }
 
   private setAutomationCatalog(hostId: HostId, state: AutomationState): void {

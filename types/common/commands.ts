@@ -30,6 +30,7 @@ import type {
 } from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
 import type { TcpConnectionsCapability } from '../channels-tcp/state.js';
+import type { SearchCapability } from '../channels-search/state.js';
 
 // ─── BaseParams ──────────────────────────────────────────────────────────────
 
@@ -233,7 +234,26 @@ export interface ClientCapabilities {
    * App-bearing tool calls as ordinary MCP tool calls.
    */
   mcpApps?: Record<string, never>;
+  /**
+   * Client understands {@link DeferredTurn} entries in
+   * {@link ChatState.turns | `ChatState.turns`} and can request their responses with
+   * {@link FetchDeferredTurnsParams | `fetchDeferredTurns`}.
+   *
+   * Hosts MAY then defer any completed turn they send this client. Hosts
+   * MUST NOT send deferred turns to clients that omit this capability.
+   *
+   * @stability 1.0
+   */
+  deferredTurns?: DeferredTurnsCapability;
 }
+
+/**
+ * Presence-only client capability for {@link ClientCapabilities.deferredTurns}.
+ *
+ * @category Commands
+ * @stability 1.0
+ */
+export interface DeferredTurnsCapability {}
 
 /**
  * Native filesystem path grammar used by a host environment.
@@ -357,6 +377,13 @@ export interface InitializeResult {
    * @see {@link /specification/tcp-channel | TCP Channel}
    */
   tcpConnections?: TcpConnectionsCapability;
+  /**
+   * Present when the host supports `createSearch`, which searches files,
+   * sessions, and chats and streams the results on an `ahp-search:` channel.
+   * @stability 1.0
+   * @see {@link /specification/search-channel | Search Channel}
+   */
+  search?: SearchCapability;
   /**
    * Present when chats in one session may be backed by different agent
    * providers (see {@link CreateChatParams.provider} and
@@ -750,6 +777,13 @@ export interface SubscribeView {
    * returned {@link ChatState} carries `turnsNextCursor`; clients pass that
    * cursor to `fetchTurns` to ask the host to page more turns into the chat
    * state.
+   *
+   * Clients that declare
+   * {@link ClientCapabilities.deferredTurns | `deferredTurns`} SHOULD omit this
+   * field and read history through deferred turns instead.
+   *
+   * @deprecated Declare `deferredTurns` and use `fetchDeferredTurns`.
+   * @stability 3
    */
   turns?: number;
 }

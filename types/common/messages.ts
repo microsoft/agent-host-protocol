@@ -59,6 +59,8 @@ import type {
   MoveChatParams,
   MoveChatResult,
   DisposeChatParams,
+  FetchDeferredTurnsParams,
+  FetchDeferredTurnsResult,
 } from '../channels-chat/commands.js';
 import type {
   CreateTerminalParams,
@@ -102,6 +104,7 @@ import type {
 import type { AhpError } from './errors.js';
 import type { TcpDataParams, TcpEofParams, TcpResetParams } from '../channels-tcp/notifications.js';
 import type { CreateTcpConnectionParams, CreateTcpConnectionResult } from '../channels-tcp/commands.js';
+import type { CreateSearchParams, CreateSearchResult } from '../channels-search/commands.js';
 
 // ─── JSON-RPC Base Types ─────────────────────────────────────────────────────
 
@@ -174,9 +177,11 @@ export interface CommandMap {
   'createTcpConnection': { params: CreateTcpConnectionParams; result: CreateTcpConnectionResult };
   'moveChat': { params: MoveChatParams; result: MoveChatResult };
   'disposeChat': { params: DisposeChatParams; result: null };
+  'fetchDeferredTurns': { params: FetchDeferredTurnsParams; result: FetchDeferredTurnsResult };
   'createTerminal': { params: CreateTerminalParams; result: null };
   'disposeTerminal': { params: DisposeTerminalParams; result: null };
   'createResourceWatch': { params: CreateResourceWatchParams; result: CreateResourceWatchResult };
+  'createSearch': { params: CreateSearchParams; result: CreateSearchResult };
   'listSessions': { params: ListSessionsParams; result: ListSessionsResult };
   'resourceRead': { params: ResourceReadParams; result: ResourceReadResult };
   'resourceWrite': { params: ResourceWriteParams; result: ResourceWriteResult };

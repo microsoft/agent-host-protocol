@@ -1,0 +1,8 @@
+{
+  "name": "fetch-deferred-turns-params",
+  "group": "A",
+  "description": "Request the responses of an inclusive range of deferred turns.",
+  "type": "FetchDeferredTurnsParams",
+  "input": { "channel": "ahp-chat:/c1", "turnId": "t45", "endTurnId": "t49" },
+  "acceptableOutputs": [{ "channel": "ahp-chat:/c1", "turnId": "t45", "endTurnId": "t49" }]
+}

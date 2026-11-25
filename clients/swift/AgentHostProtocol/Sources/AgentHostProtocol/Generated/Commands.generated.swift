@@ -488,6 +488,11 @@ public struct InitializeResult: Codable, Sendable, Equatable {
     ///
     /// Stability: 1.0 - Early development.
     public var tcpConnections: TcpConnectionsCapability?
+    /// Present when the host supports `createSearch`, which searches files,
+    /// sessions, and chats and streams the results on an `ahp-search:` channel.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var search: SearchCapability?
     /// Present when chats in one session may be backed by different agent
     /// providers (see {@link CreateChatParams.provider} and
     /// {@link ChatState.provider}).
@@ -509,6 +514,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         case telemetry
         case automations
         case tcpConnections
+        case search
         case multipleChatProviders
     }
 
@@ -525,6 +531,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         telemetry: TelemetryCapabilities? = nil,
         automations: AutomationCapabilities? = nil,
         tcpConnections: TcpConnectionsCapability? = nil,
+        search: SearchCapability? = nil,
         multipleChatProviders: MultipleChatProvidersCapability? = nil
     ) {
         self.protocolVersion = protocolVersion
@@ -539,6 +546,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         self.telemetry = telemetry
         self.automations = automations
         self.tcpConnections = tcpConnections
+        self.search = search
         self.multipleChatProviders = multipleChatProviders
     }
 }
@@ -577,11 +585,22 @@ public struct ClientCapabilities: Codable, Sendable, Equatable {
     /// capability is declared. Clients that omit it MUST treat
     /// App-bearing tool calls as ordinary MCP tool calls.
     public var mcpApps: [String: AnyCodable]?
+    /// Client understands {@link DeferredTurn} entries in
+    /// {@link ChatState.turns | `ChatState.turns`} and can request their responses with
+    /// {@link FetchDeferredTurnsParams | `fetchDeferredTurns`}.
+    ///
+    /// Hosts MAY then defer any completed turn they send this client. Hosts
+    /// MUST NOT send deferred turns to clients that omit this capability.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var deferredTurns: DeferredTurnsCapability?
 
     public init(
-        mcpApps: [String: AnyCodable]? = nil
+        mcpApps: [String: AnyCodable]? = nil,
+        deferredTurns: DeferredTurnsCapability? = nil
     ) {
         self.mcpApps = mcpApps
+        self.deferredTurns = deferredTurns
     }
 }
 
@@ -709,6 +728,17 @@ public struct AutomationOneTimeCapability: Codable, Sendable, Equatable {
 ///
 /// Stability: 1.0 - Early development.
 public struct MultipleChatProvidersCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
+/// Presence-only client capability for {@link ClientCapabilities.deferredTurns}.
+///
+/// Stability: 1.0 - Early development.
+public struct DeferredTurnsCapability: Codable, Sendable, Equatable {
 
     public init(
 
@@ -960,6 +990,12 @@ public struct SubscribeView: Codable, Sendable, Equatable {
     /// returned {@link ChatState} carries `turnsNextCursor`; clients pass that
     /// cursor to `fetchTurns` to ask the host to page more turns into the chat
     /// state.
+    ///
+    /// Clients that declare
+    /// {@link ClientCapabilities.deferredTurns | `deferredTurns`} SHOULD omit this
+    /// field and read history through deferred turns instead.
+    ///
+    /// Stability: 3 - Legacy.
     public var turns: Int?
 
     public init(
@@ -1201,6 +1237,62 @@ public struct DisposeChatParams: Codable, Sendable, Equatable {
     ) {
         self.channel = channel
         self.meta = meta
+    }
+}
+
+/// Requests the full responses of a range of {@link DeferredTurn | deferred
+/// turns} in a chat state.
+///
+/// The range runs from `turnId` through `endTurnId`, inclusive, in
+/// {@link ChatState.turns | `ChatState.turns`} order. The command result does
+/// not carry turns. Instead, before responding, the host MUST dispatch
+/// `chat/turnsMaterialized` to replace every deferred turn in the range in place
+/// with its full {@link MaterializedTurn}. Full turns in the range are left unchanged.
+///
+/// The host MUST reject the request with `InvalidParams` if `turnId` or
+/// `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.
+/// Hosts MAY also reject ranges that exceed an implementation-defined size limit
+/// with `InvalidParams`.
+///
+/// Requires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// Stability: 1.0 - Early development.
+public struct FetchDeferredTurnsParams: Codable, Sendable, Equatable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// ID of the first turn in the range.
+    public var turnId: String
+    /// ID of the last turn in the range, inclusive. Omit to request only `turnId`.
+    public var endTurnId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case turnId
+        case endTurnId
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        turnId: String,
+        endTurnId: String? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.turnId = turnId
+        self.endTurnId = endTurnId
+    }
+}
+
+public struct FetchDeferredTurnsResult: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
     }
 }
 
@@ -1882,6 +1974,76 @@ public struct CreateResourceWatchResult: Codable, Sendable, Equatable {
     }
 }
 
+/// Starts a search on the host.
+///
+/// The client chooses the channel URI and then subscribes to it to receive the
+/// search's {@link SearchState} and its results. The client replaces the query
+/// by dispatching {@link SearchQueryChangedAction | `search/queryChanged`},
+/// and cancels the search by unsubscribing.
+///
+/// The client MUST NOT send this command unless `InitializeResult.search` is
+/// present, and MUST NOT include a target whose kind is not listed in
+/// {@link SearchCapability.targets}.
+///
+/// Stability: 1.0 - Early development.
+public struct CreateSearchParams: Codable, Sendable, Equatable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// What to search for and where.
+    public var query: SearchQuery
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case query
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        query: SearchQuery
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.query = query
+    }
+}
+
+/// Result of the `createSearch` command.
+///
+/// An empty object on success.
+///
+/// Stability: 1.0 - Early development.
+public struct CreateSearchResult: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
+/// Requests that the host load older historical turns into a chat state.
+///
+/// The command result does not carry turns. Instead, before responding, the host
+/// MUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat
+/// channel's `turns` state, ahead of the already-loaded window, and update or
+/// clear `turnsNextCursor`.
+///
+/// Before applying any operation that references a turn outside the currently
+/// loaded window, the host MUST eagerly load enough older turns into state for
+/// that operation to reduce against valid state.
+///
+/// Hosts MAY load turns as {@link DeferredTurn | deferred} for clients that
+/// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// Tail-window paging is legacy. It remains supported for 1.x clients, but new
+/// clients SHOULD declare `deferredTurns` and read history with
+/// {@link FetchDeferredTurnsParams | `fetchDeferredTurns`} instead.
+///
+/// Stability: 3 - Legacy.
 public struct FetchTurnsParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
@@ -1912,6 +2074,9 @@ public struct FetchTurnsParams: Codable, Sendable, Equatable {
     }
 }
 
+/// Result of the `fetchTurns` command.
+///
+/// Stability: 3 - Legacy.
 public struct FetchTurnsResult: Codable, Sendable, Equatable {
 
     public init(
@@ -2992,6 +3157,11 @@ extension DisposeChatParams: AHPCommand {
     public static let method = "disposeChat"
 }
 
+extension FetchDeferredTurnsParams: AHPCommand {
+    public typealias Result = FetchDeferredTurnsResult
+    public static let method = "fetchDeferredTurns"
+}
+
 extension CreateTerminalParams: AHPCommand {
     public typealias Result = AHPNullResult
     public static let method = "createTerminal"
@@ -3005,6 +3175,11 @@ extension DisposeTerminalParams: AHPCommand {
 extension CreateResourceWatchParams: AHPCommand {
     public typealias Result = CreateResourceWatchResult
     public static let method = "createResourceWatch"
+}
+
+extension CreateSearchParams: AHPCommand {
+    public typealias Result = CreateSearchResult
+    public static let method = "createSearch"
 }
 
 extension ListSessionsParams: AHPCommand {

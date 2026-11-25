@@ -68,6 +68,39 @@ final class MultiHostStateMirrorTests: XCTestCase {
         XCTAssertTrue(remaining.isEmpty)
     }
 
+    func testSearchUpdatesAndResetAreIsolatedPerHost() async {
+        let mirror = MultiHostStateMirror()
+        let resource = "ahp-search:/s1"
+        let initial = SearchState(
+            query: SearchQuery(text: "parseConfig", targets: [.sessions(SessionsSearchTarget(kind: .sessions))]),
+            results: [],
+            lifecycle: .pending(SearchPendingLifecycleState(status: .pending))
+        )
+        let snapshot = Snapshot(resource: resource, state: .search(initial), fromSeq: 1)
+        await mirror.applySnapshot(host: "alpha", snapshot: snapshot)
+        await mirror.applySnapshot(host: "beta", snapshot: snapshot)
+        await mirror.apply(host: "alpha", envelope: ActionEnvelope(
+            channel: resource,
+            action: .searchLifecycleChanged(SearchLifecycleChangedAction(
+                type: .searchLifecycleChanged,
+                lifecycle: .completed(SearchCompletedLifecycleState(status: .completed, reason: .exhausted))
+            )),
+            serverSeq: 2
+        ))
+        let targeted = await mirror.searches
+        await mirror.reset(host: "alpha")
+        let afterReset = await mirror.searches
+        await mirror.reset()
+        let remaining = await mirror.searches
+        let alphaKey = HostedResourceKey(hostId: "alpha", uri: resource)
+        let betaKey = HostedResourceKey(hostId: "beta", uri: resource)
+        XCTAssertEqual(targeted[alphaKey]?.lifecycle, .completed(SearchCompletedLifecycleState(status: .completed, reason: .exhausted)))
+        XCTAssertEqual(targeted[betaKey]?.lifecycle, .pending(SearchPendingLifecycleState(status: .pending)))
+        XCTAssertNil(afterReset[alphaKey])
+        XCTAssertNotNil(afterReset[betaKey])
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
     // MARK: - root_states_are_isolated_per_host
 
     func testRootStatesAreIsolatedPerHost() async {

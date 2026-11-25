@@ -133,6 +133,10 @@ public enum AHPCommands {
         JsonRpcRequest(id: id, method: "fetchTurns", params: params)
     }
 
+    public static func fetchDeferredTurns(id: Int, params: FetchDeferredTurnsParams) -> JsonRpcRequest<FetchDeferredTurnsParams> {
+        JsonRpcRequest(id: id, method: "fetchDeferredTurns", params: params)
+    }
+
     public static func authenticate(id: Int, params: AuthenticateParams) -> JsonRpcRequest<AuthenticateParams> {
         JsonRpcRequest(id: id, method: "authenticate", params: params)
     }

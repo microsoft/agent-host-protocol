@@ -171,6 +171,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | SearchState | EmptyState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -581,11 +582,14 @@ interface StructOpts {
   deriveDefault?: boolean;
   /** Docstring for the struct itself. */
   doc?: string;
+  /** Wire names of fields to leave off the struct (e.g. a union's boolean discriminator). */
+  omitFields?: readonly string[];
 }
 
 function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpts = {}): string {
   const lines: string[] = [];
-  const emittedProps = props.filter(p => !(opts.omitDiscriminants && p.isLiteralDiscriminant));
+  const emittedProps = props.filter(p =>
+    !(opts.omitDiscriminants && p.isLiteralDiscriminant) && !opts.omitFields?.includes(p.wireName));
   const allOptional = emittedProps.length > 0 && emittedProps.every(p => p.optional);
   const wantsDefault = opts.deriveDefault || allOptional;
 
@@ -861,6 +865,8 @@ const STATE_ENUMS = [
   'AutomationDisableConditionKind',
   'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'SearchTargetKind', 'SearchResultKind',
+  'SearchLifecycleStatus', 'SearchCompletionReason',
 ];
 
 /**
@@ -868,7 +874,7 @@ const STATE_ENUMS = [
  * doesn't require forward declaration. Structs that serve as variants of a
  * discriminated union have `omitDiscriminants: true` set.
  */
-const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
+const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string; omitFields?: readonly string[] }[] = [
   { name: 'TcpConnectionsCapability' },
   { name: 'ChannelReceiveLimits' },
   { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
@@ -915,7 +921,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
   { name: 'ChatConfigState' },
-  { name: 'Turn' },
+  // `isDeferred` is the Turn union discriminator; see generateTurnUnion.
+  { name: 'MaterializedTurn', omitFields: ['isDeferred'] },
+  { name: 'DeferredTurn', omitFields: ['isDeferred'] },
   { name: 'ActiveTurn' },
   { name: 'Message' },
   { name: 'MessageOrigin' },
@@ -1048,6 +1056,23 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationCancelledRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState' },
+  { name: 'SearchCapability' },
+  { name: 'SearchQuery' },
+  { name: 'FileNamesSearchTarget', omitDiscriminants: true },
+  { name: 'FileTextSearchTarget', omitDiscriminants: true },
+  { name: 'SessionsSearchTarget', omitDiscriminants: true },
+  { name: 'ChatMessagesSearchTarget', omitDiscriminants: true },
+  { name: 'SearchHighlight' },
+  { name: 'SearchMatch' },
+  { name: 'FileNameSearchResult', omitDiscriminants: true },
+  { name: 'FileTextSearchResult', omitDiscriminants: true },
+  { name: 'SessionSearchResult', omitDiscriminants: true },
+  { name: 'ChatMessageSearchResult', omitDiscriminants: true },
+  { name: 'SearchPendingLifecycleState', omitDiscriminants: true },
+  { name: 'SearchRunningLifecycleState', omitDiscriminants: true },
+  { name: 'SearchCompletedLifecycleState', omitDiscriminants: true },
+  { name: 'SearchFailedLifecycleState', omitDiscriminants: true },
+  { name: 'SearchState' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1377,6 +1402,45 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
+const SEARCH_TARGET_UNION: UnionConfig = {
+  name: 'SearchTarget',
+  discriminantField: 'kind',
+  doc: 'One place to search.',
+  variants: [
+    { variantName: 'FileNames', innerType: 'FileNamesSearchTarget', wireValue: 'fileNames' },
+    { variantName: 'FileText', innerType: 'FileTextSearchTarget', wireValue: 'fileText' },
+    { variantName: 'Sessions', innerType: 'SessionsSearchTarget', wireValue: 'sessions' },
+    { variantName: 'ChatMessages', innerType: 'ChatMessagesSearchTarget', wireValue: 'chatMessages' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_RESULT_UNION: UnionConfig = {
+  name: 'SearchResult',
+  discriminantField: 'kind',
+  doc: 'One search match.',
+  variants: [
+    { variantName: 'FileName', innerType: 'FileNameSearchResult', wireValue: 'fileName' },
+    { variantName: 'FileText', innerType: 'FileTextSearchResult', wireValue: 'fileText' },
+    { variantName: 'Session', innerType: 'SessionSearchResult', wireValue: 'session' },
+    { variantName: 'ChatMessage', innerType: 'ChatMessageSearchResult', wireValue: 'chatMessage' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_LIFECYCLE_UNION: UnionConfig = {
+  name: 'SearchLifecycleState',
+  discriminantField: 'status',
+  doc: 'Lifecycle of a search.',
+  variants: [
+    { variantName: 'Pending', innerType: 'SearchPendingLifecycleState', wireValue: 'pending' },
+    { variantName: 'Running', innerType: 'SearchRunningLifecycleState', wireValue: 'running' },
+    { variantName: 'Completed', innerType: 'SearchCompletedLifecycleState', wireValue: 'completed' },
+    { variantName: 'Failed', innerType: 'SearchFailedLifecycleState', wireValue: 'failed' },
+  ],
+  unknown: true,
+};
+
 function generateChatOrigin(project: Project): string {
   const originKind = findEnum(project, 'ChatOriginKind');
   if (!originKind) throw new Error('ChatOriginKind enum not found');
@@ -1448,6 +1512,7 @@ pub enum SnapshotState {
     Annotations(Box<AnnotationsState>),
     Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
+    Search(Box<SearchState>),
     Root(Box<RootState>),
     /// A state that this version does not recognize, kept as raw JSON so it
     /// re-encodes unchanged.
@@ -1495,6 +1560,90 @@ impl<'de> Deserialize<'de> for Snapshot {
             state,
             from_seq: wire.from_seq,
         })
+    }
+}`;
+}
+
+/**
+ * `Turn` is discriminated by the boolean `isDeferred`: `true` selects
+ * `DeferredTurn`; absent or any other value selects `MaterializedTurn`.
+ * Serde's internally tagged enums only support string tags, so the impls are
+ * hand-written.
+ */
+function generateTurnUnion(): string {
+  return `/// A completed turn in \`ChatState.turns\`: either a [\`MaterializedTurn\`] or a
+/// [\`DeferredTurn\`], discriminated on the wire by \`isDeferred\`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Turn {
+    /// A turn carrying its full response (\`isDeferred\` absent or \`false\`).
+    Materialized(MaterializedTurn),
+    /// A turn whose response has not been sent yet (\`isDeferred: true\`).
+    Deferred(DeferredTurn),
+}
+
+impl Turn {
+    /// Turn identifier.
+    pub fn id(&self) -> &str {
+        match self {
+            Self::Materialized(turn) => &turn.id,
+            Self::Deferred(turn) => &turn.id,
+        }
+    }
+
+    /// Returns \`true\` for a [\`DeferredTurn\`].
+    pub fn is_deferred(&self) -> bool {
+        matches!(self, Self::Deferred(_))
+    }
+}
+
+impl From<MaterializedTurn> for Turn {
+    fn from(turn: MaterializedTurn) -> Self {
+        Self::Materialized(turn)
+    }
+}
+
+impl From<DeferredTurn> for Turn {
+    fn from(turn: DeferredTurn) -> Self {
+        Self::Deferred(turn)
+    }
+}
+
+impl Serialize for Turn {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WireDeferredTurn<'a> {
+            is_deferred: bool,
+            #[serde(flatten)]
+            turn: &'a DeferredTurn,
+        }
+
+        match self {
+            Self::Materialized(turn) => turn.serialize(serializer),
+            Self::Deferred(turn) => WireDeferredTurn {
+                is_deferred: true,
+                turn,
+            }
+            .serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Turn {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let turn = if raw.get("isDeferred") == Some(&serde_json::Value::Bool(true)) {
+            serde_json::from_value(raw).map(Self::Deferred)
+        } else {
+            serde_json::from_value(raw).map(Self::Materialized)
+        };
+        turn.map_err(serde::de::Error::custom)
     }
 }`;
 }
@@ -1547,6 +1696,7 @@ where D: serde::Deserializer<'de>,
       const struct = generateStructFromInterface(project, entry.name, entry.rustName, {
         omitDiscriminants: entry.omitDiscriminants,
         omitDeserialize: entry.name === 'Snapshot',
+        omitFields: entry.omitFields,
       });
       // EmptyState must match only `{}`, including when decoded directly.
       lines.push(entry.name === 'EmptyState'
@@ -1580,6 +1730,8 @@ where D: serde::Deserializer<'de>,
 
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
   lines.push(generateChatOrigin(project));
+  lines.push('');
+  lines.push(generateTurnUnion());
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, RESPONSE_PART_UNION));
   lines.push('');
@@ -1631,6 +1783,12 @@ where D: serde::Deserializer<'de>,
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_TARGET_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_RESULT_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_LIFECYCLE_UNION));
   lines.push('');
   lines.push(generateSnapshotState());
   lines.push('');
@@ -1722,6 +1880,7 @@ const ACTION_VARIANTS: {
   { type: 'session/mcpServerBackgroundRequested', variantName: 'SessionMcpServerBackgroundRequested', tsInterface: 'SessionMcpServerBackgroundRequestedAction' },
   { type: 'chat/truncated', variantName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'chat/turnsLoaded', variantName: 'ChatTurnsLoaded', tsInterface: 'ChatTurnsLoadedAction' },
+  { type: 'chat/turnsMaterialized', variantName: 'ChatTurnsMaterialized', tsInterface: 'ChatTurnsMaterializedAction' },
   { type: 'session/configChanged', variantName: 'SessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
   { type: 'session/metaChanged', variantName: 'SessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
   { type: 'changeset/statusChanged', variantName: 'ChangesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
@@ -1750,6 +1909,9 @@ const ACTION_VARIANTS: {
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'search/queryChanged', variantName: 'SearchQueryChanged', tsInterface: 'SearchQueryChangedAction' },
+  { type: 'search/resultsChanged', variantName: 'SearchResultsChanged', tsInterface: 'SearchResultsChangedAction' },
+  { type: 'search/lifecycleChanged', variantName: 'SearchLifecycleChanged', tsInterface: 'SearchLifecycleChangedAction' },
   { type: 'automation/createRequested', variantName: 'AutomationCreateRequested', tsInterface: 'AutomationCreateRequestedAction', boxed: true },
   { type: 'automation/updateRequested', variantName: 'AutomationUpdateRequested', tsInterface: 'AutomationUpdateRequestedAction', boxed: true },
   { type: 'automation/set', variantName: 'AutomationSet', tsInterface: 'AutomationSetAction', boxed: true },
@@ -1836,7 +1998,7 @@ impl Serialize for ChatErrorAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ModelSource, ModelSourceState, ProtectedResourceMetadata, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, MaterializedTurn, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary, SearchQuery, SearchLifecycleState, SearchResult, ModelSource, ModelSourceState, ProtectedResourceMetadata};');
   lines.push('');
   // ActionType enum
   lines.push('// ─── ActionType ──────────────────────────────────────────────────────\n');
@@ -1944,7 +2106,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestina
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
   { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
   { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
-  { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
+  { name: 'ClientCapabilities' }, { name: 'DeferredTurnsCapability' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
@@ -1965,6 +2127,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'DisposeSessionParams' },
   { name: 'ForkChatSource', omitDiscriminants: true }, { name: 'SideChatSource', omitDiscriminants: true }, { name: 'CreateChatParams' },
   { name: 'DisposeChatParams' },
+  { name: 'FetchDeferredTurnsParams' }, { name: 'FetchDeferredTurnsResult' },
   { name: 'ChatMoveToSessionDestination', omitDiscriminants: true }, { name: 'ChatMoveToNewSessionDestination', omitDiscriminants: true },
   { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
@@ -1979,6 +2142,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'ResourceMkdirParams' }, { name: 'ResourceMkdirResult' },
   { name: 'ResourceRequestParams' }, { name: 'ResourceRequestResult' },
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
+  { name: 'CreateSearchParams' }, { name: 'CreateSearchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget', omitDiscriminants: true },
@@ -2041,7 +2205,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, SearchCapability, SearchQuery, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -2562,6 +2726,8 @@ function checkExhaustiveness(project: Project): void {
     'ChatToolCallConfirmedAction',  // emitted as merged variant
     'ChatAction',                   // source-only union covered by StateAction
     'ChatOrigin',                   // hand-generated union for inline variants
+    'Turn',                         // hand-generated union discriminated by boolean `isDeferred`
+    'TurnBase',                     // base interface, flattened into MaterializedTurn / DeferredTurn via `extends`
     'ChatSource',
     'ChatMoveDestination',
     'PingParams',
@@ -2584,6 +2750,11 @@ function checkExhaustiveness(project: Project): void {
     'TerminalLifecycleState',       // TERMINAL_LIFECYCLE_STATE_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
     'BackgroundWork',               // BACKGROUND_WORK_UNION discriminated union
+    'SearchTarget',                 // SEARCH_TARGET_UNION discriminated union
+    'SearchResult',                 // SEARCH_RESULT_UNION discriminated union
+    'SearchLifecycleState',              // SEARCH_LIFECYCLE_UNION discriminated union
+    'FileSearchTargetBase',         // base interface, flattened into the file search target structs via `extends`
+    'SearchResultBase',             // base interface, flattened into the search result structs via `extends`
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'ReconnectResult',
     'SessionOrigin',

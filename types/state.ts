@@ -17,6 +17,7 @@ export * from './channels-changeset/state.js';
 export * from './channels-annotations/state.js';
 export * from './channels-otlp/state.js';
 export * from './channels-resource-watch/state.js';
+export * from './channels-search/state.js';
 export * from './channels-automation/state.js';
 export * from './channels-automation-run/state.js';
 export * from './channels-tcp/state.js';

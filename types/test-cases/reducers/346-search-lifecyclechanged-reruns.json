@@ -1,0 +1,148 @@
+{
+  "description": "search/lifecycleChanged moves a completed search back to running and appended results follow",
+  "reducer": "search",
+  "initial": {
+    "query": {
+      "text": "parseConfig",
+      "targets": [
+        {
+          "kind": "fileText",
+          "roots": [
+            "file:///workspace"
+          ]
+        }
+      ]
+    },
+    "results": [
+      {
+        "kind": "fileText",
+        "resource": "file:///workspace/a.ts",
+        "match": {
+          "text": "parseConfig()",
+          "highlights": [
+            {
+              "rangeStart": 0,
+              "rangeEnd": 11
+            }
+          ]
+        },
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 11
+          }
+        }
+      }
+    ],
+    "lifecycle": {
+      "status": "completed",
+      "reason": "exhausted"
+    }
+  },
+  "actions": [
+    {
+      "type": "search/lifecycleChanged",
+      "lifecycle": {
+        "status": "running"
+      }
+    },
+    {
+      "type": "search/resultsChanged",
+      "results": [
+        {
+          "kind": "fileText",
+          "resource": "file:///workspace/b.ts",
+          "match": {
+            "text": "const x = parseConfig(raw);",
+            "highlights": [
+              {
+                "rangeStart": 10,
+                "rangeEnd": 21
+              }
+            ]
+          },
+          "range": {
+            "start": {
+              "line": 4,
+              "character": 10
+            },
+            "end": {
+              "line": 4,
+              "character": 21
+            }
+          },
+          "score": 0.5
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "query": {
+      "text": "parseConfig",
+      "targets": [
+        {
+          "kind": "fileText",
+          "roots": [
+            "file:///workspace"
+          ]
+        }
+      ]
+    },
+    "results": [
+      {
+        "kind": "fileText",
+        "resource": "file:///workspace/a.ts",
+        "match": {
+          "text": "parseConfig()",
+          "highlights": [
+            {
+              "rangeStart": 0,
+              "rangeEnd": 11
+            }
+          ]
+        },
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 11
+          }
+        }
+      },
+      {
+        "kind": "fileText",
+        "resource": "file:///workspace/b.ts",
+        "match": {
+          "text": "const x = parseConfig(raw);",
+          "highlights": [
+            {
+              "rangeStart": 10,
+              "rangeEnd": 21
+            }
+          ]
+        },
+        "range": {
+          "start": {
+            "line": 4,
+            "character": 10
+          },
+          "end": {
+            "line": 4,
+            "character": 21
+          }
+        },
+        "score": 0.5
+      }
+    ],
+    "lifecycle": {
+      "status": "running"
+    }
+  }
+}

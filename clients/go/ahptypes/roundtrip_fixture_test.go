@@ -326,6 +326,10 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		var v CreateChatParams
 		dec(&v)
 		return enc(&v)
+	case "FetchDeferredTurnsParams":
+		var v FetchDeferredTurnsParams
+		dec(&v)
+		return enc(&v)
 	case "ChatSource":
 		var v ChatSource
 		dec(&v)

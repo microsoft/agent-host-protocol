@@ -85,6 +85,7 @@ const (
 	ActionTypeSessionMcpServerBackgroundRequested ActionType = "session/mcpServerBackgroundRequested"
 	ActionTypeChatTruncated                       ActionType = "chat/truncated"
 	ActionTypeChatTurnsLoaded                     ActionType = "chat/turnsLoaded"
+	ActionTypeChatTurnsMaterialized               ActionType = "chat/turnsMaterialized"
 	ActionTypeSessionIsReadChanged                ActionType = "session/isReadChanged"
 	ActionTypeSessionIsArchivedChanged            ActionType = "session/isArchivedChanged"
 	ActionTypeSessionActivityChanged              ActionType = "session/activityChanged"
@@ -121,6 +122,9 @@ const (
 	ActionTypeTerminalCommandExecuted             ActionType = "terminal/commandExecuted"
 	ActionTypeTerminalCommandFinished             ActionType = "terminal/commandFinished"
 	ActionTypeResourceWatchChanged                ActionType = "resourceWatch/changed"
+	ActionTypeSearchQueryChanged                  ActionType = "search/queryChanged"
+	ActionTypeSearchResultsChanged                ActionType = "search/resultsChanged"
+	ActionTypeSearchLifecycleChanged              ActionType = "search/lifecycleChanged"
 	ActionTypeAutomationCreateRequested           ActionType = "automation/createRequested"
 	ActionTypeAutomationUpdateRequested           ActionType = "automation/updateRequested"
 	ActionTypeAutomationSet                       ActionType = "automation/set"
@@ -703,7 +707,8 @@ type ChatErrorAction struct {
 // The turn MUST be the latest turn, its state MUST be `error`, and its final
 // response part MUST be a resumable error. The reducer reopens the same turn
 // with its existing message, response parts, and usage intact. The host then
-// resumes the provider's execution for that turn.
+// resumes the provider's execution for that turn. A deferred turn cannot be
+// resumed until it is materialized.
 type ChatTurnResumeAction struct {
 	Type ActionType `json:"type"`
 	// Identifier of the errored turn.
@@ -1029,13 +1034,35 @@ type ChatTruncatedAction struct {
 // any operation that references a turn older than the currently loaded window.
 // `turns` is ordered oldest-first and is prepended to the current `turns`
 // window. `turnsNextCursor` replaces the state's cursor; omit it when all
-// retained turns are now loaded.
+// retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+// only for clients that declared
+// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+//
+// This belongs to the legacy tail-window paging scheme, which deferred turns
+// replace. See {@link FetchTurnsParams | `fetchTurns`}.
+//
+// Stability: 3 - Legacy.
 type ChatTurnsLoadedAction struct {
 	Type ActionType `json:"type"`
 	// Older completed turns loaded into the state, ordered oldest-first.
 	Turns []Turn `json:"turns"`
 	// Opaque cursor for loading the next older page, if one remains.
 	TurnsNextCursor *string `json:"turnsNextCursor,omitempty"`
+}
+
+// Replaces {@link DeferredTurn | deferred turns} in place with their full
+// {@link MaterializedTurn | turns}.
+//
+// Hosts dispatch this before responding to `fetchDeferredTurns`, and before
+// applying any operation that needs a deferred turn's response, such as
+// `chat/turnResume`. Each entry replaces the deferred turn with the same `id`.
+// Entries whose `id` does not name a deferred turn in state are ignored.
+//
+// Stability: 1.0 - Early development.
+type ChatTurnsMaterializedAction struct {
+	Type ActionType `json:"type"`
+	// Full turns to replace their deferred entries.
+	Turns []MaterializedTurn `json:"turns"`
 }
 
 // The read state of the session changed.
@@ -1781,6 +1808,68 @@ type ResourceWatchChangedAction struct {
 	Changes json.RawMessage `json:"changes"`
 }
 
+// Replaces the search's query and restarts the search.
+//
+// Keeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to
+// {@link SearchLifecycleStatus.Pending | pending}. The old results stay
+// visible until the host replaces them, so the client does not flash an empty
+// list.
+//
+// After the host applies this action, it stops the previous search and drops
+// any of its results that it has not dispatched yet. The host MUST then
+// dispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with
+// `replace: true` before any other search action. The replacement can keep
+// old results that still match the new query, and can be empty. If the new
+// query is not valid,
+// for example because it contains an invalid regular expression, the host
+// replaces the results with an empty list and then changes the lifecycle to
+// {@link SearchLifecycleStatus.Failed | failed}.
+//
+// Stability: 1.0 - Early development.
+type SearchQueryChangedAction struct {
+	Type ActionType `json:"type"`
+	// The new query.
+	Query SearchQuery `json:"query"`
+}
+
+// Adds results to {@link SearchState.results}, or replaces them.
+//
+// By default, the reducer appends `results`. Set `replace` to `true` to
+// replace every result instead; if {@link SearchState.lifecycle} is
+// {@link SearchLifecycleStatus.Pending | pending}, a replacement also changes
+// it to {@link SearchLifecycleStatus.Running | running}.
+//
+// The host MUST dispatch a replacement first after a
+// {@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also
+// replace the results at other times, for example to re-rank them, to remove
+// duplicates, or to update a completed search when a watched file changes.
+// The host MUST NOT dispatch an empty `results` list unless `replace` is
+// `true`.
+//
+// Stability: 1.0 - Early development.
+type SearchResultsChangedAction struct {
+	Type ActionType `json:"type"`
+	// The results to append, in the order the host found them, or the replacement results.
+	Results []SearchResult `json:"results"`
+	// When `true`, replaces every result instead of appending.
+	Replace *bool `json:"replace,omitempty"`
+}
+
+// Replaces {@link SearchState.lifecycle}.
+//
+// The host dispatches this to complete or fail a search, or to move a
+// completed search back to {@link SearchLifecycleStatus.Running | running} when it
+// searches again, for example after a watched file changes. The host MUST NOT
+// change the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only
+// {@link SearchQueryChangedAction | `search/queryChanged`} does that.
+//
+// Stability: 1.0 - Early development.
+type SearchLifecycleChangedAction struct {
+	Type ActionType `json:"type"`
+	// The new lifecycle.
+	Lifecycle SearchLifecycleState `json:"lifecycle"`
+}
+
 // Ask the host to create a durable automation at a client-chosen resource.
 //
 // Clients may dispatch this action only when the host advertises its `create`
@@ -1962,6 +2051,7 @@ func (*ChatInputAnswerChangedAction) isStateAction()              {}
 func (*ChatInputCompletedAction) isStateAction()                  {}
 func (*ChatTruncatedAction) isStateAction()                       {}
 func (*ChatTurnsLoadedAction) isStateAction()                     {}
+func (*ChatTurnsMaterializedAction) isStateAction()               {}
 func (*SessionIsReadChangedAction) isStateAction()                {}
 func (*SessionIsArchivedChangedAction) isStateAction()            {}
 func (*SessionActivityChangedAction) isStateAction()              {}
@@ -2012,6 +2102,9 @@ func (*TerminalCommandDetectionAvailableAction) isStateAction()   {}
 func (*TerminalCommandExecutedAction) isStateAction()             {}
 func (*TerminalCommandFinishedAction) isStateAction()             {}
 func (*ResourceWatchChangedAction) isStateAction()                {}
+func (*SearchQueryChangedAction) isStateAction()                  {}
+func (*SearchResultsChangedAction) isStateAction()                {}
+func (*SearchLifecycleChangedAction) isStateAction()              {}
 func (*AutomationCreateRequestedAction) isStateAction()           {}
 func (*AutomationUpdateRequestedAction) isStateAction()           {}
 func (*AutomationSetAction) isStateAction()                       {}
@@ -2348,6 +2441,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
+	case "chat/turnsMaterialized":
+		var value ChatTurnsMaterializedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
 	case "session/isReadChanged":
 		var value SessionIsReadChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -2644,6 +2743,24 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "resourceWatch/changed":
 		var value ResourceWatchChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "search/queryChanged":
+		var value SearchQueryChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "search/resultsChanged":
+		var value SearchResultsChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "search/lifecycleChanged":
+		var value SearchLifecycleChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

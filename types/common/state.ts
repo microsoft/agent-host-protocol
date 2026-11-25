@@ -17,6 +17,7 @@ import type { ChatState } from '../channels-chat/state.js';
 import type { CanvasState } from '../channels-canvas/state.js';
 import type { AutomationState } from '../channels-automation/state.js';
 import type { AutomationRunState } from '../channels-automation-run/state.js';
+import type { SearchState } from '../channels-search/state.js';
 
 // ─── Type Aliases ────────────────────────────────────────────────────────────
 
@@ -472,7 +473,7 @@ export interface Snapshot {
    * new kinds of state; a client MUST NOT fail on a state that it does not
    * recognize, and ignores that snapshot.
    */
-  state: RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState;
+  state: RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | SearchState | EmptyState;
   /** The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`. */
   fromSeq: number;
 }

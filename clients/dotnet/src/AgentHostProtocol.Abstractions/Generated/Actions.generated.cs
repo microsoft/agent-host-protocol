@@ -157,6 +157,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatTurnsLoaded = new ActionType("chat/turnsLoaded");
 
+    public static readonly ActionType ChatTurnsMaterialized = new ActionType("chat/turnsMaterialized");
+
     public static readonly ActionType SessionIsReadChanged = new ActionType("session/isReadChanged");
 
     public static readonly ActionType SessionIsArchivedChanged = new ActionType("session/isArchivedChanged");
@@ -228,6 +230,12 @@ public readonly struct ActionType : IEquatable<ActionType>
     public static readonly ActionType TerminalCommandFinished = new ActionType("terminal/commandFinished");
 
     public static readonly ActionType ResourceWatchChanged = new ActionType("resourceWatch/changed");
+
+    public static readonly ActionType SearchQueryChanged = new ActionType("search/queryChanged");
+
+    public static readonly ActionType SearchResultsChanged = new ActionType("search/resultsChanged");
+
+    public static readonly ActionType SearchLifecycleChanged = new ActionType("search/lifecycleChanged");
 
     public static readonly ActionType AutomationCreateRequested = new ActionType("automation/createRequested");
 
@@ -1826,7 +1834,8 @@ public sealed record ChatErrorAction
 /// The turn MUST be the latest turn, its state MUST be `error`, and its final
 /// response part MUST be a resumable error. The reducer reopens the same turn
 /// with its existing message, response parts, and usage intact. The host then
-/// resumes the provider's execution for that turn.</summary>
+/// resumes the provider's execution for that turn. A deferred turn cannot be
+/// resumed until it is materialized.</summary>
 public sealed record ChatTurnResumeAction
 {
     public ActionType Type { get; init; } = ActionType.ChatTurnResume;
@@ -2045,7 +2054,14 @@ public sealed record ChatTruncatedAction
 /// any operation that references a turn older than the currently loaded window.
 /// `turns` is ordered oldest-first and is prepended to the current `turns`
 /// window. `turnsNextCursor` replaces the state's cursor; omit it when all
-/// retained turns are now loaded.</summary>
+/// retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+/// only for clients that declared
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// This belongs to the legacy tail-window paging scheme, which deferred turns
+/// replace. See {@link FetchTurnsParams | `fetchTurns`}.
+///
+/// Stability: 3 - Legacy.</summary>
 public sealed record ChatTurnsLoadedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatTurnsLoaded;
@@ -2056,6 +2072,23 @@ public sealed record ChatTurnsLoadedAction
     /// <summary>Opaque cursor for loading the next older page, if one remains.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? TurnsNextCursor { get; init; }
+}
+
+/// <summary>Replaces {@link DeferredTurn | deferred turns} in place with their full
+/// {@link MaterializedTurn | turns}.
+///
+/// Hosts dispatch this before responding to `fetchDeferredTurns`, and before
+/// applying any operation that needs a deferred turn's response, such as
+/// `chat/turnResume`. Each entry replaces the deferred turn with the same `id`.
+/// Entries whose `id` does not name a deferred turn in state are ignored.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChatTurnsMaterializedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatTurnsMaterialized;
+
+    /// <summary>Full turns to replace their deferred entries.</summary>
+    public required List<MaterializedTurn> Turns { get; init; }
 }
 
 /// <summary>A pending message was set (upsert semantics: creates or replaces).
@@ -2587,6 +2620,76 @@ public sealed record ResourceWatchChangedAction
     public JsonElement Changes { get; init; }
 }
 
+/// <summary>Replaces the search's query and restarts the search.
+///
+/// Keeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to
+/// {@link SearchLifecycleStatus.Pending | pending}. The old results stay
+/// visible until the host replaces them, so the client does not flash an empty
+/// list.
+///
+/// After the host applies this action, it stops the previous search and drops
+/// any of its results that it has not dispatched yet. The host MUST then
+/// dispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with
+/// `replace: true` before any other search action. The replacement can keep
+/// old results that still match the new query, and can be empty. If the new
+/// query is not valid,
+/// for example because it contains an invalid regular expression, the host
+/// replaces the results with an empty list and then changes the lifecycle to
+/// {@link SearchLifecycleStatus.Failed | failed}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchQueryChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.SearchQueryChanged;
+
+    /// <summary>The new query.</summary>
+    public required SearchQuery Query { get; init; }
+}
+
+/// <summary>Adds results to {@link SearchState.results}, or replaces them.
+///
+/// By default, the reducer appends `results`. Set `replace` to `true` to
+/// replace every result instead; if {@link SearchState.lifecycle} is
+/// {@link SearchLifecycleStatus.Pending | pending}, a replacement also changes
+/// it to {@link SearchLifecycleStatus.Running | running}.
+///
+/// The host MUST dispatch a replacement first after a
+/// {@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also
+/// replace the results at other times, for example to re-rank them, to remove
+/// duplicates, or to update a completed search when a watched file changes.
+/// The host MUST NOT dispatch an empty `results` list unless `replace` is
+/// `true`.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchResultsChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.SearchResultsChanged;
+
+    /// <summary>The results to append, in the order the host found them, or the replacement results.</summary>
+    public required List<SearchResult> Results { get; init; }
+
+    /// <summary>When `true`, replaces every result instead of appending.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Replace { get; init; }
+}
+
+/// <summary>Replaces {@link SearchState.lifecycle}.
+///
+/// The host dispatches this to complete or fail a search, or to move a
+/// completed search back to {@link SearchLifecycleStatus.Running | running} when it
+/// searches again, for example after a watched file changes. The host MUST NOT
+/// change the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only
+/// {@link SearchQueryChangedAction | `search/queryChanged`} does that.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SearchLifecycleChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.SearchLifecycleChanged;
+
+    /// <summary>The new lifecycle.</summary>
+    public required SearchLifecycleState Lifecycle { get; init; }
+}
+
 /// <summary>Upsert an {@link Annotation} in the annotations channel — adds a new
 /// annotation, or replaces an existing one identified by
 /// {@link Annotation.id}.
@@ -3005,6 +3108,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/reasoning"] = typeof(ChatReasoningAction),
         ["chat/truncated"] = typeof(ChatTruncatedAction),
         ["chat/turnsLoaded"] = typeof(ChatTurnsLoadedAction),
+        ["chat/turnsMaterialized"] = typeof(ChatTurnsMaterializedAction),
         ["chat/pendingMessageSet"] = typeof(ChatPendingMessageSetAction),
         ["chat/pendingMessageRemoved"] = typeof(ChatPendingMessageRemovedAction),
         ["chat/queuedMessagesReordered"] = typeof(ChatQueuedMessagesReorderedAction),
@@ -3037,6 +3141,9 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["terminal/commandExecuted"] = typeof(TerminalCommandExecutedAction),
         ["terminal/commandFinished"] = typeof(TerminalCommandFinishedAction),
         ["resourceWatch/changed"] = typeof(ResourceWatchChangedAction),
+        ["search/queryChanged"] = typeof(SearchQueryChangedAction),
+        ["search/resultsChanged"] = typeof(SearchResultsChangedAction),
+        ["search/lifecycleChanged"] = typeof(SearchLifecycleChangedAction),
         ["annotations/set"] = typeof(AnnotationsSetAction),
         ["annotations/removed"] = typeof(AnnotationsRemovedAction),
         ["annotations/entrySet"] = typeof(AnnotationsEntrySetAction),

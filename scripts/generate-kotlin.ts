@@ -160,6 +160,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | SearchState | EmptyState' ||
     tsType === 'RootState | SessionState | ChatState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
@@ -660,6 +661,35 @@ function generateDiscriminatedUnion(project: Project, config: UnionConfig): stri
 
 // ─── Interface → Kotlin data class (auto from project) ───────────────────────
 
+/**
+ * Discriminator fields dropped from generated data classes because a
+ * hand-rolled union serializer decodes and injects them instead.
+ */
+const OMITTED_PROPS: Record<string, readonly string[]> = {
+  MaterializedTurn: ['isDeferred'],
+  DeferredTurn: ['isDeferred'],
+};
+
+/**
+ * Pinned constructor parameter order (by wire name) for data classes whose
+ * fields moved into a `*Base` interface, keeping positional constructors
+ * source-compatible.
+ */
+const PROP_ORDER: Record<string, readonly string[]> = {
+  MaterializedTurn: ['id', 'startedAt', 'duration', 'message', 'responseParts', 'usage', 'state'],
+};
+
+function orderProps(tsInterfaceName: string, props: KotlinProp[]): KotlinProp[] {
+  const order = PROP_ORDER[tsInterfaceName];
+  if (!order) return props;
+  const rank = (p: KotlinProp) => {
+    const idx = order.indexOf(p.wireName);
+    if (idx < 0) throw new Error(`PROP_ORDER.${tsInterfaceName} is missing ${p.wireName}`);
+    return idx;
+  };
+  return [...props].sort((a, b) => rank(a) - rank(b));
+}
+
 function generateDataClassFromInterface(
   project: Project,
   tsInterfaceName: string,
@@ -668,7 +698,11 @@ function generateDataClassFromInterface(
   const iface = findInterface(project, tsInterfaceName);
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = ktNameOverride ?? tsInterfaceName;
-  const props = extractProps(iface, project);
+  const omitted = OMITTED_PROPS[tsInterfaceName] ?? [];
+  const props = orderProps(
+    tsInterfaceName,
+    extractProps(iface, project).filter(p => !omitted.includes(p.wireName)),
+  );
   const declaration = preservesUnknownMembers(iface)
     ? generatePreservingKotlinDataClass(name, props)
     : generateKotlinDataClass(name, props);
@@ -867,6 +901,7 @@ sealed interface SnapshotState {
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
     @JvmInline value class Automations(val value: AutomationState) : SnapshotState
     @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
+    @JvmInline value class Search(val value: SearchState) : SnapshotState
     /** A state that this version does not recognize, kept as raw JSON so it re-encodes unchanged. */
     @JvmInline value class Unknown(val raw: JsonObject) : SnapshotState
 }
@@ -883,7 +918,9 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             ?: error("Expected JsonObject for SnapshotState")
         // Try the most distinctive shape first. AutomationRunState has required
         // \`automation\`, \`origin\`, and \`sessions\`; AutomationState has
-        // required \`entries\`; SessionState has required
+        // required \`entries\`; SearchState has required \`query\` +
+        // \`results\` (checked before session, because it also has a required
+        // \`lifecycle\`); SessionState has required
         // \`lifecycle\`; ChatState has required \`turns\`; ChangesetState has
         // required \`status\` + \`files\`; ResourceWatchState has required
         // \`root\` + \`recursive\`; AnnotationsState has required \`annotations\`
@@ -897,6 +934,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
                 SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
+            obj.containsKey("query") && obj.containsKey("results") ->
+                SnapshotState.Search(input.json.decodeFromJsonElement(SearchState.serializer(), element))
             obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
             obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("instanceId") && obj.containsKey("extensionId") && obj.containsKey("canvasId") ->
@@ -930,7 +969,75 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
             is SnapshotState.Automations -> output.json.encodeToJsonElement(AutomationState.serializer(), value.value)
             is SnapshotState.AutomationRun -> output.json.encodeToJsonElement(AutomationRunState.serializer(), value.value)
+            is SnapshotState.Search -> output.json.encodeToJsonElement(SearchState.serializer(), value.value)
             is SnapshotState.Unknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}`;
+}
+
+/**
+ * `Turn = MaterializedTurn | DeferredTurn`, discriminated by the boolean
+ * `isDeferred`. `true` decodes as [Turn.Deferred]; absent, `false`, or any
+ * other value decodes as [Turn.Materialized]. Neither variant data class
+ * carries `isDeferred`; the serializer injects `"isDeferred": true` when
+ * encoding a deferred turn. The shared `TurnBase` fields are exposed on the
+ * sealed interface so callers can read them without matching.
+ */
+function generateTurnKotlin(project: Project): string {
+  const base = findInterface(project, 'TurnBase');
+  if (!base) throw new Error('Interface TurnBase not found');
+  const baseProps = extractProps(base, project);
+  const alias = project.getSourceFiles().map(sf => sf.getTypeAlias('Turn')).find(a => a);
+  if (!alias) throw new Error('Type alias Turn not found');
+  const doc = getDocumentation(alias);
+  const overrides = baseProps
+    .map(p => `        override val ${p.name}: ${p.type} get() = value.${p.name}`)
+    .join('\n');
+  return `${emitKDoc(doc).join('\n')}
+@Serializable(with = TurnSerializer::class)
+sealed interface Turn {
+${baseProps.map(p => [...emitKDoc(p.doc, '    '), `    val ${p.name}: ${p.type}`].join('\n')).join('\n')}
+
+    /** A [MaterializedTurn] carrying its full response. */
+    @JvmInline value class Materialized(val value: MaterializedTurn) : Turn {
+${overrides}
+    }
+
+    /** A [DeferredTurn] whose response has not been sent yet. */
+    @JvmInline value class Deferred(val value: DeferredTurn) : Turn {
+${overrides}
+    }
+}
+
+internal object TurnSerializer : KSerializer<Turn> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("Turn")
+
+    override fun deserialize(decoder: Decoder): Turn {
+        val input = decoder as? JsonDecoder
+            ?: error("Turn can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for Turn")
+        val isDeferred = (obj["isDeferred"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
+        return if (isDeferred) {
+            Turn.Deferred(input.json.decodeFromJsonElement(DeferredTurn.serializer(), element))
+        } else {
+            Turn.Materialized(input.json.decodeFromJsonElement(MaterializedTurn.serializer(), element))
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: Turn) {
+        val output = encoder as? JsonEncoder
+            ?: error("Turn can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is Turn.Materialized -> output.json.encodeToJsonElement(MaterializedTurn.serializer(), value.value)
+            is Turn.Deferred -> JsonObject(
+                output.json.encodeToJsonElement(DeferredTurn.serializer(), value.value).jsonObject +
+                    ("isDeferred" to JsonPrimitive(true)),
+            )
         }
         output.encodeJsonElement(element)
     }
@@ -1019,6 +1126,8 @@ const STATE_ENUMS = [
   'AutomationDisableConditionKind',
   'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'SearchTargetKind', 'SearchResultKind',
+  'SearchLifecycleStatus', 'SearchCompletionReason',
 ];
 
 const STATE_STRUCTS = [
@@ -1038,7 +1147,7 @@ const STATE_STRUCTS = [
   'CanvasReference', 'CanvasState',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionToolAuthenticationRequest',
-  'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'Turn', 'ActiveTurn', 'Message',
+  'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'MaterializedTurn', 'DeferredTurn', 'ActiveTurn', 'Message',
   'MessageOrigin',
   'ChatInputOption',
   'ChatInputTextAnswerValue', 'ChatInputNumberAnswerValue',
@@ -1099,6 +1208,12 @@ const STATE_STRUCTS = [
   'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
   'AutomationRunSummary', 'AutomationRunState',
+  'SearchCapability', 'SearchQuery',
+  'FileNamesSearchTarget', 'FileTextSearchTarget', 'SessionsSearchTarget', 'ChatMessagesSearchTarget',
+  'SearchHighlight', 'SearchMatch',
+  'FileNameSearchResult', 'FileTextSearchResult', 'SessionSearchResult', 'ChatMessageSearchResult',
+  'SearchPendingLifecycleState', 'SearchRunningLifecycleState', 'SearchCompletedLifecycleState', 'SearchFailedLifecycleState',
+  'SearchState',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1458,6 +1573,43 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   injectDiscriminantOnSerialize: true,
 };
 
+const SEARCH_TARGET_UNION: UnionConfig = {
+  name: 'SearchTarget',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'FileNames', structName: 'FileNamesSearchTarget', discriminantValue: 'fileNames' },
+    { caseName: 'FileText', structName: 'FileTextSearchTarget', discriminantValue: 'fileText' },
+    { caseName: 'Sessions', structName: 'SessionsSearchTarget', discriminantValue: 'sessions' },
+    { caseName: 'ChatMessages', structName: 'ChatMessagesSearchTarget', discriminantValue: 'chatMessages' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_RESULT_UNION: UnionConfig = {
+  name: 'SearchResult',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'FileName', structName: 'FileNameSearchResult', discriminantValue: 'fileName' },
+    { caseName: 'FileText', structName: 'FileTextSearchResult', discriminantValue: 'fileText' },
+    { caseName: 'Session', structName: 'SessionSearchResult', discriminantValue: 'session' },
+    { caseName: 'ChatMessage', structName: 'ChatMessageSearchResult', discriminantValue: 'chatMessage' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_LIFECYCLE_UNION: UnionConfig = {
+  name: 'SearchLifecycleState',
+  discriminantField: 'status',
+  variants: [
+    { caseName: 'Pending', structName: 'SearchPendingLifecycleState', discriminantValue: 'pending' },
+    { caseName: 'Running', structName: 'SearchRunningLifecycleState', discriminantValue: 'running' },
+    { caseName: 'Completed', structName: 'SearchCompletedLifecycleState', discriminantValue: 'completed' },
+    { caseName: 'Failed', structName: 'SearchFailedLifecycleState', discriminantValue: 'failed' },
+  ],
+  unknown: true,
+  injectDiscriminantOnSerialize: true,
+};
+
 function generateStateFile(project: Project): string {
   const lines: string[] = [
     GENERATED_HEADER.replace('package ', '@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)\n\npackage '),
@@ -1561,6 +1713,14 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_TARGET_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_RESULT_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_LIFECYCLE_UNION));
+  lines.push('');
+  lines.push(generateTurnKotlin(project));
+  lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1642,6 +1802,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/mcpServerBackgroundRequested', caseName: 'SessionMcpServerBackgroundRequested', tsInterface: 'SessionMcpServerBackgroundRequestedAction' },
   { type: 'chat/truncated', caseName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'chat/turnsLoaded', caseName: 'ChatTurnsLoaded', tsInterface: 'ChatTurnsLoadedAction' },
+  { type: 'chat/turnsMaterialized', caseName: 'ChatTurnsMaterialized', tsInterface: 'ChatTurnsMaterializedAction' },
   { type: 'session/configChanged', caseName: 'SessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
   { type: 'session/metaChanged', caseName: 'SessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
   { type: 'changeset/statusChanged', caseName: 'ChangesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
@@ -1674,6 +1835,9 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'terminal/commandExecuted', caseName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', caseName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', caseName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'search/queryChanged', caseName: 'SearchQueryChanged', tsInterface: 'SearchQueryChangedAction' },
+  { type: 'search/resultsChanged', caseName: 'SearchResultsChanged', tsInterface: 'SearchResultsChangedAction' },
+  { type: 'search/lifecycleChanged', caseName: 'SearchLifecycleChanged', tsInterface: 'SearchLifecycleChangedAction' },
   { type: 'automation/createRequested', caseName: 'AutomationCreateRequested', tsInterface: 'AutomationCreateRequestedAction' },
   { type: 'automation/updateRequested', caseName: 'AutomationUpdateRequested', tsInterface: 'AutomationUpdateRequestedAction' },
   { type: 'automation/set', caseName: 'AutomationSet', tsInterface: 'AutomationSetAction' },
@@ -1844,7 +2008,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestina
 const COMMAND_STRUCTS = [
   'CreateTcpConnectionParams', 'CreateTcpConnectionResult',
   'InitializeParams', 'HostEnvironment', 'InitializeResult',
-  'ClientCapabilities', 'AutomationCapabilities',
+  'ClientCapabilities', 'DeferredTurnsCapability', 'AutomationCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
@@ -1873,7 +2037,9 @@ const COMMAND_STRUCTS = [
   'ResourceMkdirParams', 'ResourceMkdirResult',
   'ResourceRequestParams', 'ResourceRequestResult',
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
+  'CreateSearchParams', 'CreateSearchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
+  'FetchDeferredTurnsParams', 'FetchDeferredTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
   'McpServerAuthenticateTarget', 'ModelSourceAuthenticateTarget',
   'AuthenticateParams', 'AuthenticateResult',
@@ -2411,6 +2577,9 @@ object AhpCommands {
     fun fetchTurns(id: Long, params: FetchTurnsParams): JsonRpcRequest<FetchTurnsParams> =
         JsonRpcRequest(id = id, method = "fetchTurns", params = params)
 
+    fun fetchDeferredTurns(id: Long, params: FetchDeferredTurnsParams): JsonRpcRequest<FetchDeferredTurnsParams> =
+        JsonRpcRequest(id = id, method = "fetchDeferredTurns", params = params)
+
     fun authenticate(id: Long, params: AuthenticateParams): JsonRpcRequest<AuthenticateParams> =
         JsonRpcRequest(id = id, method = "authenticate", params = params)
 
@@ -2514,6 +2683,8 @@ function checkExhaustiveness(project: Project): void {
     'ActionEnvelope',               // generateDataClassFromInterface() call in generateActionsFile()
     'ActionOrigin',                 // generateDataClassFromInterface() call in generateActionsFile()
     'ResponsePart',                 // RESPONSE_PART_UNION discriminated union
+    'Turn',                         // generateTurnKotlin()
+    'TurnBase',                     // base interface, flattened into MaterializedTurn / DeferredTurn via `extends`
     'ToolResultContent',            // generateToolResultContentUnion()
     'SessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
     'SessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction
@@ -2542,6 +2713,11 @@ function checkExhaustiveness(project: Project): void {
     'TerminalLifecycleState',       // TERMINAL_LIFECYCLE_STATE_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
     'BackgroundWork',               // BACKGROUND_WORK_UNION discriminated union
+    'SearchTarget',                 // SEARCH_TARGET_UNION discriminated union
+    'SearchResult',                 // SEARCH_RESULT_UNION discriminated union
+    'SearchLifecycleState',              // SEARCH_LIFECYCLE_UNION discriminated union
+    'FileSearchTargetBase',         // base interface, flattened into the file search target data classes via `extends`
+    'SearchResultBase',             // base interface, flattened into the search result data classes via `extends`
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'ChildCustomizationType',       // TS subset alias of CustomizationType; consumers reuse CustomizationType
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union

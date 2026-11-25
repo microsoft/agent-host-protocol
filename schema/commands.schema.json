@@ -128,8 +128,17 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Client can render\n[MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.\nit can host the View sandbox, run the `ui/*` protocol against it,\nand forward `mcp://`-channel traffic on the App's behalf.\n\nHosts SHOULD only populate\n{@link McpServerCustomization.mcpApp | `McpServerCustomization.mcpApp`}\n(and expose the corresponding\n{@link McpServerCustomization.channel | `mcp://` channel}) when this\ncapability is declared. Clients that omit it MUST treat\nApp-bearing tool calls as ordinary MCP tool calls."
+        },
+        "deferredTurns": {
+          "$ref": "#/$defs/DeferredTurnsCapability",
+          "description": "Client understands {@link DeferredTurn} entries in\n{@link ChatState.turns | `ChatState.turns`} and can request their responses with\n{@link FetchDeferredTurnsParams | `fetchDeferredTurns`}.\n\nHosts MAY then defer any completed turn they send this client. Hosts\nMUST NOT send deferred turns to clients that omit this capability.\n\nStability: 1.0 - Early development."
         }
       }
+    },
+    "DeferredTurnsCapability": {
+      "type": "object",
+      "description": "Presence-only client capability for {@link ClientCapabilities.deferredTurns}.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "HostEnvironment": {
       "type": "object",
@@ -199,6 +208,10 @@
         "tcpConnections": {
           "$ref": "#/$defs/TcpConnectionsCapability",
           "description": "Present when the host supports `createTcpConnection`, which opens a TCP\nconnection on the host's network for the client to forward.\n\nStability: 1.0 - Early development."
+        },
+        "search": {
+          "$ref": "#/$defs/SearchCapability",
+          "description": "Present when the host supports `createSearch`, which searches files,\nsessions, and chats and streams the results on an `ahp-search:` channel.\n\nStability: 1.0 - Early development."
         },
         "multipleChatProviders": {
           "$ref": "#/$defs/MultipleChatProvidersCapability",
@@ -527,7 +540,7 @@
       "properties": {
         "turns": {
           "type": "number",
-          "description": "Advisory number of most-recent completed turns to expose in a chat\nsnapshot.\n\nServers MAY return more or fewer turns than requested. When omitted, the\nhost MUST return all retained turns. When older turns remain available, the\nreturned {@link ChatState} carries `turnsNextCursor`; clients pass that\ncursor to `fetchTurns` to ask the host to page more turns into the chat\nstate."
+          "description": "Advisory number of most-recent completed turns to expose in a chat\nsnapshot.\n\nServers MAY return more or fewer turns than requested. When omitted, the\nhost MUST return all retained turns. When older turns remain available, the\nreturned {@link ChatState} carries `turnsNextCursor`; clients pass that\ncursor to `fetchTurns` to ask the host to page more turns into the chat\nstate.\n\nClients that declare\n{@link ClientCapabilities.deferredTurns | `deferredTurns`} SHOULD omit this\nfield and read history through deferred turns instead.\n\nStability: 3 - Legacy."
         }
       }
     },
@@ -1368,7 +1381,7 @@
     },
     "FetchTurnsParams": {
       "type": "object",
-      "description": "Requests that the host load older historical turns into a chat state.\n\nThe command result does not carry turns. Instead, before responding, the host\nMUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat\nchannel's `turns` state, ahead of the already-loaded window, and update or\nclear `turnsNextCursor`.\n\nBefore applying any operation that references a turn outside the currently\nloaded window, the host MUST eagerly load enough older turns into state for\nthat operation to reduce against valid state.",
+      "description": "Requests that the host load older historical turns into a chat state.\n\nThe command result does not carry turns. Instead, before responding, the host\nMUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat\nchannel's `turns` state, ahead of the already-loaded window, and update or\nclear `turnsNextCursor`.\n\nBefore applying any operation that references a turn outside the currently\nloaded window, the host MUST eagerly load enough older turns into state for\nthat operation to reduce against valid state.\n\nHosts MAY load turns as {@link DeferredTurn | deferred} for clients that\ndeclared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.\n\nTail-window paging is legacy. It remains supported for 1.x clients, but new\nclients SHOULD declare `deferredTurns` and read history with\n{@link FetchDeferredTurnsParams | `fetchDeferredTurns`} instead.\n\nStability: 3 - Legacy.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -1390,7 +1403,7 @@
     },
     "FetchTurnsResult": {
       "type": "object",
-      "description": "Result of the `fetchTurns` command.",
+      "description": "Result of the `fetchTurns` command.\n\nStability: 3 - Legacy.",
       "properties": {}
     },
     "CompletionsParams": {
@@ -1435,12 +1448,14 @@
           "description": "The text inserted into the input when this item is accepted."
         },
         "rangeStart": {
-          "type": "number",
-          "description": "If defined, the start of the range in the input's `text` that is replaced\nby `insertText`. The range is the half-open interval\n`[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code\nunits.\n\nWhen omitted, the client SHOULD insert `insertText` at the cursor.\n\nNote: this range refers to positions in the *current* input. The\nattachment's own `rangeStart`/`rangeEnd` (when present) refer to\npositions in the final {@link Message.text} after the item is\naccepted."
+          "type": "integer",
+          "description": "If defined, the start of the range in the input's `text` that is replaced\nby `insertText`. The range is the half-open interval\n`[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code\nunits.\n\nWhen omitted, the client SHOULD insert `insertText` at the cursor.\n\nNote: this range refers to positions in the *current* input. The\nattachment's own `rangeStart`/`rangeEnd` (when present) refer to\npositions in the final {@link Message.text} after the item is\naccepted.",
+          "minimum": 0
         },
         "rangeEnd": {
-          "type": "number",
-          "description": "The end of the range in the input's `text` that is replaced by\n`insertText`. See {@link rangeStart}."
+          "type": "integer",
+          "description": "The end of the range in the input's `text` that is replaced by\n`insertText`. See {@link rangeStart}.",
+          "minimum": 1
         },
         "attachment": {
           "$ref": "#/$defs/MessageAttachment",
@@ -1652,6 +1667,38 @@
       "required": [
         "channel"
       ]
+    },
+    "FetchDeferredTurnsParams": {
+      "type": "object",
+      "description": "Requests the full responses of a range of {@link DeferredTurn | deferred\nturns} in a chat state.\n\nThe range runs from `turnId` through `endTurnId`, inclusive, in\n{@link ChatState.turns | `ChatState.turns`} order. The command result does\nnot carry turns. Instead, before responding, the host MUST dispatch\n`chat/turnsMaterialized` to replace every deferred turn in the range in place\nwith its full {@link MaterializedTurn}. Full turns in the range are left unchanged.\n\nThe host MUST reject the request with `InvalidParams` if `turnId` or\n`endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.\nHosts MAY also reject ranges that exceed an implementation-defined size limit\nwith `InvalidParams`.\n\nRequires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat URI"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "turnId": {
+          "type": "string",
+          "description": "ID of the first turn in the range."
+        },
+        "endTurnId": {
+          "type": "string",
+          "description": "ID of the last turn in the range, inclusive. Omit to request only `turnId`."
+        }
+      },
+      "required": [
+        "channel",
+        "turnId"
+      ]
+    },
+    "FetchDeferredTurnsResult": {
+      "type": "object",
+      "description": "Result of the `fetchDeferredTurns` command.",
+      "properties": {}
     },
     "CreateTerminalParams": {
       "type": "object",
@@ -2004,6 +2051,34 @@
     "CreateTcpConnectionResult": {
       "type": "object",
       "description": "Result of the `createTcpConnection` command.\n\nAn empty object on success.\n\nStability: 1.0 - Early development.",
+      "properties": {}
+    },
+    "CreateSearchParams": {
+      "type": "object",
+      "description": "Starts a search on the host.\n\nThe client chooses the channel URI and then subscribes to it to receive the\nsearch's {@link SearchState} and its results. The client replaces the query\nby dispatching {@link SearchQueryChangedAction | `search/queryChanged`},\nand cancels the search by unsubscribing.\n\nThe client MUST NOT send this command unless `InitializeResult.search` is\npresent, and MUST NOT include a target whose kind is not listed in\n{@link SearchCapability.targets}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The client-chosen URI for the new channel, for example `ahp-search:/<uuid>`."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "query": {
+          "$ref": "#/$defs/SearchQuery",
+          "description": "What to search for and where."
+        }
+      },
+      "required": [
+        "channel",
+        "query"
+      ]
+    },
+    "CreateSearchResult": {
+      "type": "object",
+      "description": "Result of the `createSearch` command.\n\nAn empty object on success.\n\nStability: 1.0 - Early development.",
       "properties": {}
     },
     "ReconnectResult": {
@@ -2616,6 +2691,9 @@
             },
             {
               "$ref": "#/$defs/AutomationRunState"
+            },
+            {
+              "$ref": "#/$defs/SearchState"
             },
             {
               "$ref": "#/$defs/EmptyState"
@@ -4888,11 +4966,11 @@
           "items": {
             "$ref": "#/$defs/Turn"
           },
-          "description": "Completed turns"
+          "description": "Completed turns, oldest first.\n\nEntries may be {@link DeferredTurn | deferred} only for clients that\ndeclared {@link ClientCapabilities.deferredTurns | `deferredTurns`}."
         },
         "turnsNextCursor": {
           "type": "string",
-          "description": "Cursor for loading older completed turns into this chat state.\n\nPresence means `turns` is a tail window and more historical turns are\navailable. Pass this opaque cursor to `fetchTurns`; the host MUST insert\nthe loaded turns into state and update or clear this cursor before\nresponding. Absence means the state contains all retained turns."
+          "description": "Cursor for loading older completed turns into this chat state.\n\nPresence means `turns` is a tail window and more historical turns are\navailable. Pass this opaque cursor to `fetchTurns`; the host MUST insert\nthe loaded turns into state and update or clear this cursor before\nresponding. Absence means the state contains all retained turns.\n\nHosts SHOULD NOT set this for clients that declared\n{@link ClientCapabilities.deferredTurns | `deferredTurns`}. Instead, they\nSHOULD send every retained turn and defer the ones the client doesn't need\nyet.\n\nStability: 3 - Legacy."
         },
         "activeTurn": {
           "$ref": "#/$defs/ActiveTurn",
@@ -5592,9 +5670,9 @@
         "state"
       ]
     },
-    "Turn": {
+    "TurnBase": {
       "type": "object",
-      "description": "A completed request/response cycle.",
+      "description": "Fields shared by {@link MaterializedTurn} and {@link DeferredTurn}.",
       "properties": {
         "id": {
           "type": "string",
@@ -5612,13 +5690,6 @@
           "$ref": "#/$defs/Message",
           "description": "The message that initiated the turn"
         },
-        "responseParts": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ResponsePart"
-          },
-          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nConsumers should derive display text by concatenating markdown parts,\nand find tool calls by filtering for `ToolCall` parts."
-        },
         "usage": {
           "$ref": "#/$defs/UsageInfo",
           "description": "Token usage info"
@@ -5631,8 +5702,96 @@
       "required": [
         "id",
         "message",
-        "responseParts",
         "state"
+      ]
+    },
+    "MaterializedTurn": {
+      "type": "object",
+      "description": "A completed request/response cycle, including its full response.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when this turn started."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Turn duration in milliseconds."
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "The message that initiated the turn"
+        },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo",
+          "description": "Token usage info"
+        },
+        "state": {
+          "$ref": "#/$defs/TurnState",
+          "description": "How the turn ended"
+        },
+        "isDeferred": {
+          "type": "boolean",
+          "const": false,
+          "description": "Absent or `false`: this turn carries its full response."
+        },
+        "responseParts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResponsePart"
+          },
+          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nConsumers should derive display text by concatenating markdown parts,\nand find tool calls by filtering for `ToolCall` parts."
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "state",
+        "responseParts"
+      ]
+    },
+    "DeferredTurn": {
+      "type": "object",
+      "description": "A completed turn whose response the host has not sent yet.\n\nThe turn keeps its position in {@link ChatState.turns}, so clients can show\nthe initiating message and outcome without downloading the response.\nRequest the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};\nthe host replaces the entry in place with a {@link MaterializedTurn} via\n{@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.\n\nHosts MUST NOT send a `DeferredTurn` to a client that did not declare\n{@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,\naction, or command result. Those clients receive the corresponding\n{@link MaterializedTurn}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when this turn started."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Turn duration in milliseconds."
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "The message that initiated the turn"
+        },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo",
+          "description": "Token usage info"
+        },
+        "state": {
+          "$ref": "#/$defs/TurnState",
+          "description": "How the turn ended"
+        },
+        "isDeferred": {
+          "type": "boolean",
+          "const": true,
+          "description": "Marks a turn without `responseParts`."
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "state",
+        "isDeferred"
       ]
     },
     "ActiveTurn": {
@@ -8424,6 +8583,477 @@
       "description": "Present when the host supports `createTcpConnection`.\n\nA client creates a connection with `createTcpConnection`, then subscribes to\nits channel with windowed delivery. A TCP channel's state is an\n{@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`\nnotifications. TCP connections do not survive the loss of the AHP connection.\n\nStability: 1.0 - Early development.",
       "properties": {}
     },
+    "SearchCapability": {
+      "type": "object",
+      "description": "Present when the host supports `createSearch`.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchTargetKind"
+          },
+          "description": "The target kinds the host can search. A client MUST NOT send a\n{@link SearchTarget} whose kind is not listed here."
+        }
+      },
+      "required": [
+        "targets"
+      ]
+    },
+    "SearchQuery": {
+      "type": "object",
+      "description": "What a search looks for and where.\n\nThe client sends a query in `createSearch` and replaces it with\n{@link SearchQueryChangedAction | `search/queryChanged`}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The text to search for. Its meaning depends on the target: see\n{@link SearchTarget}. An empty `text` matches nothing; the host completes\nthe search with no results."
+        },
+        "matchCase": {
+          "type": "boolean",
+          "description": "Match case. Defaults to `false`."
+        },
+        "wholeWord": {
+          "type": "boolean",
+          "description": "Match only whole words. Defaults to `false`."
+        },
+        "isRegex": {
+          "type": "boolean",
+          "description": "Treat `text` as a regular expression. Defaults to `false`."
+        },
+        "fuzzy": {
+          "type": "boolean",
+          "description": "A hint that precise matching isn't expected, for example because the\nsearch powers a quick-find picker. The host MAY then match loosely, rank\nresults by how well they match, and ignore {@link isRegex} and\n{@link wholeWord}. Defaults to `false`."
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchTarget"
+          },
+          "description": "Where to search. MUST contain at least one target."
+        },
+        "maxResults": {
+          "type": "integer",
+          "description": "The maximum number of results. The host MAY apply a lower limit, and\ncompletes the search with {@link SearchCompletionReason.LimitReached}\nwhen it reaches the limit that applies.",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "text",
+        "targets"
+      ]
+    },
+    "FileSearchTargetBase": {
+      "type": "object",
+      "description": "Shared fields for file search targets.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "roots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "The folders to search. MUST contain at least one URI."
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. When present, only matching files are searched."
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. Matching files are not searched."
+        },
+        "includeIgnored": {
+          "type": "boolean",
+          "description": "Also search files that the host's ignore rules, such as `.gitignore`\nfiles, would otherwise skip. Defaults to `false`. `excludes` still apply."
+        }
+      },
+      "required": [
+        "roots"
+      ]
+    },
+    "FileNamesSearchTarget": {
+      "type": "object",
+      "description": "Searches file paths under {@link FileSearchTargetBase.roots}.\n\nThe host decides how to match {@link SearchQuery.text} against file paths,\nfor example with fuzzy matching, and which query options apply. Results\nare {@link FileNameSearchResult}s.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "roots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "The folders to search. MUST contain at least one URI."
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. When present, only matching files are searched."
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. Matching files are not searched."
+        },
+        "includeIgnored": {
+          "type": "boolean",
+          "description": "Also search files that the host's ignore rules, such as `.gitignore`\nfiles, would otherwise skip. Defaults to `false`. `excludes` still apply."
+        },
+        "kind": {
+          "const": "fileNames"
+        }
+      },
+      "required": [
+        "roots",
+        "kind"
+      ]
+    },
+    "FileTextSearchTarget": {
+      "type": "object",
+      "description": "Searches the text content of files under {@link FileSearchTargetBase.roots}.\nResults are {@link FileTextSearchResult}s.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "roots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "The folders to search. MUST contain at least one URI."
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. When present, only matching files are searched."
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns relative to a root. Matching files are not searched."
+        },
+        "includeIgnored": {
+          "type": "boolean",
+          "description": "Also search files that the host's ignore rules, such as `.gitignore`\nfiles, would otherwise skip. Defaults to `false`. `excludes` still apply."
+        },
+        "kind": {
+          "const": "fileText"
+        }
+      },
+      "required": [
+        "roots",
+        "kind"
+      ]
+    },
+    "SessionsSearchTarget": {
+      "type": "object",
+      "description": "Searches the host's sessions, the same sessions that `listSessions`\nreturns. The host decides which session content it matches, for example\ntitles or requests. Results are {@link SessionSearchResult}s.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "kind": {
+          "const": "sessions"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "ChatMessagesSearchTarget": {
+      "type": "object",
+      "description": "Searches the visible text of chat requests and responses, including the\nresponses of deferred turns. Results are\n{@link ChatMessageSearchResult}s.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "kind": {
+          "const": "chatMessages"
+        },
+        "chats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "The chats to search. MUST contain at least one chat URI."
+        }
+      },
+      "required": [
+        "kind",
+        "chats"
+      ]
+    },
+    "SearchHighlight": {
+      "type": "object",
+      "description": "A matched span within {@link SearchMatch.text}: the half-open interval\n`[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code\nunits, as in {@link CompletionItem.rangeStart}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "rangeStart": {
+          "type": "integer",
+          "description": "The start of the span.",
+          "minimum": 0
+        },
+        "rangeEnd": {
+          "type": "integer",
+          "description": "The end of the span, exclusive. MUST be greater than {@link rangeStart}\nand at most the length of {@link SearchMatch.text}.",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "rangeStart",
+        "rangeEnd"
+      ]
+    },
+    "SearchMatch": {
+      "type": "object",
+      "description": "The matched text of a result, with the matched spans highlighted. The host\nchooses how much text around the match to include.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The text to display."
+        },
+        "highlights": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchHighlight"
+          },
+          "description": "The matched spans, in order. Spans MUST NOT overlap."
+        }
+      },
+      "required": [
+        "text",
+        "highlights"
+      ]
+    },
+    "SearchResultBase": {
+      "type": "object",
+      "description": "Shared fields for search results. Each result is one match.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The resource that contains the match."
+        },
+        "match": {
+          "$ref": "#/$defs/SearchMatch",
+          "description": "The text to display, with the matched spans highlighted."
+        },
+        "score": {
+          "type": "number",
+          "description": "How well the result matches; higher is better. Scores have no fixed\nrange, and are comparable across all results of one search. Clients\nSHOULD show results in descending score order. A host that does not rank\nresults omits the score."
+        }
+      },
+      "required": [
+        "resource",
+        "match"
+      ]
+    },
+    "FileNameSearchResult": {
+      "type": "object",
+      "description": "A file whose path matches. {@link SearchResultBase.resource} is the file;\nthe match text is its path, usually relative to the root that contains it.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The resource that contains the match."
+        },
+        "match": {
+          "$ref": "#/$defs/SearchMatch",
+          "description": "The text to display, with the matched spans highlighted."
+        },
+        "score": {
+          "type": "number",
+          "description": "How well the result matches; higher is better. Scores have no fixed\nrange, and are comparable across all results of one search. Clients\nSHOULD show results in descending score order. A host that does not rank\nresults omits the score."
+        },
+        "kind": {
+          "const": "fileName"
+        }
+      },
+      "required": [
+        "resource",
+        "match",
+        "kind"
+      ]
+    },
+    "FileTextSearchResult": {
+      "type": "object",
+      "description": "A match in the text of a file. {@link SearchResultBase.resource} is the\nfile; the match text is the text around the match, usually its line.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The resource that contains the match."
+        },
+        "match": {
+          "$ref": "#/$defs/SearchMatch",
+          "description": "The text to display, with the matched spans highlighted."
+        },
+        "score": {
+          "type": "number",
+          "description": "How well the result matches; higher is better. Scores have no fixed\nrange, and are comparable across all results of one search. Clients\nSHOULD show results in descending score order. A host that does not rank\nresults omits the score."
+        },
+        "kind": {
+          "const": "fileText"
+        },
+        "range": {
+          "$ref": "#/$defs/TextRange",
+          "description": "The location of the match in the file."
+        }
+      },
+      "required": [
+        "resource",
+        "match",
+        "kind",
+        "range"
+      ]
+    },
+    "SessionSearchResult": {
+      "type": "object",
+      "description": "A session whose content matches. {@link SearchResultBase.resource} is the\nsession URI.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The resource that contains the match."
+        },
+        "match": {
+          "$ref": "#/$defs/SearchMatch",
+          "description": "The text to display, with the matched spans highlighted."
+        },
+        "score": {
+          "type": "number",
+          "description": "How well the result matches; higher is better. Scores have no fixed\nrange, and are comparable across all results of one search. Clients\nSHOULD show results in descending score order. A host that does not rank\nresults omits the score."
+        },
+        "kind": {
+          "const": "session"
+        },
+        "title": {
+          "type": "string",
+          "description": "The session's title."
+        }
+      },
+      "required": [
+        "resource",
+        "match",
+        "kind",
+        "title"
+      ]
+    },
+    "ChatMessageSearchResult": {
+      "type": "object",
+      "description": "A match in a chat request or response. {@link SearchResultBase.resource}\nis the chat URI.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The resource that contains the match."
+        },
+        "match": {
+          "$ref": "#/$defs/SearchMatch",
+          "description": "The text to display, with the matched spans highlighted."
+        },
+        "score": {
+          "type": "number",
+          "description": "How well the result matches; higher is better. Scores have no fixed\nrange, and are comparable across all results of one search. Clients\nSHOULD show results in descending score order. A host that does not rank\nresults omits the score."
+        },
+        "kind": {
+          "const": "chatMessage"
+        },
+        "title": {
+          "type": "string",
+          "description": "The chat's title."
+        },
+        "turnId": {
+          "type": "string",
+          "description": "The ID of the turn that contains the match."
+        }
+      },
+      "required": [
+        "resource",
+        "match",
+        "kind",
+        "title",
+        "turnId"
+      ]
+    },
+    "SearchPendingLifecycleState": {
+      "type": "object",
+      "description": "The query changed and the host has not replaced the results yet. Clients\nMAY show the previous query's results differently, for example dimmed.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "status": {
+          "const": "pending"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "SearchRunningLifecycleState": {
+      "type": "object",
+      "description": "The host is searching and may add more results.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "status": {
+          "const": "running"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "SearchCompletedLifecycleState": {
+      "type": "object",
+      "description": "The host found every result for the query. A host that watches the\nsearched files, sessions, or chats MAY still change the results later.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "status": {
+          "const": "completed"
+        },
+        "reason": {
+          "$ref": "#/$defs/SearchCompletionReason",
+          "description": "Why the search completed."
+        }
+      },
+      "required": [
+        "status",
+        "reason"
+      ]
+    },
+    "SearchFailedLifecycleState": {
+      "type": "object",
+      "description": "The search failed. Results found before the failure remain in\n{@link SearchState.results}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "status": {
+          "const": "failed"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Why the search failed, for example an invalid regular expression."
+        }
+      },
+      "required": [
+        "status",
+        "error"
+      ]
+    },
+    "SearchState": {
+      "type": "object",
+      "description": "Full state for one search, returned when a client subscribes to its\n`ahp-search:` URI.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "query": {
+          "$ref": "#/$defs/SearchQuery",
+          "description": "The current query."
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchResult"
+          },
+          "description": "Results in the order the host found them. Sort by\n{@link SearchResultBase.score} to rank them. While {@link lifecycle} is\n{@link SearchLifecycleStatus.Pending | pending}, these are results for the\nprevious query."
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/SearchLifecycleState",
+          "description": "Where the search is in its lifecycle."
+        }
+      },
+      "required": [
+        "query",
+        "results",
+        "lifecycle"
+      ]
+    },
     "ActionOrigin": {
       "type": "object",
       "description": "Identifies the client that originally dispatched an action.",
@@ -9495,6 +10125,8 @@
           "const": "chat/toolCallConfirmed"
         },
         "approved": {
+          "type": "boolean",
+          "const": true,
           "description": "The tool call was approved"
         },
         "confirmed": {
@@ -9539,6 +10171,8 @@
           "const": "chat/toolCallConfirmed"
         },
         "approved": {
+          "type": "boolean",
+          "const": false,
           "description": "The tool call was denied"
         },
         "reason": {
@@ -9823,7 +10457,7 @@
     },
     "ChatTurnResumeAction": {
       "type": "object",
-      "description": "Resumes the latest errored turn without adding another message.\n\nThe turn MUST be the latest turn, its state MUST be `error`, and its final\nresponse part MUST be a resumable error. The reducer reopens the same turn\nwith its existing message, response parts, and usage intact. The host then\nresumes the provider's execution for that turn.",
+      "description": "Resumes the latest errored turn without adding another message.\n\nThe turn MUST be the latest turn, its state MUST be `error`, and its final\nresponse part MUST be a resumable error. The reducer reopens the same turn\nwith its existing message, response parts, and usage intact. The host then\nresumes the provider's execution for that turn. A deferred turn cannot be\nresumed until it is materialized.",
       "properties": {
         "type": {
           "const": "chat/turnResume"
@@ -10063,7 +10697,7 @@
     },
     "ChatTurnsLoadedAction": {
       "type": "object",
-      "description": "Loads older completed turns into this chat's state.\n\nHosts dispatch this before responding to `fetchTurns`, and before applying\nany operation that references a turn older than the currently loaded window.\n`turns` is ordered oldest-first and is prepended to the current `turns`\nwindow. `turnsNextCursor` replaces the state's cursor; omit it when all\nretained turns are now loaded.",
+      "description": "Loads older completed turns into this chat's state.\n\nHosts dispatch this before responding to `fetchTurns`, and before applying\nany operation that references a turn older than the currently loaded window.\n`turns` is ordered oldest-first and is prepended to the current `turns`\nwindow. `turnsNextCursor` replaces the state's cursor; omit it when all\nretained turns are now loaded. Entries may be {@link DeferredTurn | deferred}\nonly for clients that declared\n{@link ClientCapabilities.deferredTurns | `deferredTurns`}.\n\nThis belongs to the legacy tail-window paging scheme, which deferred turns\nreplace. See {@link FetchTurnsParams | `fetchTurns`}.\n\nStability: 3 - Legacy.",
       "properties": {
         "type": {
           "const": "chat/turnsLoaded"
@@ -10078,6 +10712,26 @@
         "turnsNextCursor": {
           "type": "string",
           "description": "Opaque cursor for loading the next older page, if one remains."
+        }
+      },
+      "required": [
+        "type",
+        "turns"
+      ]
+    },
+    "ChatTurnsMaterializedAction": {
+      "type": "object",
+      "description": "Replaces {@link DeferredTurn | deferred turns} in place with their full\n{@link MaterializedTurn | turns}.\n\nHosts dispatch this before responding to `fetchDeferredTurns`, and before\napplying any operation that needs a deferred turn's response, such as\n`chat/turnResume`. Each entry replaces the deferred turn with the same `id`.\nEntries whose `id` does not name a deferred turn in state are ignored.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "chat/turnsMaterialized"
+        },
+        "turns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MaterializedTurn"
+          },
+          "description": "Full turns to replace their deferred entries."
         }
       },
       "required": [
@@ -11076,6 +11730,64 @@
         "type"
       ]
     },
+    "SearchQueryChangedAction": {
+      "type": "object",
+      "description": "Replaces the search's query and restarts the search.\n\nKeeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to\n{@link SearchLifecycleStatus.Pending | pending}. The old results stay\nvisible until the host replaces them, so the client does not flash an empty\nlist.\n\nAfter the host applies this action, it stops the previous search and drops\nany of its results that it has not dispatched yet. The host MUST then\ndispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with\n`replace: true` before any other search action. The replacement can keep\nold results that still match the new query, and can be empty. If the new\nquery is not valid,\nfor example because it contains an invalid regular expression, the host\nreplaces the results with an empty list and then changes the lifecycle to\n{@link SearchLifecycleStatus.Failed | failed}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "search/queryChanged"
+        },
+        "query": {
+          "$ref": "#/$defs/SearchQuery",
+          "description": "The new query."
+        }
+      },
+      "required": [
+        "type",
+        "query"
+      ]
+    },
+    "SearchResultsChangedAction": {
+      "type": "object",
+      "description": "Adds results to {@link SearchState.results}, or replaces them.\n\nBy default, the reducer appends `results`. Set `replace` to `true` to\nreplace every result instead; if {@link SearchState.lifecycle} is\n{@link SearchLifecycleStatus.Pending | pending}, a replacement also changes\nit to {@link SearchLifecycleStatus.Running | running}.\n\nThe host MUST dispatch a replacement first after a\n{@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also\nreplace the results at other times, for example to re-rank them, to remove\nduplicates, or to update a completed search when a watched file changes.\nThe host MUST NOT dispatch an empty `results` list unless `replace` is\n`true`.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "search/resultsChanged"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchResult"
+          },
+          "description": "The results to append, in the order the host found them, or the replacement results."
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "When `true`, replaces every result instead of appending."
+        }
+      },
+      "required": [
+        "type",
+        "results"
+      ]
+    },
+    "SearchLifecycleChangedAction": {
+      "type": "object",
+      "description": "Replaces {@link SearchState.lifecycle}.\n\nThe host dispatches this to complete or fail a search, or to move a\ncompleted search back to {@link SearchLifecycleStatus.Running | running} when it\nsearches again, for example after a watched file changes. The host MUST NOT\nchange the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only\n{@link SearchQueryChangedAction | `search/queryChanged`} does that.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "search/lifecycleChanged"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/SearchLifecycleState",
+          "description": "The new lifecycle."
+        }
+      },
+      "required": [
+        "type",
+        "lifecycle"
+      ]
+    },
     "URI": {
       "type": "string",
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
@@ -11322,6 +12034,9 @@
           "$ref": "#/$defs/ChatTurnsLoadedAction"
         },
         {
+          "$ref": "#/$defs/ChatTurnsMaterializedAction"
+        },
+        {
           "$ref": "#/$defs/ChangesetStatusChangedAction"
         },
         {
@@ -11395,6 +12110,15 @@
         },
         {
           "$ref": "#/$defs/ResourceWatchChangedAction"
+        },
+        {
+          "$ref": "#/$defs/SearchQueryChangedAction"
+        },
+        {
+          "$ref": "#/$defs/SearchResultsChangedAction"
+        },
+        {
+          "$ref": "#/$defs/SearchLifecycleChangedAction"
         },
         {
           "$ref": "#/$defs/AutomationCreateRequestedAction"
@@ -11882,6 +12606,17 @@
       ],
       "description": "Work running in the background for a chat, such as a shell or a subagent.\nClients that don't recognize a `kind` should keep the entry and may render it\nfrom the common fields."
     },
+    "Turn": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MaterializedTurn"
+        },
+        {
+          "$ref": "#/$defs/DeferredTurn"
+        }
+      ],
+      "description": "A completed request/response cycle: either a {@link MaterializedTurn} with\nits full response or a {@link DeferredTurn}, discriminated by `isDeferred`."
+    },
     "PendingMessageKind": {
       "enum": [
         "steering",
@@ -11940,6 +12675,15 @@
         }
       ]
     },
+    "TurnState": {
+      "enum": [
+        "complete",
+        "cancelled",
+        "error"
+      ],
+      "type": "string",
+      "description": "How a turn ended."
+    },
     "ResponsePart": {
       "oneOf": [
         {
@@ -11964,15 +12708,6 @@
           "$ref": "#/$defs/ErrorResponsePart"
         }
       ]
-    },
-    "TurnState": {
-      "enum": [
-        "complete",
-        "cancelled",
-        "error"
-      ],
-      "type": "string",
-      "description": "How a turn ended."
     },
     "MessageKind": {
       "enum": [
@@ -12259,6 +12994,75 @@
         }
       ],
       "description": "Discriminated lifecycle of an automation run."
+    },
+    "SearchTargetKind": {
+      "enum": [
+        "fileNames",
+        "fileText",
+        "sessions",
+        "chatMessages"
+      ],
+      "type": "string",
+      "description": "Discriminant for {@link SearchTarget}."
+    },
+    "SearchTarget": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/FileNamesSearchTarget"
+        },
+        {
+          "$ref": "#/$defs/FileTextSearchTarget"
+        },
+        {
+          "$ref": "#/$defs/SessionsSearchTarget"
+        },
+        {
+          "$ref": "#/$defs/ChatMessagesSearchTarget"
+        }
+      ],
+      "description": "One place to search."
+    },
+    "SearchCompletionReason": {
+      "enum": [
+        "exhausted",
+        "limitReached"
+      ],
+      "type": "string",
+      "description": "Why a search completed."
+    },
+    "SearchResult": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/FileNameSearchResult"
+        },
+        {
+          "$ref": "#/$defs/FileTextSearchResult"
+        },
+        {
+          "$ref": "#/$defs/SessionSearchResult"
+        },
+        {
+          "$ref": "#/$defs/ChatMessageSearchResult"
+        }
+      ],
+      "description": "One search match."
+    },
+    "SearchLifecycleState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/SearchPendingLifecycleState"
+        },
+        {
+          "$ref": "#/$defs/SearchRunningLifecycleState"
+        },
+        {
+          "$ref": "#/$defs/SearchCompletedLifecycleState"
+        },
+        {
+          "$ref": "#/$defs/SearchFailedLifecycleState"
+        }
+      ],
+      "description": "Discriminated lifecycle of a search."
     },
     "ChatToolCallConfirmedAction": {
       "oneOf": [

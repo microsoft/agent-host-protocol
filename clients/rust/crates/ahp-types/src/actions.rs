@@ -19,9 +19,10 @@ use crate::state::{
     ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
-    ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
-    ModelSelection, ModelSource, ModelSourceState, PendingMessageKind, ProtectedResourceMetadata,
-    ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection,
+    ErrorResponsePart, FileEditCollection, MaterializedTurn, McpAuthRequirement, McpServerState,
+    Message, ModelSelection, ModelSource, ModelSourceState, PendingMessageKind,
+    ProtectedResourceMetadata, ResponsePart, SearchLifecycleState, SearchQuery, SearchResult,
+    SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection,
     TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
     ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput,
     ToolResultContent, Turn, UsageInfo,
@@ -98,6 +99,7 @@ pub enum ActionType {
     SessionMcpServerBackgroundRequested,
     ChatTruncated,
     ChatTurnsLoaded,
+    ChatTurnsMaterialized,
     SessionIsReadChanged,
     SessionIsArchivedChanged,
     SessionActivityChanged,
@@ -134,6 +136,9 @@ pub enum ActionType {
     TerminalCommandExecuted,
     TerminalCommandFinished,
     ResourceWatchChanged,
+    SearchQueryChanged,
+    SearchResultsChanged,
+    SearchLifecycleChanged,
     AutomationCreateRequested,
     AutomationUpdateRequested,
     AutomationSet,
@@ -263,6 +268,7 @@ impl serde::Serialize for ActionType {
             }
             Self::ChatTruncated => serializer.serialize_str("chat/truncated"),
             Self::ChatTurnsLoaded => serializer.serialize_str("chat/turnsLoaded"),
+            Self::ChatTurnsMaterialized => serializer.serialize_str("chat/turnsMaterialized"),
             Self::SessionIsReadChanged => serializer.serialize_str("session/isReadChanged"),
             Self::SessionIsArchivedChanged => serializer.serialize_str("session/isArchivedChanged"),
             Self::SessionActivityChanged => serializer.serialize_str("session/activityChanged"),
@@ -309,6 +315,9 @@ impl serde::Serialize for ActionType {
             Self::TerminalCommandExecuted => serializer.serialize_str("terminal/commandExecuted"),
             Self::TerminalCommandFinished => serializer.serialize_str("terminal/commandFinished"),
             Self::ResourceWatchChanged => serializer.serialize_str("resourceWatch/changed"),
+            Self::SearchQueryChanged => serializer.serialize_str("search/queryChanged"),
+            Self::SearchResultsChanged => serializer.serialize_str("search/resultsChanged"),
+            Self::SearchLifecycleChanged => serializer.serialize_str("search/lifecycleChanged"),
             Self::AutomationCreateRequested => {
                 serializer.serialize_str("automation/createRequested")
             }
@@ -408,6 +417,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "session/mcpServerBackgroundRequested" => Self::SessionMcpServerBackgroundRequested,
             "chat/truncated" => Self::ChatTruncated,
             "chat/turnsLoaded" => Self::ChatTurnsLoaded,
+            "chat/turnsMaterialized" => Self::ChatTurnsMaterialized,
             "session/isReadChanged" => Self::SessionIsReadChanged,
             "session/isArchivedChanged" => Self::SessionIsArchivedChanged,
             "session/activityChanged" => Self::SessionActivityChanged,
@@ -444,6 +454,9 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "terminal/commandExecuted" => Self::TerminalCommandExecuted,
             "terminal/commandFinished" => Self::TerminalCommandFinished,
             "resourceWatch/changed" => Self::ResourceWatchChanged,
+            "search/queryChanged" => Self::SearchQueryChanged,
+            "search/resultsChanged" => Self::SearchResultsChanged,
+            "search/lifecycleChanged" => Self::SearchLifecycleChanged,
             "automation/createRequested" => Self::AutomationCreateRequested,
             "automation/updateRequested" => Self::AutomationUpdateRequested,
             "automation/set" => Self::AutomationSet,
@@ -1149,7 +1162,8 @@ impl Serialize for ChatErrorAction {
 /// The turn MUST be the latest turn, its state MUST be `error`, and its final
 /// response part MUST be a resumable error. The reducer reopens the same turn
 /// with its existing message, response parts, and usage intact. The host then
-/// resumes the provider's execution for that turn.
+/// resumes the provider's execution for that turn. A deferred turn cannot be
+/// resumed until it is materialized.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatTurnResumeAction {
@@ -1899,7 +1913,14 @@ pub struct ChatTruncatedAction {
 /// any operation that references a turn older than the currently loaded window.
 /// `turns` is ordered oldest-first and is prepended to the current `turns`
 /// window. `turnsNextCursor` replaces the state's cursor; omit it when all
-/// retained turns are now loaded.
+/// retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+/// only for clients that declared
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// This belongs to the legacy tail-window paging scheme, which deferred turns
+/// replace. See {@link FetchTurnsParams | `fetchTurns`}.
+///
+/// Stability: 3 - Legacy.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatTurnsLoadedAction {
@@ -1908,6 +1929,22 @@ pub struct ChatTurnsLoadedAction {
     /// Opaque cursor for loading the next older page, if one remains.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turns_next_cursor: Option<String>,
+}
+
+/// Replaces {@link DeferredTurn | deferred turns} in place with their full
+/// {@link MaterializedTurn | turns}.
+///
+/// Hosts dispatch this before responding to `fetchDeferredTurns`, and before
+/// applying any operation that needs a deferred turn's response, such as
+/// `chat/turnResume`. Each entry replaces the deferred turn with the same `id`.
+/// Entries whose `id` does not name a deferred turn in state are ignored.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatTurnsMaterializedAction {
+    /// Full turns to replace their deferred entries.
+    pub turns: Vec<MaterializedTurn>,
 }
 
 /// Client changed a mutable config value mid-session.
@@ -2329,6 +2366,72 @@ pub struct ResourceWatchChangedAction {
     pub changes: AnyValue,
 }
 
+/// Replaces the search's query and restarts the search.
+///
+/// Keeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to
+/// {@link SearchLifecycleStatus.Pending | pending}. The old results stay
+/// visible until the host replaces them, so the client does not flash an empty
+/// list.
+///
+/// After the host applies this action, it stops the previous search and drops
+/// any of its results that it has not dispatched yet. The host MUST then
+/// dispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with
+/// `replace: true` before any other search action. The replacement can keep
+/// old results that still match the new query, and can be empty. If the new
+/// query is not valid,
+/// for example because it contains an invalid regular expression, the host
+/// replaces the results with an empty list and then changes the lifecycle to
+/// {@link SearchLifecycleStatus.Failed | failed}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchQueryChangedAction {
+    /// The new query.
+    pub query: SearchQuery,
+}
+
+/// Adds results to {@link SearchState.results}, or replaces them.
+///
+/// By default, the reducer appends `results`. Set `replace` to `true` to
+/// replace every result instead; if {@link SearchState.lifecycle} is
+/// {@link SearchLifecycleStatus.Pending | pending}, a replacement also changes
+/// it to {@link SearchLifecycleStatus.Running | running}.
+///
+/// The host MUST dispatch a replacement first after a
+/// {@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also
+/// replace the results at other times, for example to re-rank them, to remove
+/// duplicates, or to update a completed search when a watched file changes.
+/// The host MUST NOT dispatch an empty `results` list unless `replace` is
+/// `true`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResultsChangedAction {
+    /// The results to append, in the order the host found them, or the replacement results.
+    pub results: Vec<SearchResult>,
+    /// When `true`, replaces every result instead of appending.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replace: Option<bool>,
+}
+
+/// Replaces {@link SearchState.lifecycle}.
+///
+/// The host dispatches this to complete or fail a search, or to move a
+/// completed search back to {@link SearchLifecycleStatus.Running | running} when it
+/// searches again, for example after a watched file changes. The host MUST NOT
+/// change the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only
+/// {@link SearchQueryChangedAction | `search/queryChanged`} does that.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchLifecycleChangedAction {
+    /// The new lifecycle.
+    pub lifecycle: SearchLifecycleState,
+}
+
 /// Ask the host to create a durable automation at a client-chosen resource.
 ///
 /// Clients may dispatch this action only when the host advertises its `create`
@@ -2663,6 +2766,8 @@ pub enum StateAction {
     ChatTruncated(ChatTruncatedAction),
     #[serde(rename = "chat/turnsLoaded")]
     ChatTurnsLoaded(ChatTurnsLoadedAction),
+    #[serde(rename = "chat/turnsMaterialized")]
+    ChatTurnsMaterialized(ChatTurnsMaterializedAction),
     #[serde(rename = "session/configChanged")]
     SessionConfigChanged(SessionConfigChangedAction),
     #[serde(rename = "session/metaChanged")]
@@ -2719,6 +2824,12 @@ pub enum StateAction {
     TerminalCommandFinished(TerminalCommandFinishedAction),
     #[serde(rename = "resourceWatch/changed")]
     ResourceWatchChanged(ResourceWatchChangedAction),
+    #[serde(rename = "search/queryChanged")]
+    SearchQueryChanged(SearchQueryChangedAction),
+    #[serde(rename = "search/resultsChanged")]
+    SearchResultsChanged(SearchResultsChangedAction),
+    #[serde(rename = "search/lifecycleChanged")]
+    SearchLifecycleChanged(SearchLifecycleChangedAction),
     #[serde(rename = "automation/createRequested")]
     AutomationCreateRequested(Box<AutomationCreateRequestedAction>),
     #[serde(rename = "automation/updateRequested")]

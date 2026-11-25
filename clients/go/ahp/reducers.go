@@ -170,7 +170,7 @@ func hasOpenInputRequest(state *ahptypes.ChatState) bool {
 	return false
 }
 
-func hasResumableError(turn *ahptypes.Turn) bool {
+func hasResumableError(turn *ahptypes.MaterializedTurn) bool {
 	if len(turn.ResponseParts) == 0 {
 		return false
 	}
@@ -247,7 +247,7 @@ func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState
 		duration = 0
 	}
 	startedAt := active.StartedAt
-	turn := ahptypes.Turn{
+	turn := ahptypes.MaterializedTurn{
 		Id:            active.Id,
 		StartedAt:     &startedAt,
 		Duration:      &duration,
@@ -257,7 +257,7 @@ func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState
 		State:         turnState,
 	}
 
-	state.Turns = append(state.Turns, turn)
+	state.Turns = append(state.Turns, ahptypes.Turn{Value: &turn})
 	state.ModifiedAt = addMillisecondsToTimestamp(active.StartedAt, duration)
 	state.Status = summaryStatus(state, terminalStatus)
 	return ReduceOutcomeApplied
@@ -642,8 +642,8 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 			return ReduceOutcomeNoOp
 		}
 		turnIndex := len(state.Turns) - 1
-		turn := state.Turns[turnIndex]
-		if turn.Id != a.TurnId || turn.State != ahptypes.TurnStateError || !hasResumableError(&turn) {
+		turn, ok := state.Turns[turnIndex].Materialized()
+		if !ok || turn.Id != a.TurnId || turn.State != ahptypes.TurnStateError || !hasResumableError(turn) {
 			return ReduceOutcomeNoOp
 		}
 
@@ -817,17 +817,19 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatTurnsLoadedAction:
 		existingIds := make(map[string]struct{}, len(state.Turns))
 		for _, turn := range state.Turns {
-			existingIds[turn.Id] = struct{}{}
+			existingIds[turn.TurnId()] = struct{}{}
 		}
 		olderTurns := make([]ahptypes.Turn, 0, len(a.Turns)+len(state.Turns))
 		for _, turn := range a.Turns {
-			if _, ok := existingIds[turn.Id]; !ok {
+			if _, ok := existingIds[turn.TurnId()]; !ok {
 				olderTurns = append(olderTurns, turn)
 			}
 		}
 		state.Turns = append(olderTurns, state.Turns...)
 		state.TurnsNextCursor = a.TurnsNextCursor
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatTurnsMaterializedAction:
+		return applyTurnsMaterialized(state, a.Turns)
 	case *ahptypes.ChatInputRequestedAction:
 		return upsertInputRequest(state, a.Request)
 	case *ahptypes.ChatInputAnswerChangedAction:
@@ -1753,7 +1755,7 @@ func applyTruncated(state *ahptypes.ChatState, turnID *string) ReduceOutcome {
 	} else {
 		idx := -1
 		for i := range state.Turns {
-			if state.Turns[i].Id == *turnID {
+			if state.Turns[i].TurnId() == *turnID {
 				idx = i
 				break
 			}
@@ -1765,6 +1767,33 @@ func applyTruncated(state *ahptypes.ChatState, turnID *string) ReduceOutcome {
 	}
 	state.ActiveTurn = nil
 	state.Status = summaryStatus(state, nil)
+	return ReduceOutcomeApplied
+}
+
+// applyTurnsMaterialized replaces deferred turns in place with the full
+// turns carrying the same id. Ids that are unknown or already name a full
+// turn are ignored.
+func applyTurnsMaterialized(state *ahptypes.ChatState, turns []ahptypes.MaterializedTurn) ReduceOutcome {
+	materialized := make(map[string]ahptypes.MaterializedTurn, len(turns))
+	for _, turn := range turns {
+		materialized[turn.Id] = turn
+	}
+	changed := false
+	for i := range state.Turns {
+		deferred, ok := state.Turns[i].Deferred()
+		if !ok {
+			continue
+		}
+		replacement, ok := materialized[deferred.Id]
+		if !ok {
+			continue
+		}
+		state.Turns[i] = ahptypes.Turn{Value: &replacement}
+		changed = true
+	}
+	if !changed {
+		return ReduceOutcomeNoOp
+	}
 	return ReduceOutcomeApplied
 }
 
@@ -2080,6 +2109,37 @@ func ApplyActionToResourceWatch(state *ahptypes.ResourceWatchState, action ahpty
 	switch action.Value.(type) {
 	case *ahptypes.ResourceWatchChangedAction:
 		return ReduceOutcomeNoOp
+	}
+	return ReduceOutcomeOutOfScope
+}
+
+// ─── Search Reducer ────────────────────────────────────────────────────
+
+// ApplyActionToSearch applies action to the [ahptypes.SearchState] in
+// place. Returns [ReduceOutcomeOutOfScope] for actions that target a
+// different state tree.
+func ApplyActionToSearch(state *ahptypes.SearchState, action ahptypes.StateAction) ReduceOutcome {
+	switch a := action.Value.(type) {
+	case *ahptypes.SearchQueryChangedAction:
+		state.Query = a.Query
+		state.Lifecycle = ahptypes.SearchLifecycleState{Value: &ahptypes.SearchPendingLifecycleState{Status: ahptypes.SearchLifecycleStatusPending}}
+		return ReduceOutcomeApplied
+	case *ahptypes.SearchResultsChangedAction:
+		if a.Replace == nil || !*a.Replace {
+			if len(a.Results) == 0 {
+				return ReduceOutcomeNoOp
+			}
+			state.Results = append(state.Results, a.Results...)
+			return ReduceOutcomeApplied
+		}
+		state.Results = append([]ahptypes.SearchResult{}, a.Results...)
+		if _, pending := state.Lifecycle.Value.(*ahptypes.SearchPendingLifecycleState); pending {
+			state.Lifecycle = ahptypes.SearchLifecycleState{Value: &ahptypes.SearchRunningLifecycleState{Status: ahptypes.SearchLifecycleStatusRunning}}
+		}
+		return ReduceOutcomeApplied
+	case *ahptypes.SearchLifecycleChangedAction:
+		state.Lifecycle = a.Lifecycle
+		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope
 }

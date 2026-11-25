@@ -1,0 +1,5 @@
+{
+  "type": "changed",
+  "message": "`CompletionItem.rangeStart` and `rangeEnd` are now typed as integers in the JSON Schema, with minimums of 0 and 1.",
+  "targets": ["spec"]
+}

@@ -16,5 +16,6 @@ export * from './channels-terminal/actions.js';
 export * from './channels-changeset/actions.js';
 export * from './channels-annotations/actions.js';
 export * from './channels-resource-watch/actions.js';
+export * from './channels-search/actions.js';
 export * from './channels-automation/actions.js';
 export * from './channels-automation-run/actions.js';

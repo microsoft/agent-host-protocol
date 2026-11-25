@@ -95,6 +95,7 @@ value class ActionType(val rawValue: String) {
         val SESSION_MCP_SERVER_BACKGROUND_REQUESTED: ActionType = ActionType("session/mcpServerBackgroundRequested")
         val CHAT_TRUNCATED: ActionType = ActionType("chat/truncated")
         val CHAT_TURNS_LOADED: ActionType = ActionType("chat/turnsLoaded")
+        val CHAT_TURNS_MATERIALIZED: ActionType = ActionType("chat/turnsMaterialized")
         val SESSION_IS_READ_CHANGED: ActionType = ActionType("session/isReadChanged")
         val SESSION_IS_ARCHIVED_CHANGED: ActionType = ActionType("session/isArchivedChanged")
         val SESSION_ACTIVITY_CHANGED: ActionType = ActionType("session/activityChanged")
@@ -131,6 +132,9 @@ value class ActionType(val rawValue: String) {
         val TERMINAL_COMMAND_EXECUTED: ActionType = ActionType("terminal/commandExecuted")
         val TERMINAL_COMMAND_FINISHED: ActionType = ActionType("terminal/commandFinished")
         val RESOURCE_WATCH_CHANGED: ActionType = ActionType("resourceWatch/changed")
+        val SEARCH_QUERY_CHANGED: ActionType = ActionType("search/queryChanged")
+        val SEARCH_RESULTS_CHANGED: ActionType = ActionType("search/resultsChanged")
+        val SEARCH_LIFECYCLE_CHANGED: ActionType = ActionType("search/lifecycleChanged")
         val AUTOMATION_CREATE_REQUESTED: ActionType = ActionType("automation/createRequested")
         val AUTOMATION_UPDATE_REQUESTED: ActionType = ActionType("automation/updateRequested")
         val AUTOMATION_SET: ActionType = ActionType("automation/set")
@@ -1265,6 +1269,22 @@ data class ChatTruncatedAction(
     val turnId: String? = null
 )
 
+/**
+ * Loads older completed turns into this chat's state.
+ *
+ * Hosts dispatch this before responding to `fetchTurns`, and before applying
+ * any operation that references a turn older than the currently loaded window.
+ * `turns` is ordered oldest-first and is prepended to the current `turns`
+ * window. `turnsNextCursor` replaces the state's cursor; omit it when all
+ * retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+ * only for clients that declared
+ * {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+ *
+ * This belongs to the legacy tail-window paging scheme, which deferred turns
+ * replace. See {@link FetchTurnsParams | `fetchTurns`}.
+ *
+ * Stability: 3 - Legacy.
+ */
 @Serializable
 data class ChatTurnsLoadedAction(
     val type: ActionType,
@@ -1276,6 +1296,26 @@ data class ChatTurnsLoadedAction(
      * Opaque cursor for loading the next older page, if one remains.
      */
     val turnsNextCursor: String? = null
+)
+
+/**
+ * Replaces {@link DeferredTurn | deferred turns} in place with their full
+ * {@link MaterializedTurn | turns}.
+ *
+ * Hosts dispatch this before responding to `fetchDeferredTurns`, and before
+ * applying any operation that needs a deferred turn's response, such as
+ * `chat/turnResume`. Each entry replaces the deferred turn with the same `id`.
+ * Entries whose `id` does not name a deferred turn in state are ignored.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChatTurnsMaterializedAction(
+    val type: ActionType,
+    /**
+     * Full turns to replace their deferred entries.
+     */
+    val turns: List<MaterializedTurn>
 )
 
 @Serializable
@@ -1678,6 +1718,85 @@ data class ResourceWatchChangedAction(
     val changes: JsonElement
 )
 
+/**
+ * Replaces the search's query and restarts the search.
+ *
+ * Keeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to
+ * {@link SearchLifecycleStatus.Pending | pending}. The old results stay
+ * visible until the host replaces them, so the client does not flash an empty
+ * list.
+ *
+ * After the host applies this action, it stops the previous search and drops
+ * any of its results that it has not dispatched yet. The host MUST then
+ * dispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with
+ * `replace: true` before any other search action. The replacement can keep
+ * old results that still match the new query, and can be empty. If the new
+ * query is not valid,
+ * for example because it contains an invalid regular expression, the host
+ * replaces the results with an empty list and then changes the lifecycle to
+ * {@link SearchLifecycleStatus.Failed | failed}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchQueryChangedAction(
+    val type: ActionType,
+    /**
+     * The new query.
+     */
+    val query: SearchQuery
+)
+
+/**
+ * Adds results to {@link SearchState.results}, or replaces them.
+ *
+ * By default, the reducer appends `results`. Set `replace` to `true` to
+ * replace every result instead; if {@link SearchState.lifecycle} is
+ * {@link SearchLifecycleStatus.Pending | pending}, a replacement also changes
+ * it to {@link SearchLifecycleStatus.Running | running}.
+ *
+ * The host MUST dispatch a replacement first after a
+ * {@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also
+ * replace the results at other times, for example to re-rank them, to remove
+ * duplicates, or to update a completed search when a watched file changes.
+ * The host MUST NOT dispatch an empty `results` list unless `replace` is
+ * `true`.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchResultsChangedAction(
+    val type: ActionType,
+    /**
+     * The results to append, in the order the host found them, or the replacement results.
+     */
+    val results: List<SearchResult>,
+    /**
+     * When `true`, replaces every result instead of appending.
+     */
+    val replace: Boolean? = null
+)
+
+/**
+ * Replaces {@link SearchState.lifecycle}.
+ *
+ * The host dispatches this to complete or fail a search, or to move a
+ * completed search back to {@link SearchLifecycleStatus.Running | running} when it
+ * searches again, for example after a watched file changes. The host MUST NOT
+ * change the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only
+ * {@link SearchQueryChangedAction | `search/queryChanged`} does that.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchLifecycleChangedAction(
+    val type: ActionType,
+    /**
+     * The new lifecycle.
+     */
+    val lifecycle: SearchLifecycleState
+)
+
 @Serializable
 data class AutomationCreateRequestedAction(
     val type: ActionType,
@@ -1909,6 +2028,7 @@ sealed interface StateAction
 @JvmInline value class StateActionSessionMcpServerBackgroundRequested(val value: SessionMcpServerBackgroundRequestedAction) : StateAction
 @JvmInline value class StateActionChatTruncated(val value: ChatTruncatedAction) : StateAction
 @JvmInline value class StateActionChatTurnsLoaded(val value: ChatTurnsLoadedAction) : StateAction
+@JvmInline value class StateActionChatTurnsMaterialized(val value: ChatTurnsMaterializedAction) : StateAction
 @JvmInline value class StateActionSessionConfigChanged(val value: SessionConfigChangedAction) : StateAction
 @JvmInline value class StateActionSessionMetaChanged(val value: SessionMetaChangedAction) : StateAction
 @JvmInline value class StateActionChangesetStatusChanged(val value: ChangesetStatusChangedAction) : StateAction
@@ -1941,6 +2061,9 @@ sealed interface StateAction
 @JvmInline value class StateActionTerminalCommandExecuted(val value: TerminalCommandExecutedAction) : StateAction
 @JvmInline value class StateActionTerminalCommandFinished(val value: TerminalCommandFinishedAction) : StateAction
 @JvmInline value class StateActionResourceWatchChanged(val value: ResourceWatchChangedAction) : StateAction
+@JvmInline value class StateActionSearchQueryChanged(val value: SearchQueryChangedAction) : StateAction
+@JvmInline value class StateActionSearchResultsChanged(val value: SearchResultsChangedAction) : StateAction
+@JvmInline value class StateActionSearchLifecycleChanged(val value: SearchLifecycleChangedAction) : StateAction
 @JvmInline value class StateActionAutomationCreateRequested(val value: AutomationCreateRequestedAction) : StateAction
 @JvmInline value class StateActionAutomationUpdateRequested(val value: AutomationUpdateRequestedAction) : StateAction
 @JvmInline value class StateActionAutomationSet(val value: AutomationSetAction) : StateAction
@@ -2035,6 +2158,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "session/mcpServerBackgroundRequested" -> StateActionSessionMcpServerBackgroundRequested(input.json.decodeFromJsonElement(SessionMcpServerBackgroundRequestedAction.serializer(), element))
             "chat/truncated" -> StateActionChatTruncated(input.json.decodeFromJsonElement(ChatTruncatedAction.serializer(), element))
             "chat/turnsLoaded" -> StateActionChatTurnsLoaded(input.json.decodeFromJsonElement(ChatTurnsLoadedAction.serializer(), element))
+            "chat/turnsMaterialized" -> StateActionChatTurnsMaterialized(input.json.decodeFromJsonElement(ChatTurnsMaterializedAction.serializer(), element))
             "session/configChanged" -> StateActionSessionConfigChanged(input.json.decodeFromJsonElement(SessionConfigChangedAction.serializer(), element))
             "session/metaChanged" -> StateActionSessionMetaChanged(input.json.decodeFromJsonElement(SessionMetaChangedAction.serializer(), element))
             "changeset/statusChanged" -> StateActionChangesetStatusChanged(input.json.decodeFromJsonElement(ChangesetStatusChangedAction.serializer(), element))
@@ -2067,6 +2191,9 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "terminal/commandExecuted" -> StateActionTerminalCommandExecuted(input.json.decodeFromJsonElement(TerminalCommandExecutedAction.serializer(), element))
             "terminal/commandFinished" -> StateActionTerminalCommandFinished(input.json.decodeFromJsonElement(TerminalCommandFinishedAction.serializer(), element))
             "resourceWatch/changed" -> StateActionResourceWatchChanged(input.json.decodeFromJsonElement(ResourceWatchChangedAction.serializer(), element))
+            "search/queryChanged" -> StateActionSearchQueryChanged(input.json.decodeFromJsonElement(SearchQueryChangedAction.serializer(), element))
+            "search/resultsChanged" -> StateActionSearchResultsChanged(input.json.decodeFromJsonElement(SearchResultsChangedAction.serializer(), element))
+            "search/lifecycleChanged" -> StateActionSearchLifecycleChanged(input.json.decodeFromJsonElement(SearchLifecycleChangedAction.serializer(), element))
             "automation/createRequested" -> StateActionAutomationCreateRequested(input.json.decodeFromJsonElement(AutomationCreateRequestedAction.serializer(), element))
             "automation/updateRequested" -> StateActionAutomationUpdateRequested(input.json.decodeFromJsonElement(AutomationUpdateRequestedAction.serializer(), element))
             "automation/set" -> StateActionAutomationSet(input.json.decodeFromJsonElement(AutomationSetAction.serializer(), element))
@@ -2154,6 +2281,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionSessionMcpServerBackgroundRequested -> output.json.encodeToJsonElement(SessionMcpServerBackgroundRequestedAction.serializer(), value.value)
             is StateActionChatTruncated -> output.json.encodeToJsonElement(ChatTruncatedAction.serializer(), value.value)
             is StateActionChatTurnsLoaded -> output.json.encodeToJsonElement(ChatTurnsLoadedAction.serializer(), value.value)
+            is StateActionChatTurnsMaterialized -> output.json.encodeToJsonElement(ChatTurnsMaterializedAction.serializer(), value.value)
             is StateActionSessionConfigChanged -> output.json.encodeToJsonElement(SessionConfigChangedAction.serializer(), value.value)
             is StateActionSessionMetaChanged -> output.json.encodeToJsonElement(SessionMetaChangedAction.serializer(), value.value)
             is StateActionChangesetStatusChanged -> output.json.encodeToJsonElement(ChangesetStatusChangedAction.serializer(), value.value)
@@ -2186,6 +2314,9 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionTerminalCommandExecuted -> output.json.encodeToJsonElement(TerminalCommandExecutedAction.serializer(), value.value)
             is StateActionTerminalCommandFinished -> output.json.encodeToJsonElement(TerminalCommandFinishedAction.serializer(), value.value)
             is StateActionResourceWatchChanged -> output.json.encodeToJsonElement(ResourceWatchChangedAction.serializer(), value.value)
+            is StateActionSearchQueryChanged -> output.json.encodeToJsonElement(SearchQueryChangedAction.serializer(), value.value)
+            is StateActionSearchResultsChanged -> output.json.encodeToJsonElement(SearchResultsChangedAction.serializer(), value.value)
+            is StateActionSearchLifecycleChanged -> output.json.encodeToJsonElement(SearchLifecycleChangedAction.serializer(), value.value)
             is StateActionAutomationCreateRequested -> output.json.encodeToJsonElement(AutomationCreateRequestedAction.serializer(), value.value)
             is StateActionAutomationUpdateRequested -> output.json.encodeToJsonElement(AutomationUpdateRequestedAction.serializer(), value.value)
             is StateActionAutomationSet -> output.json.encodeToJsonElement(AutomationSetAction.serializer(), value.value)

@@ -1402,6 +1402,139 @@ enum class AutomationRunOriginKind {
     TRIGGER
 }
 
+/**
+ * Discriminant for {@link SearchTarget}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable(with = SearchTargetKindSerializer::class)
+@JvmInline
+value class SearchTargetKind(val rawValue: String) {
+    companion object {
+        /**
+         * File paths.
+         */
+        val FILE_NAMES: SearchTargetKind = SearchTargetKind("fileNames")
+        /**
+         * The text content of files.
+         */
+        val FILE_TEXT: SearchTargetKind = SearchTargetKind("fileText")
+        /**
+         * The host's sessions.
+         */
+        val SESSIONS: SearchTargetKind = SearchTargetKind("sessions")
+        /**
+         * The text of chat requests and responses.
+         */
+        val CHAT_MESSAGES: SearchTargetKind = SearchTargetKind("chatMessages")
+    }
+}
+
+internal object SearchTargetKindSerializer : KSerializer<SearchTargetKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("SearchTargetKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: SearchTargetKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): SearchTargetKind =
+        SearchTargetKind(decoder.decodeString())
+}
+
+/**
+ * Discriminant for {@link SearchResult}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable(with = SearchResultKindSerializer::class)
+@JvmInline
+value class SearchResultKind(val rawValue: String) {
+    companion object {
+        val FILE_NAME: SearchResultKind = SearchResultKind("fileName")
+        val FILE_TEXT: SearchResultKind = SearchResultKind("fileText")
+        val SESSION: SearchResultKind = SearchResultKind("session")
+        val CHAT_MESSAGE: SearchResultKind = SearchResultKind("chatMessage")
+    }
+}
+
+internal object SearchResultKindSerializer : KSerializer<SearchResultKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("SearchResultKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: SearchResultKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): SearchResultKind =
+        SearchResultKind(decoder.decodeString())
+}
+
+/**
+ * Lifecycle status of a search.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable(with = SearchLifecycleStatusSerializer::class)
+@JvmInline
+value class SearchLifecycleStatus(val rawValue: String) {
+    companion object {
+        /**
+         * The query changed and the host has not replaced the results yet.
+         * {@link SearchState.results} belong to the previous query.
+         */
+        val PENDING: SearchLifecycleStatus = SearchLifecycleStatus("pending")
+        /**
+         * The host is searching.
+         */
+        val RUNNING: SearchLifecycleStatus = SearchLifecycleStatus("running")
+        /**
+         * The host found every result for the query.
+         */
+        val COMPLETED: SearchLifecycleStatus = SearchLifecycleStatus("completed")
+        /**
+         * The search failed.
+         */
+        val FAILED: SearchLifecycleStatus = SearchLifecycleStatus("failed")
+    }
+}
+
+internal object SearchLifecycleStatusSerializer : KSerializer<SearchLifecycleStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("SearchLifecycleStatus", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: SearchLifecycleStatus) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): SearchLifecycleStatus =
+        SearchLifecycleStatus(decoder.decodeString())
+}
+
+/**
+ * Why a search completed.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable(with = SearchCompletionReasonSerializer::class)
+@JvmInline
+value class SearchCompletionReason(val rawValue: String) {
+    companion object {
+        /**
+         * The host searched every target.
+         */
+        val EXHAUSTED: SearchCompletionReason = SearchCompletionReason("exhausted")
+        /**
+         * The host stopped at the result limit. More results may exist.
+         */
+        val LIMIT_REACHED: SearchCompletionReason = SearchCompletionReason("limitReached")
+    }
+}
+
+internal object SearchCompletionReasonSerializer : KSerializer<SearchCompletionReason> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("SearchCompletionReason", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: SearchCompletionReason) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): SearchCompletionReason =
+        SearchCompletionReason(decoder.decodeString())
+}
+
 // ─── State Types ────────────────────────────────────────────────────────────
 
 /**
@@ -2323,7 +2456,10 @@ data class ChatState(
      */
     val config: ChatConfigState? = null,
     /**
-     * Completed turns
+     * Completed turns, oldest first.
+     *
+     * Entries may be {@link DeferredTurn | deferred} only for clients that
+     * declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
      */
     val turns: List<Turn>,
     /**
@@ -2333,6 +2469,13 @@ data class ChatState(
      * available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
      * the loaded turns into state and update or clear this cursor before
      * responding. Absence means the state contains all retained turns.
+     *
+     * Hosts SHOULD NOT set this for clients that declared
+     * {@link ClientCapabilities.deferredTurns | `deferredTurns`}. Instead, they
+     * SHOULD send every retained turn and defer the ones the client doesn't need
+     * yet.
+     *
+     * Stability: 3 - Legacy.
      */
     val turnsNextCursor: String? = null,
     /**
@@ -3048,7 +3191,7 @@ data class ChatConfigState(
 )
 
 @Serializable
-data class Turn(
+data class MaterializedTurn(
     /**
      * Turn identifier
      */
@@ -3072,6 +3215,50 @@ data class Turn(
      * and find tool calls by filtering for `ToolCall` parts.
      */
     val responseParts: List<ResponsePart>,
+    /**
+     * Token usage info
+     */
+    val usage: UsageInfo? = null,
+    /**
+     * How the turn ended
+     */
+    val state: TurnState
+)
+
+/**
+ * A completed turn whose response the host has not sent yet.
+ *
+ * The turn keeps its position in {@link ChatState.turns}, so clients can show
+ * the initiating message and outcome without downloading the response.
+ * Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
+ * the host replaces the entry in place with a {@link MaterializedTurn} via
+ * {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
+ *
+ * Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
+ * {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
+ * action, or command result. Those clients receive the corresponding
+ * {@link MaterializedTurn}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class DeferredTurn(
+    /**
+     * Turn identifier
+     */
+    val id: String,
+    /**
+     * ISO 8601 timestamp when this turn started.
+     */
+    val startedAt: String? = null,
+    /**
+     * Turn duration in milliseconds.
+     */
+    val duration: Long? = null,
+    /**
+     * The message that initiated the turn
+     */
+    val message: Message,
     /**
      * Token usage info
      */
@@ -7205,6 +7392,433 @@ data class AutomationRunState(
     val meta: Map<String, JsonElement>? = null
 )
 
+/**
+ * Present when the host supports `createSearch`.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchCapability(
+    /**
+     * The target kinds the host can search. A client MUST NOT send a
+     * {@link SearchTarget} whose kind is not listed here.
+     */
+    val targets: List<SearchTargetKind>
+)
+
+/**
+ * What a search looks for and where.
+ *
+ * The client sends a query in `createSearch` and replaces it with
+ * {@link SearchQueryChangedAction | `search/queryChanged`}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@KeepGeneratedSerializer
+@Serializable(with = SearchQuerySerializer::class)
+data class SearchQuery(
+    /**
+     * The text to search for. Its meaning depends on the target: see
+     * {@link SearchTarget}. An empty `text` matches nothing; the host completes
+     * the search with no results.
+     */
+    val text: String,
+    /**
+     * Match case. Defaults to `false`.
+     */
+    val matchCase: Boolean? = null,
+    /**
+     * Match only whole words. Defaults to `false`.
+     */
+    val wholeWord: Boolean? = null,
+    /**
+     * Treat `text` as a regular expression. Defaults to `false`.
+     */
+    val isRegex: Boolean? = null,
+    /**
+     * A hint that precise matching isn't expected, for example because the
+     * search powers a quick-find picker. The host MAY then match loosely, rank
+     * results by how well they match, and ignore {@link isRegex} and
+     * {@link wholeWord}. Defaults to `false`.
+     */
+    val fuzzy: Boolean? = null,
+    /**
+     * Where to search. MUST contain at least one target.
+     */
+    val targets: List<SearchTarget>,
+    /**
+     * The maximum number of results. The host MAY apply a lower limit, and
+     * completes the search with {@link SearchCompletionReason.LimitReached}
+     * when it reaches the limit that applies.
+     */
+    val maxResults: Long? = null,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object SearchQuerySerializer : UnknownMembersSerializer<SearchQuery>(
+    SearchQuery.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)
+
+/**
+ * Searches file paths under {@link FileSearchTargetBase.roots}.
+ *
+ * The host decides how to match {@link SearchQuery.text} against file paths,
+ * for example with fuzzy matching, and which query options apply. Results
+ * are {@link FileNameSearchResult}s.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@KeepGeneratedSerializer
+@Serializable(with = FileNamesSearchTargetSerializer::class)
+data class FileNamesSearchTarget(
+    /**
+     * The folders to search. MUST contain at least one URI.
+     */
+    val roots: List<String>,
+    /**
+     * Glob patterns relative to a root. When present, only matching files are searched.
+     */
+    val includes: List<String>? = null,
+    /**
+     * Glob patterns relative to a root. Matching files are not searched.
+     */
+    val excludes: List<String>? = null,
+    /**
+     * Also search files that the host's ignore rules, such as `.gitignore`
+     * files, would otherwise skip. Defaults to `false`. `excludes` still apply.
+     */
+    val includeIgnored: Boolean? = null,
+    val kind: SearchTargetKind,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object FileNamesSearchTargetSerializer : UnknownMembersSerializer<FileNamesSearchTarget>(
+    FileNamesSearchTarget.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)
+
+/**
+ * Searches the text content of files under {@link FileSearchTargetBase.roots}.
+ * Results are {@link FileTextSearchResult}s.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@KeepGeneratedSerializer
+@Serializable(with = FileTextSearchTargetSerializer::class)
+data class FileTextSearchTarget(
+    /**
+     * The folders to search. MUST contain at least one URI.
+     */
+    val roots: List<String>,
+    /**
+     * Glob patterns relative to a root. When present, only matching files are searched.
+     */
+    val includes: List<String>? = null,
+    /**
+     * Glob patterns relative to a root. Matching files are not searched.
+     */
+    val excludes: List<String>? = null,
+    /**
+     * Also search files that the host's ignore rules, such as `.gitignore`
+     * files, would otherwise skip. Defaults to `false`. `excludes` still apply.
+     */
+    val includeIgnored: Boolean? = null,
+    val kind: SearchTargetKind,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object FileTextSearchTargetSerializer : UnknownMembersSerializer<FileTextSearchTarget>(
+    FileTextSearchTarget.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)
+
+/**
+ * Searches the host's sessions, the same sessions that `listSessions`
+ * returns. The host decides which session content it matches, for example
+ * titles or requests. Results are {@link SessionSearchResult}s.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@KeepGeneratedSerializer
+@Serializable(with = SessionsSearchTargetSerializer::class)
+data class SessionsSearchTarget(
+    val kind: SearchTargetKind,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object SessionsSearchTargetSerializer : UnknownMembersSerializer<SessionsSearchTarget>(
+    SessionsSearchTarget.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)
+
+/**
+ * Searches the visible text of chat requests and responses, including the
+ * responses of deferred turns. Results are
+ * {@link ChatMessageSearchResult}s.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@KeepGeneratedSerializer
+@Serializable(with = ChatMessagesSearchTargetSerializer::class)
+data class ChatMessagesSearchTarget(
+    val kind: SearchTargetKind,
+    /**
+     * The chats to search. MUST contain at least one chat URI.
+     */
+    val chats: List<String>,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object ChatMessagesSearchTargetSerializer : UnknownMembersSerializer<ChatMessagesSearchTarget>(
+    ChatMessagesSearchTarget.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)
+
+/**
+ * A matched span within {@link SearchMatch.text}: the half-open interval
+ * `[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code
+ * units, as in {@link CompletionItem.rangeStart}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchHighlight(
+    /**
+     * The start of the span.
+     */
+    val rangeStart: Long,
+    /**
+     * The end of the span, exclusive. MUST be greater than {@link rangeStart}
+     * and at most the length of {@link SearchMatch.text}.
+     */
+    val rangeEnd: Long
+)
+
+/**
+ * The matched text of a result, with the matched spans highlighted. The host
+ * chooses how much text around the match to include.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchMatch(
+    /**
+     * The text to display.
+     */
+    val text: String,
+    /**
+     * The matched spans, in order. Spans MUST NOT overlap.
+     */
+    val highlights: List<SearchHighlight>
+)
+
+/**
+ * A file whose path matches. {@link SearchResultBase.resource} is the file;
+ * the match text is its path, usually relative to the root that contains it.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class FileNameSearchResult(
+    /**
+     * The resource that contains the match.
+     */
+    val resource: String,
+    /**
+     * The text to display, with the matched spans highlighted.
+     */
+    val match: SearchMatch,
+    /**
+     * How well the result matches; higher is better. Scores have no fixed
+     * range, and are comparable across all results of one search. Clients
+     * SHOULD show results in descending score order. A host that does not rank
+     * results omits the score.
+     */
+    val score: Double? = null,
+    val kind: SearchResultKind
+)
+
+/**
+ * A match in the text of a file. {@link SearchResultBase.resource} is the
+ * file; the match text is the text around the match, usually its line.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class FileTextSearchResult(
+    /**
+     * The resource that contains the match.
+     */
+    val resource: String,
+    /**
+     * The text to display, with the matched spans highlighted.
+     */
+    val match: SearchMatch,
+    /**
+     * How well the result matches; higher is better. Scores have no fixed
+     * range, and are comparable across all results of one search. Clients
+     * SHOULD show results in descending score order. A host that does not rank
+     * results omits the score.
+     */
+    val score: Double? = null,
+    val kind: SearchResultKind,
+    /**
+     * The location of the match in the file.
+     */
+    val range: TextRange
+)
+
+/**
+ * A session whose content matches. {@link SearchResultBase.resource} is the
+ * session URI.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SessionSearchResult(
+    /**
+     * The resource that contains the match.
+     */
+    val resource: String,
+    /**
+     * The text to display, with the matched spans highlighted.
+     */
+    val match: SearchMatch,
+    /**
+     * How well the result matches; higher is better. Scores have no fixed
+     * range, and are comparable across all results of one search. Clients
+     * SHOULD show results in descending score order. A host that does not rank
+     * results omits the score.
+     */
+    val score: Double? = null,
+    val kind: SearchResultKind,
+    /**
+     * The session's title.
+     */
+    val title: String
+)
+
+/**
+ * A match in a chat request or response. {@link SearchResultBase.resource}
+ * is the chat URI.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChatMessageSearchResult(
+    /**
+     * The resource that contains the match.
+     */
+    val resource: String,
+    /**
+     * The text to display, with the matched spans highlighted.
+     */
+    val match: SearchMatch,
+    /**
+     * How well the result matches; higher is better. Scores have no fixed
+     * range, and are comparable across all results of one search. Clients
+     * SHOULD show results in descending score order. A host that does not rank
+     * results omits the score.
+     */
+    val score: Double? = null,
+    val kind: SearchResultKind,
+    /**
+     * The chat's title.
+     */
+    val title: String,
+    /**
+     * The ID of the turn that contains the match.
+     */
+    val turnId: String
+)
+
+/**
+ * The query changed and the host has not replaced the results yet. Clients
+ * MAY show the previous query's results differently, for example dimmed.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchPendingLifecycleState(
+    val status: SearchLifecycleStatus
+)
+
+/**
+ * The host is searching and may add more results.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchRunningLifecycleState(
+    val status: SearchLifecycleStatus
+)
+
+/**
+ * The host found every result for the query. A host that watches the
+ * searched files, sessions, or chats MAY still change the results later.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchCompletedLifecycleState(
+    val status: SearchLifecycleStatus,
+    /**
+     * Why the search completed.
+     */
+    val reason: SearchCompletionReason
+)
+
+/**
+ * The search failed. Results found before the failure remain in
+ * {@link SearchState.results}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchFailedLifecycleState(
+    val status: SearchLifecycleStatus,
+    /**
+     * Why the search failed, for example an invalid regular expression.
+     */
+    val error: ErrorInfo
+)
+
+/**
+ * Full state for one search, returned when a client subscribes to its
+ * `ahp-search:` URI.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchState(
+    /**
+     * The current query.
+     */
+    val query: SearchQuery,
+    /**
+     * Results in the order the host found them. Sort by
+     * {@link SearchResultBase.score} to rank them. While {@link lifecycle} is
+     * {@link SearchLifecycleStatus.Pending | pending}, these are results for the
+     * previous query.
+     */
+    val results: List<SearchResult>,
+    /**
+     * Where the search is in its lifecycle.
+     */
+    val lifecycle: SearchLifecycleState
+)
+
 // ─── Customization Enablement Union ─────────────────────────────────────
 
 /**
@@ -8738,6 +9352,270 @@ internal object AutomationRunLifecycleSerializer : KSerializer<AutomationRunLife
     }
 }
 
+@Serializable(with = SearchTargetSerializer::class)
+sealed interface SearchTarget
+
+@JvmInline
+value class SearchTargetFileNames(val value: FileNamesSearchTarget) : SearchTarget
+@JvmInline
+value class SearchTargetFileText(val value: FileTextSearchTarget) : SearchTarget
+@JvmInline
+value class SearchTargetSessions(val value: SessionsSearchTarget) : SearchTarget
+@JvmInline
+value class SearchTargetChatMessages(val value: ChatMessagesSearchTarget) : SearchTarget
+/**
+ * Forward-compat catch-all for unknown SearchTarget discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class SearchTargetUnknown(val raw: JsonObject) : SearchTarget
+
+internal object SearchTargetSerializer : KSerializer<SearchTarget> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("SearchTarget")
+
+    override fun deserialize(decoder: Decoder): SearchTarget {
+        val input = decoder as? JsonDecoder
+            ?: error("SearchTarget can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for SearchTarget")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return SearchTargetUnknown(obj)
+        return when (discriminant) {
+            "fileNames" -> SearchTargetFileNames(input.json.decodeFromJsonElement(FileNamesSearchTarget.serializer(), element))
+            "fileText" -> SearchTargetFileText(input.json.decodeFromJsonElement(FileTextSearchTarget.serializer(), element))
+            "sessions" -> SearchTargetSessions(input.json.decodeFromJsonElement(SessionsSearchTarget.serializer(), element))
+            "chatMessages" -> SearchTargetChatMessages(input.json.decodeFromJsonElement(ChatMessagesSearchTarget.serializer(), element))
+            else -> SearchTargetUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: SearchTarget) {
+        val output = encoder as? JsonEncoder
+            ?: error("SearchTarget can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is SearchTargetFileNames -> output.json.encodeToJsonElement(FileNamesSearchTarget.serializer(), value.value)
+            is SearchTargetFileText -> output.json.encodeToJsonElement(FileTextSearchTarget.serializer(), value.value)
+            is SearchTargetSessions -> output.json.encodeToJsonElement(SessionsSearchTarget.serializer(), value.value)
+            is SearchTargetChatMessages -> output.json.encodeToJsonElement(ChatMessagesSearchTarget.serializer(), value.value)
+            is SearchTargetUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
+@Serializable(with = SearchResultSerializer::class)
+sealed interface SearchResult
+
+@JvmInline
+value class SearchResultFileName(val value: FileNameSearchResult) : SearchResult
+@JvmInline
+value class SearchResultFileText(val value: FileTextSearchResult) : SearchResult
+@JvmInline
+value class SearchResultSession(val value: SessionSearchResult) : SearchResult
+@JvmInline
+value class SearchResultChatMessage(val value: ChatMessageSearchResult) : SearchResult
+/**
+ * Forward-compat catch-all for unknown SearchResult discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class SearchResultUnknown(val raw: JsonObject) : SearchResult
+
+internal object SearchResultSerializer : KSerializer<SearchResult> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("SearchResult")
+
+    override fun deserialize(decoder: Decoder): SearchResult {
+        val input = decoder as? JsonDecoder
+            ?: error("SearchResult can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for SearchResult")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return SearchResultUnknown(obj)
+        return when (discriminant) {
+            "fileName" -> SearchResultFileName(input.json.decodeFromJsonElement(FileNameSearchResult.serializer(), element))
+            "fileText" -> SearchResultFileText(input.json.decodeFromJsonElement(FileTextSearchResult.serializer(), element))
+            "session" -> SearchResultSession(input.json.decodeFromJsonElement(SessionSearchResult.serializer(), element))
+            "chatMessage" -> SearchResultChatMessage(input.json.decodeFromJsonElement(ChatMessageSearchResult.serializer(), element))
+            else -> SearchResultUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: SearchResult) {
+        val output = encoder as? JsonEncoder
+            ?: error("SearchResult can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is SearchResultFileName -> output.json.encodeToJsonElement(FileNameSearchResult.serializer(), value.value)
+            is SearchResultFileText -> output.json.encodeToJsonElement(FileTextSearchResult.serializer(), value.value)
+            is SearchResultSession -> output.json.encodeToJsonElement(SessionSearchResult.serializer(), value.value)
+            is SearchResultChatMessage -> output.json.encodeToJsonElement(ChatMessageSearchResult.serializer(), value.value)
+            is SearchResultUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
+@Serializable(with = SearchLifecycleStateSerializer::class)
+sealed interface SearchLifecycleState
+
+@JvmInline
+value class SearchLifecycleStatePending(val value: SearchPendingLifecycleState) : SearchLifecycleState
+@JvmInline
+value class SearchLifecycleStateRunning(val value: SearchRunningLifecycleState) : SearchLifecycleState
+@JvmInline
+value class SearchLifecycleStateCompleted(val value: SearchCompletedLifecycleState) : SearchLifecycleState
+@JvmInline
+value class SearchLifecycleStateFailed(val value: SearchFailedLifecycleState) : SearchLifecycleState
+/**
+ * Forward-compat catch-all for unknown SearchLifecycleState discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class SearchLifecycleStateUnknown(val raw: JsonObject) : SearchLifecycleState
+
+internal object SearchLifecycleStateSerializer : KSerializer<SearchLifecycleState> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("SearchLifecycleState")
+
+    override fun deserialize(decoder: Decoder): SearchLifecycleState {
+        val input = decoder as? JsonDecoder
+            ?: error("SearchLifecycleState can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for SearchLifecycleState")
+        val discriminant = (obj["status"] as? JsonPrimitive)?.content
+            ?: return SearchLifecycleStateUnknown(obj)
+        return when (discriminant) {
+            "pending" -> SearchLifecycleStatePending(input.json.decodeFromJsonElement(SearchPendingLifecycleState.serializer(), element))
+            "running" -> SearchLifecycleStateRunning(input.json.decodeFromJsonElement(SearchRunningLifecycleState.serializer(), element))
+            "completed" -> SearchLifecycleStateCompleted(input.json.decodeFromJsonElement(SearchCompletedLifecycleState.serializer(), element))
+            "failed" -> SearchLifecycleStateFailed(input.json.decodeFromJsonElement(SearchFailedLifecycleState.serializer(), element))
+            else -> SearchLifecycleStateUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: SearchLifecycleState) {
+        val output = encoder as? JsonEncoder
+            ?: error("SearchLifecycleState can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is SearchLifecycleStatePending -> output.json.encodeToJsonElement(SearchPendingLifecycleState.serializer(), value.value)
+            is SearchLifecycleStateRunning -> output.json.encodeToJsonElement(SearchRunningLifecycleState.serializer(), value.value)
+            is SearchLifecycleStateCompleted -> output.json.encodeToJsonElement(SearchCompletedLifecycleState.serializer(), value.value)
+            is SearchLifecycleStateFailed -> output.json.encodeToJsonElement(SearchFailedLifecycleState.serializer(), value.value)
+            is SearchLifecycleStateUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is SearchLifecycleStatePending -> "pending"
+            is SearchLifecycleStateRunning -> "running"
+            is SearchLifecycleStateCompleted -> "completed"
+            is SearchLifecycleStateFailed -> "failed"
+            is SearchLifecycleStateUnknown -> null
+        }
+        if (discriminant != null) encodedObject["status"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+/**
+ * A completed request/response cycle: either a {@link MaterializedTurn} with
+ * its full response or a {@link DeferredTurn}, discriminated by `isDeferred`.
+ */
+@Serializable(with = TurnSerializer::class)
+sealed interface Turn {
+    /**
+     * Turn identifier
+     */
+    val id: String
+    /**
+     * ISO 8601 timestamp when this turn started.
+     */
+    val startedAt: String?
+    /**
+     * Turn duration in milliseconds.
+     */
+    val duration: Long?
+    /**
+     * The message that initiated the turn
+     */
+    val message: Message
+    /**
+     * Token usage info
+     */
+    val usage: UsageInfo?
+    /**
+     * How the turn ended
+     */
+    val state: TurnState
+
+    /** A [MaterializedTurn] carrying its full response. */
+    @JvmInline value class Materialized(val value: MaterializedTurn) : Turn {
+        override val id: String get() = value.id
+        override val startedAt: String? get() = value.startedAt
+        override val duration: Long? get() = value.duration
+        override val message: Message get() = value.message
+        override val usage: UsageInfo? get() = value.usage
+        override val state: TurnState get() = value.state
+    }
+
+    /** A [DeferredTurn] whose response has not been sent yet. */
+    @JvmInline value class Deferred(val value: DeferredTurn) : Turn {
+        override val id: String get() = value.id
+        override val startedAt: String? get() = value.startedAt
+        override val duration: Long? get() = value.duration
+        override val message: Message get() = value.message
+        override val usage: UsageInfo? get() = value.usage
+        override val state: TurnState get() = value.state
+    }
+}
+
+internal object TurnSerializer : KSerializer<Turn> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("Turn")
+
+    override fun deserialize(decoder: Decoder): Turn {
+        val input = decoder as? JsonDecoder
+            ?: error("Turn can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for Turn")
+        val isDeferred = (obj["isDeferred"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
+        return if (isDeferred) {
+            Turn.Deferred(input.json.decodeFromJsonElement(DeferredTurn.serializer(), element))
+        } else {
+            Turn.Materialized(input.json.decodeFromJsonElement(MaterializedTurn.serializer(), element))
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: Turn) {
+        val output = encoder as? JsonEncoder
+            ?: error("Turn can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is Turn.Materialized -> output.json.encodeToJsonElement(MaterializedTurn.serializer(), value.value)
+            is Turn.Deferred -> JsonObject(
+                output.json.encodeToJsonElement(DeferredTurn.serializer(), value.value).jsonObject +
+                    ("isDeferred" to JsonPrimitive(true)),
+            )
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
 @Serializable(with = ToolResultContentSerializer::class)
 sealed interface ToolResultContent {
     @JvmInline value class Text(val value: ToolResultTextContent) : ToolResultContent
@@ -8811,6 +9689,7 @@ sealed interface SnapshotState {
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
     @JvmInline value class Automations(val value: AutomationState) : SnapshotState
     @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
+    @JvmInline value class Search(val value: SearchState) : SnapshotState
     /** A state that this version does not recognize, kept as raw JSON so it re-encodes unchanged. */
     @JvmInline value class Unknown(val raw: JsonObject) : SnapshotState
 }
@@ -8827,7 +9706,9 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             ?: error("Expected JsonObject for SnapshotState")
         // Try the most distinctive shape first. AutomationRunState has required
         // `automation`, `origin`, and `sessions`; AutomationState has
-        // required `entries`; SessionState has required
+        // required `entries`; SearchState has required `query` +
+        // `results` (checked before session, because it also has a required
+        // `lifecycle`); SessionState has required
         // `lifecycle`; ChatState has required `turns`; ChangesetState has
         // required `status` + `files`; ResourceWatchState has required
         // `root` + `recursive`; AnnotationsState has required `annotations`
@@ -8841,6 +9722,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
                 SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
+            obj.containsKey("query") && obj.containsKey("results") ->
+                SnapshotState.Search(input.json.decodeFromJsonElement(SearchState.serializer(), element))
             obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
             obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("instanceId") && obj.containsKey("extensionId") && obj.containsKey("canvasId") ->
@@ -8874,6 +9757,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
             is SnapshotState.Automations -> output.json.encodeToJsonElement(AutomationState.serializer(), value.value)
             is SnapshotState.AutomationRun -> output.json.encodeToJsonElement(AutomationRunState.serializer(), value.value)
+            is SnapshotState.Search -> output.json.encodeToJsonElement(SearchState.serializer(), value.value)
             is SnapshotState.Unknown -> value.raw
         }
         output.encodeJsonElement(element)

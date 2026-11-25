@@ -335,6 +335,13 @@ function extractProps(iface: InterfaceDeclaration, project: Project): CsProp[] {
     let literalValue: string | undefined;
     let literalMemberName: string | undefined;
 
+    // A required boolean literal (e.g. `DeferredTurn.isDeferred: true`) is a
+    // boolean discriminant: pin it to its only valid value.
+    if ((tsType === 'true' || tsType === 'false') && !p.hasQuestionToken()) {
+      isLiteralDiscriminant = true;
+      literalValue = tsType;
+    }
+
     const tsPropLower = tsName.toLowerCase();
     if (['type', 'kind', 'status', 'state'].includes(tsPropLower)) {
       if (enumMember) {
@@ -562,6 +569,8 @@ function generateEnum(enumDecl: EnumDeclaration): string {
 interface StructOpts {
   preserveUnknownMembers?: boolean;
   omitDiscriminants?: boolean;
+  /** TS property names to leave off the emitted type. */
+  omitProps?: string[];
   doc?: string;
   includeDiscriminants?: boolean;
   /**
@@ -609,6 +618,9 @@ function csPropDefault(csType: string, optional: boolean, prop?: CsProp): string
   if (prop?.isLiteralDiscriminant && prop.literalMemberName && csIsValueType(csType)) {
     return ` = ${csType}.${prop.literalMemberName};`;
   }
+  if (prop?.isLiteralDiscriminant && csType === 'bool' && prop.literalValue) {
+    return ` = ${prop.literalValue};`;
+  }
   // Required value types get the C# default (matches Go's numeric/bool zero).
   if (csIsValueType(csType)) return '';
   // Required reference types (string, StringOrMarkdown, nested object,
@@ -623,7 +635,8 @@ function generateCsClass(csName: string, props: CsProp[], opts: StructOpts = {})
   emitDocComment('', opts.doc, lines);
   const include = opts.includeDiscriminants === true;
   const emittedProps = props.filter(
-    (p) => include || !(opts.omitDiscriminants && p.isLiteralDiscriminant),
+    (p) => (include || !(opts.omitDiscriminants && p.isLiteralDiscriminant))
+      && !opts.omitProps?.includes(p.wireName),
   );
 
   // Mutable STATE types are classes (reducers mutate in place); every other
@@ -779,11 +792,13 @@ const STATE_ENUMS = [
   'AutomationDisableConditionKind',
   'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'SearchTargetKind', 'SearchResultKind',
+  'SearchLifecycleStatus', 'SearchCompletionReason',
 ];
 
 // `mutable: true` marks the STATE types the reducers mutate in place — these
 // stay `class` with `{ get; set; }`. Everything else is a write-once `record`.
-const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string; mutable?: boolean }[] = [
+const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string; mutable?: boolean; omitProps?: string[] }[] = [
   { name: 'TcpConnectionsCapability' },
   { name: 'ChannelReceiveLimits' },
   { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
@@ -843,7 +858,11 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState', mutable: true },
   { name: 'ChatConfigState', mutable: true },
-  { name: 'Turn', mutable: true },
+  // `MaterializedTurn.isDeferred` is only ever absent or `false`; the Turn
+  // converter selects the variant, so MaterializedTurn keeps no discriminator
+  // property.
+  { name: 'MaterializedTurn', mutable: true, omitProps: ['isDeferred'] },
+  { name: 'DeferredTurn', mutable: true },
   { name: 'ActiveTurn', mutable: true },
   { name: 'SideChatSelection' },
   { name: 'MessageOrigin' },
@@ -963,6 +982,23 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationCancelledRunLifecycle' },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState', mutable: true },
+  { name: 'SearchCapability' },
+  { name: 'SearchQuery' },
+  { name: 'FileNamesSearchTarget' },
+  { name: 'FileTextSearchTarget' },
+  { name: 'SessionsSearchTarget' },
+  { name: 'ChatMessagesSearchTarget' },
+  { name: 'SearchHighlight' },
+  { name: 'SearchMatch' },
+  { name: 'FileNameSearchResult' },
+  { name: 'FileTextSearchResult' },
+  { name: 'SessionSearchResult' },
+  { name: 'ChatMessageSearchResult' },
+  { name: 'SearchPendingLifecycleState' },
+  { name: 'SearchRunningLifecycleState' },
+  { name: 'SearchCompletedLifecycleState' },
+  { name: 'SearchFailedLifecycleState' },
+  { name: 'SearchState', mutable: true },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1040,6 +1076,76 @@ const TERMINAL_CONTENT_PART_UNION: UnionConfig = {
   ],
   unknown: true,
 };
+
+// `Turn` (types/channels-chat/state.ts) is `MaterializedTurn | DeferredTurn`,
+// discriminated by the BOOLEAN `isDeferred` with MaterializedTurn as the
+// default variant (absent or `false`). UnionConverter<T> only handles string
+// discriminators with a required tag, so emit a small dedicated converter. A
+// boolean has no unknown values, so there is no raw-JSON fallback. DeferredTurn
+// carries its own `IsDeferred = true`, so encoding by runtime type writes the
+// tag; MaterializedTurn has no such property, so encoding never emits
+// `isDeferred`.
+const TURN_UNION_CS = `/// <summary>
+/// Turn is a completed turn in ChatState.Turns: either a
+/// <see cref="MaterializedTurn"/> or a <see cref="DeferredTurn"/>,
+/// discriminated by <c>isDeferred</c>.
+/// </summary>
+[JsonConverter(typeof(TurnConverter))]
+public sealed class Turn : AhpUnion
+{
+    /// <summary>Creates an empty Turn (no active variant).</summary>
+    public Turn() { }
+
+    /// <summary>Creates a Turn wrapping a <see cref="MaterializedTurn"/> or <see cref="DeferredTurn"/>.</summary>
+    public Turn(object? value) : base(value) { }
+
+    /// <summary>The materialized variant, or <see langword="null"/> when this turn is not materialized.</summary>
+    [JsonIgnore]
+    public MaterializedTurn? Materialized => Value as MaterializedTurn;
+
+    /// <summary>The deferred variant, or <see langword="null"/> when this turn is not deferred.</summary>
+    [JsonIgnore]
+    public DeferredTurn? Deferred => Value as DeferredTurn;
+}
+
+/// <summary>System.Text.Json converter for the Turn union.</summary>
+internal sealed class TurnConverter : JsonConverter<Turn>
+{
+    public override Turn? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return null;
+        }
+
+        using JsonDocument doc = JsonDocument.ParseValue(ref reader);
+        JsonElement root = doc.RootElement;
+        bool isDeferred = root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("isDeferred", out JsonElement flag)
+            && flag.ValueKind == JsonValueKind.True;
+        return isDeferred
+            ? new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<DeferredTurn>(options)))
+            : new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<MaterializedTurn>(options)));
+    }
+
+    public override void Write(Utf8JsonWriter writer, Turn value, JsonSerializerOptions options)
+    {
+        switch (value.Value)
+        {
+            case MaterializedTurn materialized:
+                JsonSerializer.Serialize(writer, materialized, AhpJsonTypeInfo.Get<MaterializedTurn>(options));
+                return;
+            case DeferredTurn deferred:
+                JsonSerializer.Serialize(writer, deferred, AhpJsonTypeInfo.Get<DeferredTurn>(options));
+                return;
+            case null:
+                writer.WriteNullValue();
+                return;
+            default:
+                throw new JsonException("Turn cannot hold a " + value.Value.GetType().Name + ".");
+        }
+    }
+}`;
 
 // `ToolInput` (types/channels-chat/state.ts) is `string | ContentRef` — an
 // UNTAGGED union with no discriminant field, so it cannot go through
@@ -1419,6 +1525,45 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
+const SEARCH_TARGET_UNION: UnionConfig = {
+  name: 'SearchTarget',
+  discriminantField: 'kind',
+  doc: 'SearchTarget is one place to search.',
+  variants: [
+    { variantName: 'FileNames', innerType: 'FileNamesSearchTarget', wireValue: 'fileNames' },
+    { variantName: 'FileText', innerType: 'FileTextSearchTarget', wireValue: 'fileText' },
+    { variantName: 'Sessions', innerType: 'SessionsSearchTarget', wireValue: 'sessions' },
+    { variantName: 'ChatMessages', innerType: 'ChatMessagesSearchTarget', wireValue: 'chatMessages' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_RESULT_UNION: UnionConfig = {
+  name: 'SearchResult',
+  discriminantField: 'kind',
+  doc: 'SearchResult is one search match.',
+  variants: [
+    { variantName: 'FileName', innerType: 'FileNameSearchResult', wireValue: 'fileName' },
+    { variantName: 'FileText', innerType: 'FileTextSearchResult', wireValue: 'fileText' },
+    { variantName: 'Session', innerType: 'SessionSearchResult', wireValue: 'session' },
+    { variantName: 'ChatMessage', innerType: 'ChatMessageSearchResult', wireValue: 'chatMessage' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_LIFECYCLE_UNION: UnionConfig = {
+  name: 'SearchLifecycleState',
+  discriminantField: 'status',
+  doc: 'SearchLifecycleState is the lifecycle of a search.',
+  variants: [
+    { variantName: 'Pending', innerType: 'SearchPendingLifecycleState', wireValue: 'pending' },
+    { variantName: 'Running', innerType: 'SearchRunningLifecycleState', wireValue: 'running' },
+    { variantName: 'Completed', innerType: 'SearchCompletedLifecycleState', wireValue: 'completed' },
+    { variantName: 'Failed', innerType: 'SearchFailedLifecycleState', wireValue: 'failed' },
+  ],
+  unknown: true,
+};
+
 function generateCustomizationEnablementUnionCs(project: Project): string {
   const extra = aliasPreservesUnknownMembers(project, 'CustomizationEnablement')
     ? '    [JsonExtensionData]\n    public Dictionary<string, JsonElement>? Extra { get; set; }\n'
@@ -1480,9 +1625,9 @@ function generateSnapshotState(): string {
   return `/// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
   /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// automation-run, or empty state. Read
+  /// automation-run, search, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// (empty → chat → search → session → canvas → terminal → changeset → resource-watch → annotations → root).
 /// An object with no members is an empty state, used by channels whose state has no fields.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
@@ -1521,6 +1666,9 @@ public sealed class SnapshotState
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
 
+    /// <summary>Search state variant, when populated.</summary>
+    public SearchState? Search { get; set; }
+
     /// <summary>
     /// A state that this version does not recognize, such as the state of a channel
     /// added in a later protocol version. Kept as raw JSON so it re-encodes unchanged.
@@ -1554,6 +1702,11 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         else if (root.TryGetProperty("turns", out _))
         {
             result.Chat = root.Deserialize(AhpJsonTypeInfo.Get<ChatState>(options));
+        }
+        // SearchState also has a required \`lifecycle\`, so probe it before SessionState.
+        else if (root.TryGetProperty("query", out _) && root.TryGetProperty("results", out _))
+        {
+            result.Search = root.Deserialize(AhpJsonTypeInfo.Get<SearchState>(options));
         }
         else if (root.TryGetProperty("lifecycle", out _))
         {
@@ -1603,6 +1756,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
         if (value.Canvas is not null) { JsonSerializer.Serialize(writer, value.Canvas, AhpJsonTypeInfo.Get<CanvasState>(options)); return; }
+        if (value.Search is not null) { JsonSerializer.Serialize(writer, value.Search, AhpJsonTypeInfo.Get<SearchState>(options)); return; }
         if (value.Session is not null) { JsonSerializer.Serialize(writer, value.Session, AhpJsonTypeInfo.Get<SessionState>(options)); return; }
         if (value.Terminal is not null) { JsonSerializer.Serialize(writer, value.Terminal, AhpJsonTypeInfo.Get<TerminalState>(options)); return; }
         if (value.Changeset is not null) { JsonSerializer.Serialize(writer, value.Changeset, AhpJsonTypeInfo.Get<ChangesetState>(options)); return; }
@@ -1634,6 +1788,7 @@ function generateStateFile(project: Project): string {
         generateClassFromInterface(project, entry.name, entry.csName, {
           omitDiscriminants: entry.omitDiscriminants,
           mutable: entry.mutable,
+          omitProps: entry.omitProps,
         }),
       );
       lines.push('');
@@ -1658,11 +1813,14 @@ function generateStateFile(project: Project): string {
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
     AUTOMATION_DISABLE_CONDITION_UNION, AUTOMATION_TARGET_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
+    SEARCH_TARGET_UNION, SEARCH_RESULT_UNION, SEARCH_LIFECYCLE_UNION,
   ]) {
     lines.push(generateDiscriminatedUnion(project, u));
     lines.push('');
   }
   lines.push(generateChatOriginUnionCs(project));
+  lines.push('');
+  lines.push(TURN_UNION_CS);
   lines.push('');
   lines.push(TOOL_INPUT_UNION_CS);
   lines.push('');
@@ -1763,6 +1921,7 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'chat/reasoning', variantName: 'ChatReasoning', tsInterface: 'ChatReasoningAction' },
   { type: 'chat/truncated', variantName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'chat/turnsLoaded', variantName: 'ChatTurnsLoaded', tsInterface: 'ChatTurnsLoadedAction' },
+  { type: 'chat/turnsMaterialized', variantName: 'ChatTurnsMaterialized', tsInterface: 'ChatTurnsMaterializedAction' },
   { type: 'chat/pendingMessageSet', variantName: 'ChatPendingMessageSet', tsInterface: 'ChatPendingMessageSetAction' },
   { type: 'chat/pendingMessageRemoved', variantName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', variantName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
@@ -1795,6 +1954,9 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'search/queryChanged', variantName: 'SearchQueryChanged', tsInterface: 'SearchQueryChangedAction' },
+  { type: 'search/resultsChanged', variantName: 'SearchResultsChanged', tsInterface: 'SearchResultsChangedAction' },
+  { type: 'search/lifecycleChanged', variantName: 'SearchLifecycleChanged', tsInterface: 'SearchLifecycleChangedAction' },
   { type: 'annotations/set', variantName: 'AnnotationsSet', tsInterface: 'AnnotationsSetAction' },
   { type: 'annotations/removed', variantName: 'AnnotationsRemoved', tsInterface: 'AnnotationsRemovedAction' },
   { type: 'annotations/entrySet', variantName: 'AnnotationsEntrySet', tsInterface: 'AnnotationsEntrySetAction' },
@@ -2364,6 +2526,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   // record or those fields reference a non-existent type (CS0246).
   { name: 'Implementation' },
   { name: 'ClientCapabilities' },
+  { name: 'DeferredTurnsCapability' },
   { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
@@ -2392,6 +2555,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'ForkChatSource' }, { name: 'SideChatSource' },
   { name: 'CreateChatParams' },
   { name: 'DisposeChatParams' },
+  { name: 'FetchDeferredTurnsParams' }, { name: 'FetchDeferredTurnsResult' },
   { name: 'ChatMoveToSessionDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
@@ -2405,6 +2569,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'ResourceMkdirParams' }, { name: 'ResourceMkdirResult' },
   { name: 'ResourceRequestParams' }, { name: 'ResourceRequestResult' },
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
+  { name: 'CreateSearchParams' }, { name: 'CreateSearchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget' },
@@ -2979,11 +3144,18 @@ function checkExhaustiveness(project: Project): void {
     'AutomationTarget',
     'AutomationRunOrigin', 'AutomationRunLifecycle',
     'SessionInputRequest', 'BackgroundWork', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
+    'SearchTarget', 'SearchResult', 'SearchLifecycleState',
+    // FileSearchTargetBase / SearchResultBase are base interfaces flattened into
+    // their variant records via `extends`.
+    'FileSearchTargetBase', 'SearchResultBase',
     'ReconnectResult', 'AuthRequiredErrorData',
     'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData',
     'AhpError', 'AhpErrorDetailsMap', 'AhpErrorCode', 'AhpErrorCodeWithData',
     'JsonRpcErrorCode', 'ChangesetOperationTarget', 'CustomizationEnablement',
     'ChatOrigin', 'ChatInputQuestion', 'ChatInputAnswerValue', 'ChatInputAnswer',
+    // TurnBase is denormalized into MaterializedTurn and DeferredTurn; Turn is
+    // emitted by hand (TURN_UNION_CS) for its boolean discriminator.
+    'TurnBase', 'Turn',
     // ToolInput is `string | ContentRef` — emitted by hand as an untagged union
     // (TOOL_INPUT_UNION_CS), not through the discriminated-union list.
     'ToolInput',

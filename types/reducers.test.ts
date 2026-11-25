@@ -26,13 +26,14 @@ import {
   changesetReducer,
   annotationsReducer,
   resourceWatchReducer,
+  searchReducer,
   automationReducer,
   automationRunReducer,
   isClientDispatchable,
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { RootState, SessionState, ChatState, CanvasState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
+import type { RootState, SessionState, ChatState, CanvasState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, SearchState, AutomationState, AutomationRunState } from './state.js';
 import {
   CustomizationType,
   McpServerStatus,
@@ -62,6 +63,7 @@ function readChannelSources(baseName: string): string {
     'channels-changeset',
     'channels-annotations',
     'channels-resource-watch',
+    'channels-search',
     'channels-automation',
     'channels-automation-run',
   ];
@@ -79,11 +81,11 @@ function readChannelSources(baseName: string): string {
 
 // ─── Fixture Loading ─────────────────────────────────────────────────────────
 
-type FixtureState = RootState | SessionState | ChatState | CanvasState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
+type FixtureState = RootState | SessionState | ChatState | CanvasState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | SearchState | AutomationState | AutomationRunState;
 
 interface Fixture {
   description: string;
-  reducer: 'root' | 'session' | 'chat' | 'canvas' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
+  reducer: 'root' | 'session' | 'chat' | 'canvas' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'search' | 'automation' | 'automationRun';
   initial: FixtureState;
   actions: unknown[];
   expected: FixtureState;
@@ -135,6 +137,8 @@ describe('reducer fixtures', () => {
           state = annotationsReducer(state as AnnotationsState, action as any);
         } else if (fixture.reducer === 'resourceWatch') {
           state = resourceWatchReducer(state as ResourceWatchState, action as any);
+        } else if (fixture.reducer === 'search') {
+          state = searchReducer(state as SearchState, action as any);
         } else if (fixture.reducer === 'automation') {
           state = automationReducer(state as AutomationState, action as any);
         } else if (fixture.reducer === 'automationRun') {

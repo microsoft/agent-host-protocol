@@ -1,0 +1,28 @@
+{
+  "name": "search-lifecyclechanged-action",
+  "group": "A",
+  "description": "The search/lifecycleChanged action preserves a failed lifecycle with its error.",
+  "type": "StateAction",
+  "input": {
+    "type": "search/lifecycleChanged",
+    "lifecycle": {
+      "status": "failed",
+      "error": {
+        "errorType": "permissionDenied",
+        "message": "Access to file:///other was revoked"
+      }
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "search/lifecycleChanged",
+      "lifecycle": {
+        "status": "failed",
+        "error": {
+          "errorType": "permissionDenied",
+          "message": "Access to file:///other was revoked"
+        }
+      }
+    }
+  ]
+}

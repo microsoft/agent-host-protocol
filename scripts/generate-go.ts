@@ -179,6 +179,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | SearchState | EmptyState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -478,6 +479,8 @@ interface StructOpts {
    * where the literal value differs from the inner struct's own enum.
    */
   includeDiscriminants?: boolean;
+  /** Wire properties to leave out of the struct (handled by custom (un)marshalers). */
+  omitProps?: string[];
 }
 
 function generateGoStruct(goName: string, props: GoProp[], opts: StructOpts = {}): string {
@@ -543,7 +546,8 @@ function generateStructFromInterface(
   const iface = findInterface(project, tsInterfaceName);
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = goNameOverride ?? stripIPrefix(tsInterfaceName);
-  const props = extractProps(iface, project);
+  const omitted = new Set(opts.omitProps ?? []);
+  const props = extractProps(iface, project).filter((p) => !omitted.has(p.wireName));
   const ifaceDoc = getDocumentation(iface);
   return generateGoStruct(name, props, { doc: ifaceDoc, preserveUnknownMembers: preservesUnknownMembers(iface), ...opts });
 }
@@ -765,9 +769,11 @@ const STATE_ENUMS = [
   'AutomationDisableConditionKind',
   'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'SearchTargetKind', 'SearchResultKind',
+  'SearchLifecycleStatus', 'SearchCompletionReason',
 ];
 
-const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
+const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string; omitProps?: string[] }[] = [
   { name: 'TcpConnectionsCapability' },
   { name: 'ChannelReceiveLimits' },
   { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
@@ -814,7 +820,10 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
   { name: 'ChatConfigState' },
-  { name: 'Turn' },
+  // `isDeferred` is the Turn union discriminator, handled by
+  // generateTurnUnion().
+  { name: 'MaterializedTurn', omitProps: ['isDeferred'] },
+  { name: 'DeferredTurn', omitProps: ['isDeferred'] },
   { name: 'ActiveTurn' },
   { name: 'Message' },
   { name: 'MessageOrigin' },
@@ -947,6 +956,23 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationCancelledRunLifecycle' },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState' },
+  { name: 'SearchCapability' },
+  { name: 'SearchQuery' },
+  { name: 'FileNamesSearchTarget' },
+  { name: 'FileTextSearchTarget' },
+  { name: 'SessionsSearchTarget' },
+  { name: 'ChatMessagesSearchTarget' },
+  { name: 'SearchHighlight' },
+  { name: 'SearchMatch' },
+  { name: 'FileNameSearchResult' },
+  { name: 'FileTextSearchResult' },
+  { name: 'SessionSearchResult' },
+  { name: 'ChatMessageSearchResult' },
+  { name: 'SearchPendingLifecycleState' },
+  { name: 'SearchRunningLifecycleState' },
+  { name: 'SearchCompletedLifecycleState' },
+  { name: 'SearchFailedLifecycleState' },
+  { name: 'SearchState' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1277,6 +1303,134 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   injectDiscriminantOnMarshal: true,
 };
 
+const SEARCH_TARGET_UNION: UnionConfig = {
+  name: 'SearchTarget',
+  discriminantField: 'kind',
+  doc: 'SearchTarget is one place to search.',
+  variants: [
+    { variantName: 'FileNames', innerType: 'FileNamesSearchTarget', wireValue: 'fileNames' },
+    { variantName: 'FileText', innerType: 'FileTextSearchTarget', wireValue: 'fileText' },
+    { variantName: 'Sessions', innerType: 'SessionsSearchTarget', wireValue: 'sessions' },
+    { variantName: 'ChatMessages', innerType: 'ChatMessagesSearchTarget', wireValue: 'chatMessages' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_RESULT_UNION: UnionConfig = {
+  name: 'SearchResult',
+  discriminantField: 'kind',
+  doc: 'SearchResult is one search match.',
+  variants: [
+    { variantName: 'FileName', innerType: 'FileNameSearchResult', wireValue: 'fileName' },
+    { variantName: 'FileText', innerType: 'FileTextSearchResult', wireValue: 'fileText' },
+    { variantName: 'Session', innerType: 'SessionSearchResult', wireValue: 'session' },
+    { variantName: 'ChatMessage', innerType: 'ChatMessageSearchResult', wireValue: 'chatMessage' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_LIFECYCLE_UNION: UnionConfig = {
+  name: 'SearchLifecycleState',
+  discriminantField: 'status',
+  doc: 'SearchLifecycleState is the lifecycle of a search.',
+  variants: [
+    { variantName: 'Pending', innerType: 'SearchPendingLifecycleState', wireValue: 'pending' },
+    { variantName: 'Running', innerType: 'SearchRunningLifecycleState', wireValue: 'running' },
+    { variantName: 'Completed', innerType: 'SearchCompletedLifecycleState', wireValue: 'completed' },
+    { variantName: 'Failed', innerType: 'SearchFailedLifecycleState', wireValue: 'failed' },
+  ],
+  unknown: true,
+  injectDiscriminantOnMarshal: true,
+};
+
+/**
+ * `Turn = MaterializedTurn | DeferredTurn` is discriminated by the boolean
+ * `isDeferred`, which the string-discriminant union emitter cannot express:
+ * `true` selects `DeferredTurn`, anything else (absent, `false`) selects
+ * `MaterializedTurn`. Neither variant struct carries the field;
+ * `DeferredTurn` injects it on encode and `MaterializedTurn` never emits it.
+ */
+function generateTurnUnion(): string {
+  return `// MarshalJSON encodes the deferred turn with its \`"isDeferred": true\` marker.
+func (v DeferredTurn) MarshalJSON() ([]byte, error) {
+\ttype wire DeferredTurn
+\treturn json.Marshal(struct {
+\t\twire
+\t\tIsDeferred bool \`json:"isDeferred"\`
+\t}{wire(v), true})
+}
+
+// Turn is a completed turn in ChatState.Turns: either a *MaterializedTurn
+// with its full response or a *DeferredTurn, discriminated by the boolean
+// "isDeferred" field.
+type Turn struct {
+\tValue isTurn
+}
+
+// isTurn is the marker interface implemented by every concrete variant of
+// Turn.
+type isTurn interface{ isTurn() }
+
+func (*MaterializedTurn) isTurn() {}
+func (*DeferredTurn) isTurn()     {}
+
+// UnmarshalJSON decodes a *DeferredTurn when "isDeferred" is true and a
+// *MaterializedTurn otherwise.
+func (u *Turn) UnmarshalJSON(data []byte) error {
+\tvar probe struct {
+\t\tIsDeferred json.RawMessage \`json:"isDeferred"\`
+\t}
+\tif err := json.Unmarshal(data, &probe); err != nil {
+\t\treturn err
+\t}
+\tif string(probe.IsDeferred) == "true" {
+\t\tvar value DeferredTurn
+\t\tif err := json.Unmarshal(data, &value); err != nil {
+\t\t\treturn err
+\t\t}
+\t\tu.Value = &value
+\t\treturn nil
+\t}
+\tvar value MaterializedTurn
+\tif err := json.Unmarshal(data, &value); err != nil {
+\t\treturn err
+\t}
+\tu.Value = &value
+\treturn nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u Turn) MarshalJSON() ([]byte, error) {
+\tif u.Value == nil {
+\t\treturn []byte("null"), nil
+\t}
+\treturn json.Marshal(u.Value)
+}
+
+// Materialized returns the materialized variant, if active.
+func (u Turn) Materialized() (*MaterializedTurn, bool) {
+\tv, ok := u.Value.(*MaterializedTurn)
+\treturn v, ok
+}
+
+// Deferred returns the deferred variant, if active.
+func (u Turn) Deferred() (*DeferredTurn, bool) {
+\tv, ok := u.Value.(*DeferredTurn)
+\treturn v, ok
+}
+
+// TurnId returns the id of the active variant, or "" when Value is nil.
+func (u Turn) TurnId() string {
+\tswitch v := u.Value.(type) {
+\tcase *MaterializedTurn:
+\t\treturn v.Id
+\tcase *DeferredTurn:
+\t\treturn v.Id
+\t}
+\treturn ""
+}`;
+}
+
 function generateChatOriginGo(): string {
   return `// ChatOrigin describes how a chat came into existence.
 type ChatOrigin struct {
@@ -1378,11 +1532,11 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
 // chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-// automation-run, or empty state. The active
+// automation-run, search, or empty state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (empty → automationRun → automations → session → chat → canvas → terminal →
-// changeset → resourceWatch → annotations → root). An object with no members
+// (empty → automationRun → automations → search → session → chat → canvas →
+// terminal → changeset → resourceWatch → annotations → root). An object with no members
 // is an empty state, used by channels whose state has no fields. A state that
 // matches none of these, such as the state of a channel added in a later
 // protocol version, is kept as raw JSON in Unknown.
@@ -1399,6 +1553,7 @@ type SnapshotState struct {
 \tAnnotations   *AnnotationsState   \`json:"-"\`
 \tAutomations   *AutomationState       \`json:"-"\`
 \tAutomationRun *AutomationRunState \`json:"-"\`
+\tSearch        *SearchState        \`json:"-"\`
 }
 
 // MarshalJSON encodes whichever variant is currently populated.
@@ -1416,6 +1571,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \t\treturn json.Marshal(s.Chat)
 \tcase s.Canvas != nil:
 \t\treturn json.Marshal(s.Canvas)
+\tcase s.Search != nil:
+\t\treturn json.Marshal(s.Search)
 \tcase s.Terminal != nil:
 \t\treturn json.Marshal(s.Terminal)
 \tcase s.Changeset != nil:
@@ -1456,6 +1613,13 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.Automations = &v
+\t// SearchState also has a required \`lifecycle\`, so probe it before SessionState.
+\tcase containsAll(probe, "query", "results"):
+\t\tvar v SearchState
+\t\tif err := json.Unmarshal(data, &v); err != nil {
+\t\t\treturn err
+\t\t}
+\t\ts.Search = &v
 \tcase containsAll(probe, "lifecycle"):
 \t\tvar v SessionState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1572,6 +1736,7 @@ function generateStateFile(project: Project): string {
       lines.push(
         generateStructFromInterface(project, entry.name, entry.goName, {
           omitDiscriminants: entry.omitDiscriminants,
+          omitProps: entry.omitProps,
         }),
       );
       lines.push('');
@@ -1641,6 +1806,14 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_TARGET_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_RESULT_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_LIFECYCLE_UNION));
+  lines.push('');
+  lines.push(generateTurnUnion());
+  lines.push('');
   lines.push(generateChatOriginGo());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1708,6 +1881,7 @@ const ACTION_VARIANTS: {
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
   { type: 'chat/truncated', variantName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'chat/turnsLoaded', variantName: 'ChatTurnsLoaded', tsInterface: 'ChatTurnsLoadedAction' },
+  { type: 'chat/turnsMaterialized', variantName: 'ChatTurnsMaterialized', tsInterface: 'ChatTurnsMaterializedAction' },
   { type: 'session/isReadChanged', variantName: 'SessionIsReadChanged', tsInterface: 'SessionIsReadChangedAction' },
   { type: 'session/isArchivedChanged', variantName: 'SessionIsArchivedChanged', tsInterface: 'SessionIsArchivedChangedAction' },
   { type: 'session/activityChanged', variantName: 'SessionActivityChanged', tsInterface: 'SessionActivityChangedAction' },
@@ -1758,6 +1932,9 @@ const ACTION_VARIANTS: {
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'search/queryChanged', variantName: 'SearchQueryChanged', tsInterface: 'SearchQueryChangedAction' },
+  { type: 'search/resultsChanged', variantName: 'SearchResultsChanged', tsInterface: 'SearchResultsChangedAction' },
+  { type: 'search/lifecycleChanged', variantName: 'SearchLifecycleChanged', tsInterface: 'SearchLifecycleChangedAction' },
   { type: 'automation/createRequested', variantName: 'AutomationCreateRequested', tsInterface: 'AutomationCreateRequestedAction' },
   { type: 'automation/updateRequested', variantName: 'AutomationUpdateRequested', tsInterface: 'AutomationUpdateRequestedAction' },
   { type: 'automation/set', variantName: 'AutomationSet', tsInterface: 'AutomationSetAction' },
@@ -1873,7 +2050,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestina
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
   { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
   { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
-  { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
+  { name: 'ClientCapabilities' }, { name: 'DeferredTurnsCapability' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
@@ -1894,6 +2071,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'DisposeSessionParams' },
   { name: 'ForkChatSource' }, { name: 'SideChatSource' }, { name: 'CreateChatParams' }, { name: 'DisposeChatParams' },
   { name: 'ChatMoveToSessionDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
+  { name: 'FetchDeferredTurnsParams' }, { name: 'FetchDeferredTurnsResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
@@ -1906,6 +2084,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'ResourceMkdirParams' }, { name: 'ResourceMkdirResult' },
   { name: 'ResourceRequestParams' }, { name: 'ResourceRequestResult' },
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
+  { name: 'CreateSearchParams' }, { name: 'CreateSearchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget' },
@@ -2578,6 +2757,8 @@ function checkExhaustiveness(project: Project): void {
     'ActionEnvelope',
     'ActionOrigin',
     'ResponsePart',
+    'TurnBase',
+    'Turn',
     'ToolResultContent',
     'SessionToolCallApprovedAction',
     'SessionToolCallDeniedAction',
@@ -2609,6 +2790,11 @@ function checkExhaustiveness(project: Project): void {
     'TerminalLifecycleState',
     'SessionInputRequest',
     'BackgroundWork',
+    'SearchTarget',
+    'SearchResult',
+    'SearchLifecycleState',
+    'FileSearchTargetBase',
+    'SearchResultBase',
     'ToolCallConfirmationState',
     'ReconnectResult',
     'SessionOrigin',

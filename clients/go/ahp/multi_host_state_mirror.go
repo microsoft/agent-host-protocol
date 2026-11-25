@@ -35,6 +35,7 @@ type MultiHostStateMirror struct {
 	automationCat map[string]ahptypes.AutomationState
 	automation    map[HostedResourceKey]ahptypes.AutomationEntry
 	automationRun map[HostedResourceKey]ahptypes.AutomationRunState
+	search        map[HostedResourceKey]ahptypes.SearchState
 }
 
 // NewMultiHostStateMirror returns an empty mirror.
@@ -49,6 +50,7 @@ func NewMultiHostStateMirror() *MultiHostStateMirror {
 		automationCat: make(map[string]ahptypes.AutomationState),
 		automation:    make(map[HostedResourceKey]ahptypes.AutomationEntry),
 		automationRun: make(map[HostedResourceKey]ahptypes.AutomationRunState),
+		search:        make(map[HostedResourceKey]ahptypes.SearchState),
 	}
 }
 
@@ -194,6 +196,21 @@ func (m *MultiHostStateMirror) AutomationRun(hostID string, uri ahptypes.URI) (a
 	return v, ok
 }
 
+// PutSearch stores a search snapshot under (hostID, uri).
+func (m *MultiHostStateMirror) PutSearch(hostID string, uri ahptypes.URI, state ahptypes.SearchState) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.search[HostedResourceKey{hostID, uri}] = state
+}
+
+// Search returns the search snapshot at (hostID, uri), or (zero, false).
+func (m *MultiHostStateMirror) Search(hostID string, uri ahptypes.URI) (ahptypes.SearchState, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	v, ok := m.search[HostedResourceKey{hostID, uri}]
+	return v, ok
+}
+
 // DropHost removes every snapshot belonging to hostID. Use when a
 // host is removed from the multi-host registry.
 func (m *MultiHostStateMirror) DropHost(hostID string) {
@@ -236,6 +253,11 @@ func (m *MultiHostStateMirror) DropHost(hostID string) {
 			delete(m.automationRun, k)
 		}
 	}
+	for k := range m.search {
+		if k.HostID == hostID {
+			delete(m.search, k)
+		}
+	}
 }
 
 // DropResource removes the snapshot at (hostID, uri) across every
@@ -259,4 +281,5 @@ func (m *MultiHostStateMirror) DropResource(hostID string, uri ahptypes.URI) {
 	delete(m.changes, k)
 	delete(m.automation, k)
 	delete(m.automationRun, k)
+	delete(m.search, k)
 }

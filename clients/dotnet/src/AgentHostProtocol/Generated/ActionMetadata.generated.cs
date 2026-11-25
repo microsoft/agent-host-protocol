@@ -187,6 +187,9 @@ internal static class GeneratedActionMetadata
             case ChatTurnsLoadedAction value:
                 actionType = value.Type;
                 return true;
+            case ChatTurnsMaterializedAction value:
+                actionType = value.Type;
+                return true;
             case ChatTurnStartedAction value:
                 actionType = value.Type;
                 return true;
@@ -221,6 +224,15 @@ internal static class GeneratedActionMetadata
                 actionType = value.Type;
                 return true;
             case RootTerminalsChangedAction value:
+                actionType = value.Type;
+                return true;
+            case SearchLifecycleChangedAction value:
+                actionType = value.Type;
+                return true;
+            case SearchQueryChangedAction value:
+                actionType = value.Type;
+                return true;
+            case SearchResultsChangedAction value:
                 actionType = value.Type;
                 return true;
             case SessionActiveClientRemovedAction value:

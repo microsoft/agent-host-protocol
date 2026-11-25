@@ -91,6 +91,7 @@ import type {
   ChatInputCompletedAction,
   ChatTruncatedAction,
   ChatTurnsLoadedAction,
+  ChatTurnsMaterializedAction,
 } from '../channels-chat/actions.js';
 
 import type {
@@ -133,6 +134,11 @@ import type {
 import type {
   ResourceWatchChangedAction,
 } from '../channels-resource-watch/actions.js';
+import type {
+  SearchQueryChangedAction,
+  SearchResultsChangedAction,
+  SearchLifecycleChangedAction,
+} from '../channels-search/actions.js';
 import type {
   AutomationCreateRequestedAction,
   AutomationRemovedAction,
@@ -222,6 +228,7 @@ export const enum ActionType {
   SessionMcpServerBackgroundRequested = 'session/mcpServerBackgroundRequested',
   ChatTruncated = 'chat/truncated',
   ChatTurnsLoaded = 'chat/turnsLoaded',
+  ChatTurnsMaterialized = 'chat/turnsMaterialized',
   SessionIsReadChanged = 'session/isReadChanged',
   SessionIsArchivedChanged = 'session/isArchivedChanged',
   SessionActivityChanged = 'session/activityChanged',
@@ -258,6 +265,9 @@ export const enum ActionType {
   TerminalCommandExecuted = 'terminal/commandExecuted',
   TerminalCommandFinished = 'terminal/commandFinished',
   ResourceWatchChanged = 'resourceWatch/changed',
+  SearchQueryChanged = 'search/queryChanged',
+  SearchResultsChanged = 'search/resultsChanged',
+  SearchLifecycleChanged = 'search/lifecycleChanged',
   AutomationCreateRequested = 'automation/createRequested',
   AutomationUpdateRequested = 'automation/updateRequested',
   AutomationSet = 'automation/set',
@@ -380,6 +390,7 @@ export type StateAction =
   | ChatInputCompletedAction
   | ChatTruncatedAction
   | ChatTurnsLoadedAction
+  | ChatTurnsMaterializedAction
   | ChangesetStatusChangedAction
   | ChangesetFileSetAction
   | ChangesetFileRemovedAction
@@ -405,6 +416,9 @@ export type StateAction =
   | TerminalCommandExecutedAction
   | TerminalCommandFinishedAction
   | ResourceWatchChangedAction
+  | SearchQueryChangedAction
+  | SearchResultsChangedAction
+  | SearchLifecycleChangedAction
   | AutomationCreateRequestedAction
   | AutomationUpdateRequestedAction
   | AutomationSetAction
