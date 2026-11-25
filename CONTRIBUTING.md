@@ -67,80 +67,28 @@ npx vitepress build docs
 Check the homepage's chat, automation, terminal and channel chapters as well as
 guide/specification/reference pages, search, and mobile navigation in both modes.
 
-## Releases
+## Guides and skills
 
-Release mechanics — tag conventions, per-client publish flows, CI guards,
-and the one-time admin setup for each environment — live in
-[`RELEASING.md`](RELEASING.md). For the protocol-level versioning policy,
-see [`docs/specification/versioning.md`](docs/specification/versioning.md).
+Workflow guides live under [`skills/`](skills/) as the single source of truth
+for both human contributors and AI coding agents:
 
-## Adding changelog fragments
-
-This repo ships seven independently-versioned artifacts (spec + six clients),
-each with its own `CHANGELOG.md` in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
-format. The publish workflows refuse to release a tag whose matching
-`## [X.Y.Z]` heading is missing. Normal PRs should not edit those shared
-changelog files directly; add a JSON changelog fragment under `docs/.changes/`
-instead. Release PRs collapse those fragments into the seven changelogs.
-
-**Add a one-line fragment** when your change is
-user-visible: a new / removed / renamed / behaviourally-changed action,
-command, state field, error, notification, version constant, or public client
-API; an observable bug fix; or anything security-relevant. **Skip the
-fragment** for generated code (`**/generated/**`), docs, tests, CI, lint
-config, formatting, or internal refactors with no observable effect.
-
-Fragments live directly under `docs/.changes/` and use this shape:
-
-```json
-{
-  "type": "added",
-  "message": "`session/cancelTurn` action for client-initiated turn cancellation.",
-  "issues": [123]
-}
-```
-
-`type` must be one of `added`, `changed`, `deprecated`, `removed`, `fixed`, or
-`security`. `message` is the changelog bullet text without a leading `-`.
-`issues` is optional.
-
-Omit `targets` when the entry applies to the spec and all clients (the common
-case for protocol additions). Add `targets` to scope the entry to a subset:
-
-```json
-{
-  "type": "fixed",
-  "message": "`AhpClient.connect` now rejects with `AhpProtocolError` on negotiation failure.",
-  "targets": ["typescript"]
-}
-```
-
-Path → fragment target map:
-
-| Source path touched | Fragment target(s) |
-| --- | --- |
-| `types/**` (protocol surface) | Omit `targets` (spec + all clients) unless intentionally narrower. |
-| `clients/<lang>/**` (non-generated) | That client only, e.g. `["rust"]`. |
-| `schema/**` | `["spec"]` |
-| `scripts/generate*.ts` that changes any client's generated output | Omit `targets` or list every affected target. |
-
-Run `npm run verify:change-fragments` to validate fragments. Don't invent a
-`## [X.Y.Z]` heading or edit changelogs directly for normal PRs — that's
-reserved for release time per [`RELEASING.md`](RELEASING.md).
-
-This rule is also encoded in [`AGENTS.md`](AGENTS.md) so AI coding agents
-working in the repo follow the same convention.
+- **Protocol changes & naming:** [`skills/protocol-authoring/SKILL.md`](skills/protocol-authoring/SKILL.md)
+  and the [protocol naming dictionary](skills/protocol-authoring/naming.md).
+- **Changelog fragments:** [`skills/changelog/SKILL.md`](skills/changelog/SKILL.md)
+  — add a single fragment under `docs/.changes/` (or update an existing
+  unreleased fragment) for user-visible changes, and validate with
+  `npm run verify:change-fragments`. Do not edit `CHANGELOG.md` files directly
+  on feature/fix PRs.
+- **Releases:** [`skills/release-ahp/SKILL.md`](skills/release-ahp/SKILL.md)
+  for the coordinated release flow, and [`RELEASING.md`](RELEASING.md) for tag
+  conventions, CI guards, and publishing infrastructure.
+- **Per-client conventions:** [`clients/dotnet/AGENTS.md`](clients/dotnet/AGENTS.md),
+  [`clients/go/AGENTS.md`](clients/go/AGENTS.md),
+  [`clients/kotlin/AGENTS.md`](clients/kotlin/AGENTS.md), and
+  [`clients/swift/AGENTS.md`](clients/swift/AGENTS.md).
 
 ## Code-style and review
 
-Editor / lint / typecheck configuration lives in this repo's `eslint.config.mjs`,
-`tsconfig.json`, and (per-client) the equivalent files. Run `npm test` before
+Editor / lint / typecheck configuration lives in `eslint.config.mjs`,
+`tsconfig.json`, and each client's native config. Run `npm test` before
 opening a PR; CI runs the same checks plus per-language builds.
-
-When iterating on the protocol surface in `types/`, see
-[`.github/instructions/general-instructions.instructions.md`](.github/instructions/general-instructions.instructions.md)
-for the project's editorial rules on type changes.
-
-For language-specific code-gen conventions, see the `AGENTS.md` file in each
-client directory (`clients/go/AGENTS.md`, `clients/kotlin/AGENTS.md`,
-`clients/swift/AGENTS.md`, `clients/dotnet/AGENTS.md`).

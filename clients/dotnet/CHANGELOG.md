@@ -18,45 +18,111 @@ Implements AHP 1.1.0.
 
 ### Added
 
-- Optional typed `InitializeResult.environment.pathStyle` metadata for authoritative host path semantics.
-- Optional `CreateChatParams.title` for a client-selected initial display title.
-- Optional `SessionModelInfo.vendor` for the model vendor as the provider reports it. (#503)
-- Experimental subscription-negotiated flow-control types using UTF-16 byte accounting, framed delivery and consumption credit notifications, and independent `reconnect.windows` metadata. (#492)
-- `EmptyState` variant of `Snapshot.state` for channels whose state has no fields, such as telemetry. Every experimental windowed subscription starts with `channel/snapshot`.
-- Experimental TCP channel: `createTcpConnection` opens a TCP connection on the host's network and returns an empty `CreateTcpConnectionResult`. The client forwards it over a windowed subscription with `tcp/data`, `tcp/eof`, and `tcp/reset`. TCP channels do not survive the loss of the AHP connection. (#488)
-- Each client exposes the notification methods that do not count against the window on a windowed subscription (`WINDOW_EXEMPT_METHODS` and `countsAgainstWindow` in TypeScript, with equivalents in the other clients), generated from the new `@windowExempt` annotation.
-- `ChatState.config`, the `chat/configChanged` action, and `chatMutable` on session config properties give each chat its own config for selected settings, such as tool auto-approval, so changing them in one chat no longer changes every chat in the session. `ChatConfigState.values` holds the chat's `chatMutable` properties and does not inherit from the session; missing keys take the schema default. Optional `ChatConfigState.schema` replaces the session's schema for a chat whose agent differs from the session's.
-- Optional per-chat agent provider: `CreateChatParams.provider` and `ChatSummary.provider` (mirrored on `ChatState` and `SessionChatSummary`), gated by the host-level `InitializeResult.multipleChatProviders` capability, let one session contain chats backed by different agent providers. Absent `provider` means the session's agent provider; forks and side chats keep their source chat's agent provider.
-- Optional `ChangesetFile.status`, a bitset of `ChangesetFileStatus` flags (initially `Editing`), reports per-file activity through existing changeset snapshots and actions without requiring provider-specific metadata. (#538)
-- Optional changeset file and operation-target nonces let hosts reject operations on superseded changes without requiring a capability or a nonce from every client. (#538)
-- Adds `chat/moved`, dispatched on a chat's channel after a cross-session move with its new session, `provider` and `config.schema`.
-- Optional producer-recorded `startedAt` and `duration` fields on reasoning response parts and `chat/reasoning` updates preserve each contiguous reasoning run's timing across state snapshots and history restoration.
-- Optional `ToolCallResult.resultMetadata` carries MCP `CallToolResult._meta` separately from host/provider tool-call metadata and is preserved through result confirmation.
-- Optional `ResourceReadParams.position` and `ResourceReadParams.length` request a byte range from `resourceRead`, and optional `ResourceReadResult.size` reports the total size of the resource when the receiver honored the range. A result without `size` is the whole resource, and a ranged `utf-8` result does not split a UTF-8 sequence. (#554)
-- `resourceRead` guidance: a peer SHOULD serve reads of the URIs it publishes as content, including HTTP(S) URLs that the other peer might not be able to reach.
-- Optional `McpServerCustomization.children` for MCP-served skills (SEP-2640), toggleable by id with `session/customizationToggled`.
-- Optional `authenticate.accountId` carries an opaque client-local account-selection hint without changing token validation or legacy authentication.
+- Add optional `InitializeResult.environment.pathStyle` (`posix` or `windows`) so clients can parse and format host paths using the host's native path grammar instead of guessing locally.
+- Add optional `CreateChatParams.title` so clients can choose an initial display title when creating a chat.
+- Add optional `SessionModelInfo.vendor` so clients can display the model vendor reported by the provider separately from the owning agent provider. ([#503](https://github.com/microsoft/agent-host-protocol/issues/503))
+- Add experimental windowed delivery for subscriptions so fast producers do not overwhelm slow clients: peers negotiate soft `windowBytes` and hard `maxFrameBytes` limits using UTF-16 JSON-RPC message sizes, split large messages with `channel/frame`, return cumulative credit with `channel/credit`, renegotiate fresh zero-based windows in `reconnect.windows`, and expose generated `@windowExempt` helpers (`WindowedDelivery.ExemptMethods` and `WindowedDelivery.CountsAgainstWindow` in .NET) for control notifications that do not count against the window. ([#492](https://github.com/microsoft/agent-host-protocol/issues/492))
+  ```ts
+  // Offer windowed delivery on subscribe
+  await client.request('subscribe', {
+    channel: 'ahp-terminal:/t1',
+    flowControl: { receive: { windowBytes: 262144, maxFrameBytes: 16384 } },
+  });
+  // Return cumulative UTF-16 byte credit after processing incoming data
+  client.notify('channel/credit', { channel: 'ahp-terminal:/t1', consumedBytes });
+  ```
+  Read more in [Windowed Delivery](https://microsoft.github.io/agent-host-protocol/specification/windowed-delivery).
+- Add `EmptyState` (`{}`) to `Snapshot.state` for channels with no state fields, such as telemetry and TCP channels. Windowed subscriptions always start with `channel/snapshot`, whereas ordinary subscriptions may send or omit an `EmptyState` snapshot; clients must accept both and ignore unrecognized snapshot shapes.
+  Read more in [Channels and Subscriptions](https://microsoft.github.io/agent-host-protocol/specification/subscriptions).
+- Add an experimental TCP channel (`createTcpConnection`, `tcp/data`, `tcp/eof`, and `tcp/reset`, gated by `InitializeResult.tcpConnections`) so clients can forward TCP connections opened on the host's network over a windowed subscription; connections close if the AHP transport drops. ([#488](https://github.com/microsoft/agent-host-protocol/issues/488))
+  ```ts
+  const channel = 'ahp-tcp:/t1';
+  await client.request('createTcpConnection', { channel, host: 'localhost', port: 3000 });
+  await client.request('subscribe', {
+    channel,
+    flowControl: { receive: { windowBytes: 262144, maxFrameBytes: 16384 } },
+  });
+  client.notify('tcp/data', { channel, data: base64Bytes });
+  ```
+  Read more in [TCP Channel](https://microsoft.github.io/agent-host-protocol/specification/tcp-channel).
+- Add per-chat configuration (`ChatState.config`, `chat/configChanged`, and `SessionConfigPropertySchema.chatMutable`) so settings like tool auto-approval can be changed for one chat without affecting sibling chats; `ChatConfigState.values` does not inherit from the session (missing keys use the schema default), and optional `ChatConfigState.schema` overrides the session schema when a chat uses a different agent provider.
+  ```ts
+  client.notify('dispatchAction', {
+    channel: chatUri,
+    clientSeq: 1,
+    action: { type: 'chat/configChanged', config: { autoApprove: true } },
+  });
+  ```
+  Read more in [Chat Channel — Per-chat configuration](https://microsoft.github.io/agent-host-protocol/specification/chat-channel#per-chat-configuration).
+- Add per-chat agent providers (`CreateChatParams.provider` and `provider` on `ChatSummary`, `ChatState`, and `SessionChatSummary`, gated by `InitializeResult.multipleChatProviders`) so a single session can mix chats backed by different agent providers; omitting `provider` uses the session's provider, and forks and side chats keep their source chat's provider.
+  ```ts
+  await client.request('createChat', {
+    channel: sessionUri,
+    chat: 'ahp-chat:/<uuid>',
+    provider: 'claude',
+  });
+  ```
+  Read more in [Chat Channel — Chat providers](https://microsoft.github.io/agent-host-protocol/specification/chat-channel#chat-providers).
+- Add optional `ChangesetFile.status` (a bitset of `ChangesetFileStatus` flags, starting with `Editing`) so hosts can report ongoing per-file edits in changeset snapshots and actions without provider-specific metadata. ([#538](https://github.com/microsoft/agent-host-protocol/issues/538))
+  Read more in [Changesets — Per-file Editing Activity](https://microsoft.github.io/agent-host-protocol/guide/changesets#per-file-editing-activity).
+- Add optional optimistic-concurrency nonces (`ChangesetFile.nonce` and `ChangesetOperationTarget.nonce`) so hosts can reject `invokeChangesetOperation` calls targeting superseded file edits with `Conflict` without requiring a capability or breaking clients that omit nonces. ([#538](https://github.com/microsoft/agent-host-protocol/issues/538))
+- Add the `chat/moved` action, dispatched on a chat's channel after a cross-session `moveChat` to notify subscribers of its new `session` URI and updated relative `provider` and `config.schema`.
+  Read more in [Chat Channel — Moving chats](https://microsoft.github.io/agent-host-protocol/specification/chat-channel#moving-chats).
+- Add optional producer-recorded `startedAt` and `duration` fields to `ReasoningResponsePart` and `chat/reasoning` actions so each contiguous reasoning run's timing is preserved across snapshots, reconnects, and history restoration.
+  Read more in [Chat Channel — Reasoning timing](https://microsoft.github.io/agent-host-protocol/specification/chat-channel#reasoning-timing).
+- Add optional `ToolCallResult.resultMetadata` to carry MCP `CallToolResult._meta` separately from host/provider tool-call metadata and preserve it through result confirmation.
+- Add optional byte-range parameters (`position` and `length`) to `resourceRead` and a total-size indicator (`ResourceReadResult.size`) so callers can read slices of large resources without splitting UTF-8 sequences; a response without `size` contains the whole resource. ([#554](https://github.com/microsoft/agent-host-protocol/issues/554))
+  ```ts
+  const slice = await client.request('resourceRead', {
+    channel: 'ahp-root://',
+    uri: 'file:///workspace/logo.png',
+    position: 0,
+    length: 16,
+  });
+  // slice.size is present iff the receiver honored the byte range
+  ```
+- Document that peers should serve `resourceRead` requests for URIs they publish as content, including HTTP(S) URLs that the other peer cannot reach directly (such as a loopback dev server).
+- Add optional `McpServerCustomization.children` to surface MCP-served skills (SEP-2640) inside MCP server customizations, toggleable by ID via `session/customizationToggled`.
+  Read more in [Customizations](https://microsoft.github.io/agent-host-protocol/guide/customizations).
+- Add optional `AuthenticateParams.accountId` to carry an opaque client-local account hint alongside tokens so hosts can detect account switches without changing token validation.
+  Read more in [Authentication — Account selection hints](https://microsoft.github.io/agent-host-protocol/specification/authentication#account-selection-hints).
 
 ### Changed
 
-- Experimental windowed subscriptions count every data notification against the window, whether sent whole or in `channel/frame` notifications. Frames carry messages larger than `maxFrameBytes` and let subscriptions share the connection.
-- `Snapshot.state` can be an `EmptyState` (`{}`) for channels whose state has no fields, such as telemetry. With ordinary delivery, a server may send such a snapshot or omit it, so clients must accept both. Clients must not fail on a snapshot state that they do not recognize.
-- Experimental windowed delivery removes `maximumMessageBytes` and uses one size for everything: the UTF-16 size of each JSON-RPC data message as sent, including `channel/frame` envelopes. Each message and frame counts against `windowBytes`, which is a soft target; `maxFrameBytes` remains a hard limit on each message, and receivers can return credit for stored frames.
-- Store steering and queued input in one `queuedMessages` list with optional `PendingMessage.kind` (absent means queued), using the existing per-ID pending actions. New IDs append, kind changes replace in place, and UIs group steering first without changing raw order. Mirror the latest steering update in the deprecated `steeringMessage` slot for older clients.
-- Experimental windowed subscriptions no longer carry byte counters across `reconnect`. Their counters start at zero on the new connection, and each `reconnect.windows` item offers new limits in `flowControl`, which the result accepts as in `subscribe`. Removes `ChannelReceiveProgress` and the `clientReceive`/`hostReceive` counters from reconnect.
-- Remove the User-only restriction on client-submitted messages in `chat/turnStarted` and `chat/pendingMessageSet`. (#542)
-- Experimental `CanvasState.url` is renamed to `CanvasState.uri` and holds an absolute content URI, typically HTTP(S). A client that can't load it directly reads it, and the relative references in its content, with `resourceRead`.
-- Preserve unknown members on automation patch objects and nested shared types (`extra` in Rust/Swift/Kotlin, `Extra` in Go/.NET). Rust struct literals must initialize `extra` and exhaustive patterns need `..`; Go map-bearing structs lose `==` comparability; .NET record equality compares `Extra` by reference; Swift/Kotlin consumers must recompile. (#592)
-- Annotations channels use `ahp-annotations:/<uuid>` with the owning session's id; clients should use `AnnotationsSummary.resource` rather than derive the URI.
+- Unify steering and queued input in `ChatState.queuedMessages` with an optional `PendingMessage.kind` (`steering` or `queued`, defaulting to `queued`) using existing per-ID pending actions; new IDs append, kind changes replace in place, UIs group steering first without mutating raw order, and the latest steering entry is mirrored to the deprecated `steeringMessage` slot for older clients.
+  ```ts
+  client.notify('dispatchAction', {
+    channel: chatUri,
+    clientSeq: 1,
+    action: { type: 'chat/pendingMessageSet', kind: 'steering', id: 'p1', message },
+  });
+  ```
+- Allow non-`user` message origins (such as `automation` or `systemNotification`) in client-submitted `chat/turnStarted` and `chat/pendingMessageSet` actions. ([#542](https://github.com/microsoft/agent-host-protocol/issues/542))
+- Rename experimental `CanvasState.url` to `CanvasState.uri` to hold an absolute content URI (typically HTTP(S)); clients that cannot load the URI directly can fetch it and its relative references via `resourceRead`.
+- Preserve unknown JSON members on automation patch objects and nested shared types via an `Extra` property so newer fields survive round-trips; .NET record equality compares `Extra` by reference. ([#592](https://github.com/microsoft/agent-host-protocol/issues/592))
+- Standardize annotations channel URIs on `ahp-annotations:/<uuid>` using the owning session's ID; clients should read `AnnotationsSummary.resource` rather than constructing the URI manually.
 
 ### Fixed
 
-- Decoding a snapshot whose state has an unrecognized form no longer fails. The state is kept as an `Unknown` variant with its raw JSON, and state mirrors ignore it. Go no longer decodes such a state as an empty `RootState`.
-- State mirrors leave confirmed state unchanged when an action envelope carries a rejection reason. (#586)
+- Fix snapshot decoding so unrecognized channel states no longer fail; unknown states are preserved as an `Unknown` variant with their raw JSON and ignored by state mirrors.
+- Fix state mirrors to leave confirmed state unchanged when an incoming action envelope carries a `rejectionReason`. ([#586](https://github.com/microsoft/agent-host-protocol/issues/586))
 
 ### Security
 
-- Add an optional `authenticate.target` identifying an MCP server by session URI and customization ID, preventing tokens from reaching other consumers that share a protected resource and scopes.
+- Add optional `AuthenticateParams.target` to bind a pushed OAuth token to a specific MCP server by session URI and customization ID, preventing credentials from leaking to other consumers that share a protected resource and scopes.
+  ```ts
+  await client.request('authenticate', {
+    channel: 'ahp-root://',
+    resource: 'https://mcp.example.com',
+    token: accessToken,
+    target: {
+      kind: 'mcpServer',
+      session: sessionUri,
+      customizationId: 'mcp-server-1',
+    },
+  });
+  ```
+  Read more in [Authentication — Token Delivery](https://microsoft.github.io/agent-host-protocol/specification/authentication#token-delivery).
 
 ## [1.0.0] — 2026-10-02
 
@@ -71,7 +137,7 @@ Implements AHP 1.0.0.
 - `ChatState.changesets` and `chat/changesetsChanged` expose each chat's changeset catalogue through the subscribed chat channel.
 - `AutomationDefinition.disableConditions` supports `afterRuns` (`max`) and `afterDate` (`date`) rules combined with logical OR, with at most one condition per kind. Host-owned `AutomationEntry.runCount` tracks the current scheduled-run allowance. Edit conditions through `automation/updateRequested`: omission leaves them unchanged, an array replaces them, and `[]` removes all conditions without re-enabling the automation.
 - `ChangesetStatus.Recomputing` distinguishes refreshes of a completed result from initial changeset computation.
-- `ConfigPropertySchema.minItems` and `ConfigPropertySchema.maxItems` express array cardinality for `type: "array"` config properties. (#432)
+- `ConfigPropertySchema.minItems` and `ConfigPropertySchema.maxItems` express array cardinality for `type: "array"` config properties. ([#432](https://github.com/microsoft/agent-host-protocol/issues/432))
 - `McpServerStartingState.blocking` flag indicating that message processing may be held on the server, and the client-dispatchable `session/mcpServerBackgroundRequested` action asking the host to background such a startup.
 - `AutomationSessionTemplate.customizations` lets automations carry client plugins (skills, agents, prompts, rules) that the host captures when the definition is saved, with the host-owned copies reported in `AutomationEntry.customizations` and support advertised by `AutomationCapabilities.customizations`.
 - Hosts can advertise chat-owned canvas channel references and synchronize live presentation metadata and source URLs on experimental per-canvas channels.
@@ -91,9 +157,9 @@ Implements AHP 1.0.0.
 
 ### Fixed
 
-- Generated action and union-variant records now pin their own literal discriminator as the property initializer, so constructing one without setting the discriminator serializes the correct wire value. Previously the property fell back to the type's zero value — the *first* enum member, which silently emitted the wrong discriminator on every record but the first. (#366)
-- Open (`@nonexhaustive`) protocol enums no longer fail decoding when a newer peer sends a wire value this build does not recognize. They are now generated as readonly structs wrapping the raw wire string (with the known values as static members) instead of closed C# enums, so an added enum value round-trips verbatim as `versioning.md` requires. Each open enum gets a generated converter, so the path no longer relies on reflection. (#366)
-- Discriminated unions now derive whether an unrecognized discriminator is preserved from the discriminator enum's `@exhaustive` / `@nonexhaustive` annotation, matching the other generators. `SessionOrigin` and `CustomizationEnablement` previously rejected a discriminator added by a newer peer even though their discriminants are open; `ChangesetOperationTarget` is likewise derived now. (#366)
+- Generated action and union-variant records now pin their own literal discriminator as the property initializer, so constructing one without setting the discriminator serializes the correct wire value. Previously the property fell back to the type's zero value — the *first* enum member, which silently emitted the wrong discriminator on every record but the first. ([#366](https://github.com/microsoft/agent-host-protocol/issues/366))
+- Open (`@nonexhaustive`) protocol enums no longer fail decoding when a newer peer sends a wire value this build does not recognize. They are now generated as readonly structs wrapping the raw wire string (with the known values as static members) instead of closed C# enums, so an added enum value round-trips verbatim as `versioning.md` requires. Each open enum gets a generated converter, so the path no longer relies on reflection. ([#366](https://github.com/microsoft/agent-host-protocol/issues/366))
+- Discriminated unions now derive whether an unrecognized discriminator is preserved from the discriminator enum's `@exhaustive` / `@nonexhaustive` annotation, matching the other generators. `SessionOrigin` and `CustomizationEnablement` previously rejected a discriminator added by a newer peer even though their discriminants are open; `ChangesetOperationTarget` is likewise derived now. ([#366](https://github.com/microsoft/agent-host-protocol/issues/366))
 - Preserve unknown future chat move destinations when decoding and re-encoding with the .NET client.
 
 ## [0.9.0] — 2026-08-28
@@ -104,7 +170,7 @@ Implements AHP 0.9.0.
 
 - Automation catalogue and automation-run channels, including self-contained host-defined event triggers and automation-origin messages, for shared trigger-based agent session workflows.
 - Turn errors are durable response parts, and resumable errors can reopen the same turn through `chat/turnResume`.
-- First-party .NET client with generated AHP 0.9.0 wire types, reducers, JSON-RPC and multi-host clients, and an integrated WebSocket transport targeting `netstandard2.0` and `net8.0`. (#206, #214)
+- First-party .NET client with generated AHP 0.9.0 wire types, reducers, JSON-RPC and multi-host clients, and an integrated WebSocket transport targeting `netstandard2.0` and `net8.0`. ([#206](https://github.com/microsoft/agent-host-protocol/issues/206), [#214](https://github.com/microsoft/agent-host-protocol/issues/214))
 - `ClientConfig.TimeProvider` enables deterministic request timeout, keep-alive, reconnect scheduling, and host timestamps.
 - `InitializeResult._meta` for hosts to advertise implementation-specific extension capabilities in initialize responses.
 

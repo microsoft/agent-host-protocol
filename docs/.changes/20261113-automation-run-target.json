@@ -1,5 +1,19 @@
 {
   "type": "added",
-  "message": "`AutomationDefinition.target` and `AutomationCapabilities.targets`. With `previousSession`, each automation run continues the previous run's session instead of creating one; with `chat`, each run sends its message to one existing chat.",
+  "message": "Add automation run targets (`AutomationDefinition.target`, gated by `AutomationCapabilities.targets`) so runs can continue the previous run's session (`previousSession`) or queue messages into an existing chat (`chat`) instead of always creating a new session.",
+  "details": [
+    "```ts",
+    "// Continue the previous run's session (creates one if none is usable)",
+    "const recurringTarget = { kind: 'previousSession' } as const;",
+    "",
+    "// Or deliver every run's message to one existing chat",
+    "const chatTarget = {",
+    "  kind: 'chat',",
+    "  session: 'ahp-session:/<session-id>',",
+    "  chat: 'ahp-chat:/<chat-id>',",
+    "} as const;",
+    "```",
+    "Read more in [Automations — Run targets](https://microsoft.github.io/agent-host-protocol/guide/automations#run-targets)."
+  ],
   "issues": [572]
 }

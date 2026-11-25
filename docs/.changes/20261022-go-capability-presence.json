@@ -1,5 +1,5 @@
 {
   "type": "fixed",
-  "message": "Go preserves empty-object capability opt-ins on the wire; generated optional capability flags now use pointer-to-map fields instead of dropping `{}` through `omitempty`.",
+  "message": "Fix Go serialization of empty-object capability opt-ins by generating pointer-to-map fields so `{}` is preserved on the wire instead of being dropped by `omitempty`.",
   "targets": ["go"]
 }

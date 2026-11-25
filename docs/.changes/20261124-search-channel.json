@@ -1,4 +1,27 @@
 {
   "type": "added",
-  "message": "Experimental `ahp-search:` channel: `createSearch` searches file names, file text, sessions, and chat messages and streams scored, highlighted results into `SearchState`. Clients change the query with `search/queryChanged` (results stay visible while the lifecycle is `pending`) and cancel by unsubscribing; hosts append or replace results with `search/resultsChanged` and report progress with `search/lifecycleChanged`."
+  "message": "Add an experimental `ahp-search:` channel (`createSearch`, `SearchState`, `search/queryChanged`, `search/resultsChanged`, and `search/lifecycleChanged`, gated by `InitializeResult.search`) so hosts can stream scored, highlighted matches across file names, file text, sessions, and chat messages.",
+  "details": [
+    "```ts",
+    "const channel = 'ahp-search:/q1';",
+    "await client.request('createSearch', {",
+    "  channel,",
+    "  query: {",
+    "    text: 'parseConfig',",
+    "    targets: [",
+    "      { kind: 'fileText', roots: ['file:///workspace'] },",
+    "      { kind: 'sessions' },",
+    "    ],",
+    "  },",
+    "});",
+    "await client.request('subscribe', { channel });",
+    "// Refine the query in place (previous results stay visible while lifecycle is 'pending')",
+    "client.notify('dispatchAction', {",
+    "  channel,",
+    "  clientSeq: 1,",
+    "  action: { type: 'search/queryChanged', query: nextQuery },",
+    "});",
+    "```",
+    "Read more in [Search Channel](https://microsoft.github.io/agent-host-protocol/specification/search-channel)."
+  ]
 }

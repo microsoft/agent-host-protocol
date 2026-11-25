@@ -1,4 +1,5 @@
 {
   "type": "deprecated",
-  "message": "Tail-window turn paging (`SubscribeView.turns`, `ChatState.turnsNextCursor`, `fetchTurns`, and `chat/turnsLoaded`) is now Legacy (stability 3) in favour of deferred turns. It remains supported for 1.x clients that do not declare `deferredTurns`."
+  "message": "Deprecate tail-window turn paging (`SubscribeView.turns`, `ChatState.turnsNextCursor`, `fetchTurns`, and `chat/turnsLoaded`, now stability 3 / Legacy) in favour of deferred turns; it remains supported for 1.x clients that do not declare `deferredTurns`.",
+  "details": "Read more in [Chat Channel — Legacy tail-window paging](https://microsoft.github.io/agent-host-protocol/specification/chat-channel#legacy-tail-window-paging)."
 }
