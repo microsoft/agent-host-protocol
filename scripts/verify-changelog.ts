@@ -29,6 +29,7 @@ import { fileURLToPath } from 'url';
 import { Project } from 'ts-morph';
 
 import { readProtocolVersions } from './read-protocol-versions.js';
+import { findUnlinkedIssueReferences, REPO_ISSUES_URL } from './change-fragments.js';
 import {
   readKotlinPackageVersion,
   readRustPackageVersion,
@@ -171,12 +172,14 @@ function main(): void {
   ];
 
   const failures: { target: ChangelogTarget; relative: string; expectedVersion: string }[] = [];
+  const unlinkedIssues: { relative: string; line: number; reference: string }[] = [];
   for (const target of targets) {
     const expectedVersion = changelogVersionFor(target.version);
+    const relative = path.relative(ROOT, target.changelogPath);
     if (!fs.existsSync(target.changelogPath)) {
       failures.push({
         target,
-        relative: path.relative(ROOT, target.changelogPath),
+        relative,
         expectedVersion,
       });
       continue;
@@ -184,19 +187,28 @@ function main(): void {
     if (!changelogHasHeading(target.changelogPath, expectedVersion)) {
       failures.push({
         target,
-        relative: path.relative(ROOT, target.changelogPath),
+        relative,
         expectedVersion,
       });
     }
+    const body = fs.readFileSync(target.changelogPath, 'utf-8');
+    for (const match of findUnlinkedIssueReferences(body.replace(/\r\n/g, '\n').split('\n'))) {
+      unlinkedIssues.push({ relative, line: match.line, reference: match.reference });
+    }
   }
 
-  if (failures.length > 0) {
+  if (failures.length > 0 || unlinkedIssues.length > 0) {
     console.error('❌ CHANGELOG verification failed:');
     for (const { target, relative, expectedVersion } of failures) {
       console.error(
         `  [${target.label}] ${relative} is missing a '## [${expectedVersion}]' heading`,
       );
       console.error(`    hint: ${target.hint}`);
+    }
+    for (const { relative, line, reference } of unlinkedIssues) {
+      console.error(
+        `  ${relative}:${line} contains unlinked issue/PR reference ${reference} — link it as [${reference}](${REPO_ISSUES_URL}/${reference.slice(1)})`,
+      );
     }
     process.exit(1);
   }

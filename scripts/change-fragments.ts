@@ -28,6 +28,7 @@ export interface ChangeFragment {
   readonly filePath: string;
   readonly type: ChangeType;
   readonly message: string;
+  readonly details: readonly string[];
   readonly targets: readonly ChangelogTarget[];
   readonly issues: readonly number[];
 }
@@ -42,8 +43,46 @@ interface ParsedMarkdownSection {
   body: string[];
 }
 
-const ALLOWED_FRAGMENT_KEYS = new Set(['type', 'message', 'targets', 'issues']);
+const ALLOWED_FRAGMENT_KEYS = new Set(['type', 'message', 'details', 'targets', 'issues']);
 const DEFAULT_TARGETS: readonly ChangelogTarget[] = CHANGELOG_TARGETS;
+export const REPO_ISSUES_URL = 'https://github.com/microsoft/agent-host-protocol/issues';
+
+export interface UnlinkedIssueMatch {
+  readonly line: number;
+  readonly reference: string;
+}
+
+export function findUnlinkedIssueReferences(lines: readonly string[]): UnlinkedIssueMatch[] {
+  const matches: UnlinkedIssueMatch[] = [];
+  let openFence: { char: string; length: number } | undefined;
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const fenceMatch = /^\s*(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fenceMatch) {
+      const marker = fenceMatch[1];
+      const rest = fenceMatch[2];
+      if (!openFence) {
+        openFence = { char: marker[0], length: marker.length };
+      } else if (marker[0] === openFence.char && marker.length >= openFence.length && rest.trim().length === 0) {
+        openFence = undefined;
+      }
+      continue;
+    }
+    if (openFence) {
+      continue;
+    }
+
+    const stripped = line
+      .replace(/`[^`]*`/g, '')
+      .replace(/\[[^\]]*\]\([^)]*\)/g, '');
+    for (const match of stripped.matchAll(/(?<![A-Za-z0-9_/#-])#(\d+)\b/g)) {
+      matches.push({ line: index + 1, reference: match[0] });
+    }
+  }
+
+  return matches;
+}
 
 export function changesDir(rootDir: string): string {
   return path.join(rootDir, 'docs', '.changes');
@@ -150,6 +189,88 @@ function validateIssues(filePath: string, value: unknown, errors: FragmentValida
   return issues;
 }
 
+function validateDetails(filePath: string, value: unknown, errors: FragmentValidationError[]): readonly string[] {
+  if (value === undefined) {
+    return [];
+  }
+
+  let lines: string[];
+  if (typeof value === 'string') {
+    if (value.trim().length === 0) {
+      errors.push({ filePath, message: '`details` must not be empty when present' });
+      return [];
+    }
+    lines = value.replace(/\r\n/g, '\n').split('\n');
+    if (lines.some((line) => line.includes('\r'))) {
+      errors.push({ filePath, message: '`details` must not contain bare carriage returns' });
+      return [];
+    }
+  } else if (Array.isArray(value)) {
+    if (value.length === 0) {
+      errors.push({ filePath, message: '`details` must be a non-empty string or array of lines when present' });
+      return [];
+    }
+    lines = [];
+    let hasInvalidEntry = false;
+    for (const entry of value) {
+      if (typeof entry !== 'string') {
+        errors.push({ filePath, message: '`details` array entries must be strings' });
+        hasInvalidEntry = true;
+        continue;
+      }
+      if (/\r|\n/.test(entry)) {
+        errors.push({ filePath, message: '`details` array entries must each be a single line' });
+        hasInvalidEntry = true;
+        continue;
+      }
+      lines.push(entry);
+    }
+    if (hasInvalidEntry) {
+      return [];
+    }
+  } else {
+    errors.push({ filePath, message: '`details` must be a non-empty string or array of lines when present' });
+    return [];
+  }
+
+  if (lines[0].trim().length === 0 || lines[lines.length - 1].trim().length === 0) {
+    errors.push({ filePath, message: '`details` must not have leading or trailing blank lines' });
+    return [];
+  }
+
+  let openFence: { char: string; length: number } | undefined;
+  for (const line of lines) {
+    const fenceMatch = /^\s*(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fenceMatch) {
+      const marker = fenceMatch[1];
+      const rest = fenceMatch[2];
+      if (!openFence) {
+        openFence = { char: marker[0], length: marker.length };
+      } else if (marker[0] === openFence.char && marker.length >= openFence.length && rest.trim().length === 0) {
+        openFence = undefined;
+      }
+      continue;
+    }
+
+    if (!openFence && /^\s*#{1,6}\s/.test(line)) {
+      errors.push({ filePath, message: '`details` must not contain Markdown headings outside fenced code blocks' });
+    }
+  }
+
+  if (openFence) {
+    errors.push({ filePath, message: '`details` has an unclosed fenced code block' });
+  }
+
+  for (const unlinked of findUnlinkedIssueReferences(lines)) {
+    errors.push({
+      filePath,
+      message: `\`details\` contains unlinked issue/PR reference ${unlinked.reference}; link it as [${unlinked.reference}](${REPO_ISSUES_URL}/${unlinked.reference.slice(1)}) or put it in \`issues\``,
+    });
+  }
+
+  return lines;
+}
+
 export function parseChangeFragment(filePath: string, raw: string): { fragment?: ChangeFragment; errors: FragmentValidationError[] } {
   const errors: FragmentValidationError[] = [];
   let parsed: unknown;
@@ -189,9 +310,17 @@ export function parseChangeFragment(filePath: string, raw: string): { fragment?:
   } else if (parsed.message.startsWith('- ')) {
     errors.push({ filePath, message: '`message` must not include the leading Markdown bullet' });
   } else if (/\r|\n/.test(parsed.message)) {
-    errors.push({ filePath, message: '`message` must be a single line' });
+    errors.push({ filePath, message: '`message` must be a single line; put code snippets, examples, or doc links in `details`' });
+  } else {
+    for (const unlinked of findUnlinkedIssueReferences([parsed.message])) {
+      errors.push({
+        filePath,
+        message: `\`message\` contains unlinked issue/PR reference ${unlinked.reference}; put it in \`issues\` or link it as [${unlinked.reference}](${REPO_ISSUES_URL}/${unlinked.reference.slice(1)})`,
+      });
+    }
   }
 
+  const details = validateDetails(filePath, parsed.details, errors);
   const targets = validateTargets(filePath, parsed.targets, errors);
   const issues = validateIssues(filePath, parsed.issues, errors);
 
@@ -204,6 +333,7 @@ export function parseChangeFragment(filePath: string, raw: string): { fragment?:
       filePath,
       type: parsed.type as ChangeType,
       message: parsed.message as string,
+      details,
       targets,
       issues,
     },
@@ -234,7 +364,7 @@ function issueSuffix(issues: readonly number[]): string {
   if (issues.length === 0) {
     return '';
   }
-  return ` (${issues.map((issue) => `#${issue}`).join(', ')})`;
+  return ` (${issues.map((issue) => `[#${issue}](${REPO_ISSUES_URL}/${issue})`).join(', ')})`;
 }
 
 export function renderChangeSections(fragments: readonly ChangeFragment[], target: ChangelogTarget): string[] {
@@ -250,6 +380,9 @@ export function renderChangeSections(fragments: readonly ChangeFragment[], targe
     lines.push(`### ${CHANGE_TYPE_HEADINGS[type]}`, '');
     for (const fragment of matching) {
       lines.push(`- ${fragment.message}${issueSuffix(fragment.issues)}`);
+      for (const detailLine of fragment.details) {
+        lines.push(detailLine.trim().length === 0 ? '' : `  ${detailLine}`);
+      }
     }
   }
   return lines;

@@ -1,4 +1,15 @@
 {
   "type": "added",
-  "message": "One-time automation triggers, advertised by `AutomationCapabilities.oneTime`."
+  "message": "Add one-time automation triggers (`AutomationOneTimeTrigger`, advertised by `AutomationCapabilities.oneTime`) to schedule a single run at a fixed ISO 8601 timestamp.",
+  "details": [
+    "```ts",
+    "const trigger: AutomationOneTimeTrigger = {",
+    "  id: 'release-check',",
+    "  kind: 'oneTime',",
+    "  runAt: '2026-12-01T15:00:00Z',",
+    "  misfirePolicy: 'runOnce',",
+    "};",
+    "```",
+    "Read more in [Automations — One-time triggers](https://microsoft.github.io/agent-host-protocol/guide/automations#one-time-triggers)."
+  ]
 }

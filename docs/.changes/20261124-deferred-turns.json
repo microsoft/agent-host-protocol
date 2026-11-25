@@ -1,4 +1,23 @@
 {
   "type": "added",
-  "message": "Deferred turns: clients that declare `ClientCapabilities.deferredTurns` may receive `DeferredTurn` entries (`isDeferred: true`, no `responseParts`) in `ChatState.turns`, and can expand a range of them with the `fetchDeferredTurns` command and `chat/turnsMaterialized` action."
+  "message": "Add deferred turns (`ClientCapabilities.deferredTurns`, `DeferredTurn`, `fetchDeferredTurns`, and `chat/turnsMaterialized`) so clients can render full chat histories without downloading every response up front and expand turn ranges on demand.",
+  "details": [
+    "```ts",
+    "// 1. Opt in during initialize",
+    "await client.request('initialize', {",
+    "  channel: 'ahp-root://',",
+    "  protocolVersions: ['1.2.0'],",
+    "  clientId,",
+    "  capabilities: { deferredTurns: {} },",
+    "});",
+    "",
+    "// 2. Materialize a range of deferred turns in place (emits chat/turnsMaterialized)",
+    "await client.request('fetchDeferredTurns', {",
+    "  channel: chatUri,",
+    "  turnId: 't45',",
+    "  endTurnId: 't49',",
+    "});",
+    "```",
+    "Read more in [Chat Channel — Deferred turns](https://microsoft.github.io/agent-host-protocol/specification/chat-channel#deferred-turns)."
+  ]
 }

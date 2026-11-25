@@ -95,6 +95,7 @@ function writeRemainingFragment(fragment: ChangeFragment, remainingTargets: read
   const next = {
     type: fragment.type,
     message: fragment.message,
+    ...(fragment.details.length > 0 ? { details: fragment.details } : {}),
     targets: remainingTargets,
     ...(fragment.issues.length > 0 ? { issues: fragment.issues } : {}),
   };

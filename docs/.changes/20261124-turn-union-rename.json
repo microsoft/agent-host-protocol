@@ -1,4 +1,14 @@
 {
   "type": "changed",
-  "message": "**Breaking (SDK source):** the full completed-turn type is renamed `Turn` → `MaterializedTurn`, and `Turn` is now the union `MaterializedTurn | DeferredTurn` used by `ChatState.turns` and `chat/turnsLoaded`. Code that reads `responseParts` must narrow to `MaterializedTurn` first. The wire format is unchanged for clients that don't declare `deferredTurns`."
+  "message": "Rename the full completed-turn type from `Turn` to `MaterializedTurn` (breaking SDK source change) and make `Turn` the union `MaterializedTurn | DeferredTurn` so consumers explicitly narrow before reading `responseParts`; the wire format is unchanged for clients that do not declare `deferredTurns`.",
+  "details": [
+    "```ts",
+    "for (const turn of chatState.turns) {",
+    "  if (turn.isDeferred) continue;",
+    "  // Narrowed to MaterializedTurn — safe to read turn.responseParts",
+    "  renderParts(turn.responseParts);",
+    "}",
+    "```",
+    "Read more in [Chat Channel — Deferred turns](https://microsoft.github.io/agent-host-protocol/specification/chat-channel#deferred-turns)."
+  ]
 }
