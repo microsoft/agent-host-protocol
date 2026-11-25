@@ -114,6 +114,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
 
   // Type aliases
   if (tsType === 'URI') return 'String';
+  if (tsType === 'AhpErrorCode') return 'Int';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
   if (tsType === 'ToolInput') return 'ToolInput';
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
@@ -736,6 +737,7 @@ const STATE_ENUMS = [
   'TerminalClaimKind', 'TerminalLifecycleStatus',
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
+  'ModelSourceStatus', 'ModelSourceRetentionPolicy', 'ModelSourceAuthRequiredReason',
   'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
@@ -754,7 +756,10 @@ const STATE_STRUCTS = [
   'AgentCapabilities',
   'MultipleChatsCapability',
   'MultipleWorkingDirectoriesCapability',
-  'ModelSourceInfo', 'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
+  'ModelSourceRegistrationCapability', 'ModelSourceFormatInfo', 'ModelSource', 'ModelSourceRegistration', 'ModelSourceStartingState',
+  'ModelSourceReadyState', 'ModelSourceAuthRequirement', 'ModelSourceAuthRequiredState',
+  'ModelSourceErrorState',
+  'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'BackgroundShellWork', 'BackgroundSubagentWork',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
@@ -1006,6 +1011,17 @@ const MCP_SERVER_STATUS_UNION: UnionConfig = {
     { caseName: 'authRequired', structName: 'McpServerAuthRequiredState', discriminantValue: 'authRequired' },
     { caseName: 'error', structName: 'McpServerErrorState', discriminantValue: 'error' },
     { caseName: 'stopped', structName: 'McpServerStoppedState', discriminantValue: 'stopped' },
+  ],
+};
+
+const MODEL_SOURCE_STATUS_UNION: UnionConfig = {
+  name: 'ModelSourceState',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'starting', structName: 'ModelSourceStartingState', discriminantValue: 'starting' },
+    { caseName: 'ready', structName: 'ModelSourceReadyState', discriminantValue: 'ready' },
+    { caseName: 'authRequired', structName: 'ModelSourceAuthRequiredState', discriminantValue: 'authRequired' },
+    { caseName: 'error', structName: 'ModelSourceErrorState', discriminantValue: 'error' },
   ],
 };
 
@@ -1602,6 +1618,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, MCP_SERVER_STATUS_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, MODEL_SOURCE_STATUS_UNION));
+  lines.push('');
   lines.push(generateDiscriminatedUnion(project, TOOL_CALL_CONTRIBUTOR_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, TOOL_CALL_RISK_ASSESSMENT_UNION));
@@ -1729,6 +1747,9 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'annotations/entryRemoved', caseName: 'annotationsEntryRemoved', tsInterface: 'AnnotationsEntryRemovedAction' },
   { type: 'root/terminalsChanged', caseName: 'rootTerminalsChanged', tsInterface: 'RootTerminalsChangedAction' },
   { type: 'root/configChanged', caseName: 'rootConfigChanged', tsInterface: 'RootConfigChangedAction' },
+  { type: 'root/modelSourceSet', caseName: 'rootModelSourceSet', tsInterface: 'RootModelSourceSetAction' },
+  { type: 'root/modelSourceRemoved', caseName: 'rootModelSourceRemoved', tsInterface: 'RootModelSourceRemovedAction' },
+  { type: 'root/modelSourceRegisterRequested', caseName: 'rootModelSourceRegisterRequested', tsInterface: 'RootModelSourceRegisterRequestedAction' },
   { type: 'terminal/data', caseName: 'terminalData', tsInterface: 'TerminalDataAction' },
   { type: 'terminal/input', caseName: 'terminalInput', tsInterface: 'TerminalInputAction' },
   { type: 'terminal/resized', caseName: 'terminalResized', tsInterface: 'TerminalResizedAction' },
@@ -1984,7 +2005,7 @@ const COMMAND_STRUCTS = [
   'CreateSearchParams', 'CreateSearchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
-  'McpServerAuthenticateTarget',
+  'McpServerAuthenticateTarget', 'ModelSourceAuthenticateTarget',
   'AuthenticateParams', 'AuthenticateResult',
   'CreateTerminalParams', 'DisposeTerminalParams',
   'ResolveSessionConfigParams', 'ResolveSessionConfigResult',
@@ -2004,6 +2025,7 @@ const AUTHENTICATE_TARGET_UNION: UnionConfig = {
   discriminantField: 'kind',
   variants: [
     { caseName: 'mcpServer', structName: 'McpServerAuthenticateTarget', discriminantValue: 'mcpServer' },
+    { caseName: 'modelSource', structName: 'ModelSourceAuthenticateTarget', discriminantValue: 'modelSource' },
   ],
   injectDiscriminantOnEncode: true,
 };
@@ -2410,6 +2432,8 @@ function generateErrorsFile(project: Project): string {
   lines.push('    public static let permissionDenied = -32009');
   lines.push('    /// The target resource already exists and the operation does not allow overwriting');
   lines.push('    public static let alreadyExists = -32010');
+  lines.push("    /// A request or turn needs a registered model source that can't serve it");
+  lines.push('    public static let modelSourceUnavailable = -32013');
   lines.push('}');
   lines.push('');
 
@@ -2818,6 +2842,7 @@ function checkExhaustiveness(project: Project): void {
     'ChildCustomizationType',       // TS subset alias of CustomizationType; consumers reuse the CustomizationType Swift enum
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
+    'ModelSourceState',            // MODEL_SOURCE_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union
     'ToolCallRiskAssessment',       // TOOL_CALL_RISK_ASSESSMENT_UNION discriminated union
     'TerminalLifecycleState',       // TERMINAL_LIFECYCLE_STATE_UNION discriminated union

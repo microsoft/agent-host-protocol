@@ -1492,6 +1492,12 @@ export interface ResourceMkdirResult {
  */
 export const enum AuthenticateTargetKind {
   McpServer = 'mcpServer',
+  /**
+   * A {@link ModelSourceAuthenticateTarget}.
+   *
+   * @stability 1.0
+   */
+  ModelSource = 'modelSource',
 }
 
 /**
@@ -1512,22 +1518,42 @@ export interface McpServerAuthenticateTarget {
 }
 
 /**
+ * A registered model source. The host applies the credential only to that
+ * source, and publishes the request's `accountId` as the source's
+ * `ModelSource.accountId`.
+ *
+ * @category Commands
+ * @stability 1.0
+ * @see {@link /specification/authentication#model-source-credentials | Model source credentials}
+ */
+export interface ModelSourceAuthenticateTarget {
+  kind: AuthenticateTargetKind.ModelSource;
+  /** The source's `ModelSource.id`. */
+  modelSourceId: string;
+}
+
+/**
  * Consumer of an authentication token, discriminated by `kind`.
  * Extensible to support additional consumers, such as host-owned authentication.
  *
  * @category Commands
  */
-export type AuthenticateTarget = McpServerAuthenticateTarget;
+export type AuthenticateTarget =
+  | McpServerAuthenticateTarget
+  | ModelSourceAuthenticateTarget;
 
 /**
  * Pushes a Bearer token for a protected resource. The `resource` field MUST
  * match a protected-resource identifier the client has discovered from the
  * server — whether declared statically in `AgentInfo.protectedResources`,
  * or discovered dynamically from a live `McpServerAuthRequiredState.resource`
- * or `ToolCallAuthRequiredState.auth.resource` (both surfaced only once the
- * corresponding MCP server or tool call actually challenges for auth).
+ * or `ToolCallAuthRequiredState.auth.resource` (each surfaced only once the
+ * corresponding MCP server or tool call actually challenges for auth), or
+ * from a registered model source's `ModelSource.credentialResource`.
  * Servers MUST accept any `resource` value they have themselves advertised
- * through one of these three mechanisms.
+ * through one of these mechanisms, subject to the `target` rules. A
+ * `modelSource` target takes only the source's current
+ * `credentialResource.resource`.
  *
  * Tokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)
  * (Bearer Token Usage) semantics. The client obtains the token from the
@@ -1560,7 +1586,8 @@ export interface AuthenticateParams extends BaseParams {
    * The protected resource identifier. MUST match a `resource` value the
    * server has advertised — via `ProtectedResourceMetadata` in
    * `AgentInfo.protectedResources`, or via a live
-   * `McpServerAuthRequiredState.resource` / `ToolCallAuthRequiredState.auth.resource`.
+   * `McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,
+   * or `ModelSource.credentialResource`.
    */
   resource: string;
   /** Bearer token obtained from the resource's authorization server */
@@ -1594,15 +1621,22 @@ export interface AuthenticateParams extends BaseParams {
   /**
    * Optional consumer of the token. Clients SHOULD include this when answering
    * a specific MCP server's `McpServerAuthRequiredState` or
-   * `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+   * `ToolCallAuthRequiredState` challenge, MUST include it when delivering a
+   * registered model source's credential, and omit it for provider-level
    * resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
    *
-   * When present, the host MUST apply the token only to that MCP server in
-   * that session, never to sibling servers, other sessions, or agent-level
-   * resources, even if they share the resource and scopes. `resource` MUST
-   * still equal that server's advertised `McpAuthRequirement.resource.resource`.
-   * The host MUST reject an unknown session or customization, or a
-   * customization that is not an MCP server, with `InvalidParams` (-32602).
+   * For an `mcpServer` target, the host MUST apply the token only to that MCP
+   * server in that session, never to sibling servers, other sessions, or
+   * agent-level resources, even if they share the resource and scopes.
+   * `resource` MUST still equal that server's advertised
+   * `McpAuthRequirement.resource.resource`. The host MUST reject an unknown
+   * session or customization, or a customization that is not an MCP server,
+   * with `InvalidParams` (-32602).
+   *
+   * A registered model source takes its credential only through a
+   * `modelSource` target, and the host rejects an untargeted `resource` that
+   * matches only model source challenges with `InvalidParams` (-32602). See
+   * [Model source credentials](/specification/authentication#model-source-credentials).
    *
    * Without a target, resource/scope matching is unchanged; the token may
    * satisfy every matching pending challenge. Older hosts ignore this field.

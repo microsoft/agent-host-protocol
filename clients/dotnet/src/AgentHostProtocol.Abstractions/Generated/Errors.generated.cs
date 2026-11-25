@@ -47,6 +47,8 @@ public static class AhpErrorCodes
     public const int Conflict = -32011;
     /// <summary>The host could not open the requested TCP connection.</summary>
     public const int TcpConnectionOpenFailed = -32012;
+    /// <summary>A request or turn needs a registered model source that can't serve it, for example because the source needs a credential or was removed. A turn carries it in its error part's `ErrorInfo.errorCode`. @see {@link /guide/model-sources#unavailable-sources | Model Sources guide}</summary>
+    public const int ModelSourceUnavailable = -32013;
 }
 
 /// <summary>Detail payload of an AuthRequired (-32007) error.</summary>

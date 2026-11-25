@@ -1,0 +1,68 @@
+{
+  "description": "root/modelSourceRemoved is a no-op when no model source has the modelSourceId",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v1",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "ready"
+        },
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "accountId": "account-a-1"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceRemoved",
+      "modelSourceId": "model-source-missing"
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v1",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "ready"
+        },
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "accountId": "account-a-1"
+      }
+    ]
+  }
+}

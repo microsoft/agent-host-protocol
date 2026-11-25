@@ -199,6 +199,10 @@ enum class ResourceWriteMode {
 value class AuthenticateTargetKind(val rawValue: String) {
     companion object {
         val MCP_SERVER: AuthenticateTargetKind = AuthenticateTargetKind("mcpServer")
+        /**
+         * A {@link ModelSourceAuthenticateTarget}.
+         */
+        val MODEL_SOURCE: AuthenticateTargetKind = AuthenticateTargetKind("modelSource")
     }
 }
 
@@ -1757,6 +1761,22 @@ data class McpServerAuthenticateTarget(
     val customizationId: String
 )
 
+/**
+ * A registered model source. The host applies the credential only to that
+ * source, and publishes the request's `accountId` as the source's
+ * `ModelSource.accountId`.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ModelSourceAuthenticateTarget(
+    val kind: AuthenticateTargetKind,
+    /**
+     * The source's `ModelSource.id`.
+     */
+    val modelSourceId: String
+)
+
 @Serializable
 data class AuthenticateParams(
     /**
@@ -1773,7 +1793,8 @@ data class AuthenticateParams(
      * The protected resource identifier. MUST match a `resource` value the
      * server has advertised — via `ProtectedResourceMetadata` in
      * `AgentInfo.protectedResources`, or via a live
-     * `McpServerAuthRequiredState.resource` / `ToolCallAuthRequiredState.auth.resource`.
+     * `McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,
+     * or `ModelSource.credentialResource`.
      */
     val resource: String,
     /**
@@ -1806,15 +1827,22 @@ data class AuthenticateParams(
     /**
      * Optional consumer of the token. Clients SHOULD include this when answering
      * a specific MCP server's `McpServerAuthRequiredState` or
-     * `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+     * `ToolCallAuthRequiredState` challenge, MUST include it when delivering a
+     * registered model source's credential, and omit it for provider-level
      * resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
      *
-     * When present, the host MUST apply the token only to that MCP server in
-     * that session, never to sibling servers, other sessions, or agent-level
-     * resources, even if they share the resource and scopes. `resource` MUST
-     * still equal that server's advertised `McpAuthRequirement.resource.resource`.
-     * The host MUST reject an unknown session or customization, or a
-     * customization that is not an MCP server, with `InvalidParams` (-32602).
+     * For an `mcpServer` target, the host MUST apply the token only to that MCP
+     * server in that session, never to sibling servers, other sessions, or
+     * agent-level resources, even if they share the resource and scopes.
+     * `resource` MUST still equal that server's advertised
+     * `McpAuthRequirement.resource.resource`. The host MUST reject an unknown
+     * session or customization, or a customization that is not an MCP server,
+     * with `InvalidParams` (-32602).
+     *
+     * A registered model source takes its credential only through a
+     * `modelSource` target, and the host rejects an untargeted `resource` that
+     * matches only model source challenges with `InvalidParams` (-32602). See
+     * [Model source credentials](/specification/authentication#model-source-credentials).
      *
      * Without a target, resource/scope matching is unchanged; the token may
      * satisfy every matching pending challenge. Older hosts ignore this field.
@@ -2387,6 +2415,8 @@ sealed interface AuthenticateTarget
 
 @JvmInline
 value class AuthenticateTargetMcpServer(val value: McpServerAuthenticateTarget) : AuthenticateTarget
+@JvmInline
+value class AuthenticateTargetModelSource(val value: ModelSourceAuthenticateTarget) : AuthenticateTarget
 /**
  * Forward-compat catch-all for unknown AuthenticateTarget discriminators.
  *
@@ -2412,6 +2442,7 @@ internal object AuthenticateTargetSerializer : KSerializer<AuthenticateTarget> {
             ?: return AuthenticateTargetUnknown(obj)
         return when (discriminant) {
             "mcpServer" -> AuthenticateTargetMcpServer(input.json.decodeFromJsonElement(McpServerAuthenticateTarget.serializer(), element))
+            "modelSource" -> AuthenticateTargetModelSource(input.json.decodeFromJsonElement(ModelSourceAuthenticateTarget.serializer(), element))
             else -> AuthenticateTargetUnknown(obj)
         }
     }
@@ -2421,11 +2452,13 @@ internal object AuthenticateTargetSerializer : KSerializer<AuthenticateTarget> {
             ?: error("AuthenticateTarget can only be serialized to JSON")
         val element: JsonElement = when (value) {
             is AuthenticateTargetMcpServer -> output.json.encodeToJsonElement(McpServerAuthenticateTarget.serializer(), value.value)
+            is AuthenticateTargetModelSource -> output.json.encodeToJsonElement(ModelSourceAuthenticateTarget.serializer(), value.value)
             is AuthenticateTargetUnknown -> value.raw
         }
         val encodedObject = element.jsonObject.toMutableMap()
         val discriminant = when (value) {
             is AuthenticateTargetMcpServer -> "mcpServer"
+            is AuthenticateTargetModelSource -> "modelSource"
             is AuthenticateTargetUnknown -> null
         }
         if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)

@@ -201,6 +201,12 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType RootConfigChanged = new ActionType("root/configChanged");
 
+    public static readonly ActionType RootModelSourceRegisterRequested = new ActionType("root/modelSourceRegisterRequested");
+
+    public static readonly ActionType RootModelSourceSet = new ActionType("root/modelSourceSet");
+
+    public static readonly ActionType RootModelSourceRemoved = new ActionType("root/modelSourceRemoved");
+
     public static readonly ActionType TerminalData = new ActionType("terminal/data");
 
     public static readonly ActionType TerminalInput = new ActionType("terminal/input");
@@ -346,6 +352,71 @@ public sealed record RootConfigChangedAction
     /// <summary>When `true`, replaces all config values instead of merging</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Replace { get; init; }
+}
+
+/// <summary>Adds a model source, or replaces the one with the same `id`. Only the host
+/// dispatches it, to publish a registration, a source an agent provides
+/// itself, or a change in a source's status.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record RootModelSourceSetAction
+{
+    public ActionType Type { get; init; } = ActionType.RootModelSourceSet;
+
+    /// <summary>The model source to add or replace, matched by `id`.</summary>
+    public required ModelSource ModelSource { get; init; }
+}
+
+/// <summary>Removes the model source with the given `modelSourceId`, for every client.
+/// A no-op when none matches.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record RootModelSourceRemovedAction
+{
+    public ActionType Type { get; init; } = ActionType.RootModelSourceRemoved;
+
+    /// <summary>The model source's `id`.</summary>
+    public required string ModelSourceId { get; init; }
+}
+
+/// <summary>Asks the host to register a model source, or to update the one with the
+/// same `modelSourceId`. The reducer leaves state unchanged. The host counts
+/// the dispatching client as a contributing client, validates the
+/// registration, and publishes the result with
+/// {@link RootModelSourceSetAction | `root/modelSourceSet`}. It keeps the
+/// source's status and credential when the registration is unchanged.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record RootModelSourceRegisterRequestedAction
+{
+    public ActionType Type { get; init; } = ActionType.RootModelSourceRegisterRequested;
+
+    /// <summary>The model source's `id`, chosen by the client.</summary>
+    public required string ModelSourceId { get; init; }
+
+    /// <summary>Agent provider whose agent serves the source's models.</summary>
+    public required string Provider { get; init; }
+
+    /// <summary>Human-readable name.</summary>
+    public required string DisplayName { get; init; }
+
+    /// <summary>Icons for UI display.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<Icon>? Icons { get; init; }
+
+    /// <summary>The source's format and definition.</summary>
+    public required ModelSourceRegistration Registration { get; init; }
+
+    /// <summary>What happens to the source when the last contributing client leaves.
+    /// Absent means `contributingClient`. The host keeps it privately.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ModelSourceRetentionPolicy? Retention { get; init; }
+
+    /// <summary>Additional implementation-defined metadata for this model source.
+    /// MUST NOT contain a credential.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
 }
 
 /// <summary>Session backend initialized successfully.</summary>
@@ -2961,6 +3032,9 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["root/agentsChanged"] = typeof(RootAgentsChangedAction),
         ["root/activeSessionsChanged"] = typeof(RootActiveSessionsChangedAction),
         ["root/configChanged"] = typeof(RootConfigChangedAction),
+        ["root/modelSourceSet"] = typeof(RootModelSourceSetAction),
+        ["root/modelSourceRemoved"] = typeof(RootModelSourceRemovedAction),
+        ["root/modelSourceRegisterRequested"] = typeof(RootModelSourceRegisterRequestedAction),
         ["session/ready"] = typeof(SessionReadyAction),
         ["session/creationFailed"] = typeof(SessionCreationFailedAction),
         ["session/turnStarted"] = typeof(SessionTurnStartedAction),

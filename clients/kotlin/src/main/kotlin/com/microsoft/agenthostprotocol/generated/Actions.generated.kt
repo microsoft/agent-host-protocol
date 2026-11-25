@@ -117,6 +117,9 @@ value class ActionType(val rawValue: String) {
         val ANNOTATIONS_ENTRY_REMOVED: ActionType = ActionType("annotations/entryRemoved")
         val ROOT_TERMINALS_CHANGED: ActionType = ActionType("root/terminalsChanged")
         val ROOT_CONFIG_CHANGED: ActionType = ActionType("root/configChanged")
+        val ROOT_MODEL_SOURCE_REGISTER_REQUESTED: ActionType = ActionType("root/modelSourceRegisterRequested")
+        val ROOT_MODEL_SOURCE_SET: ActionType = ActionType("root/modelSourceSet")
+        val ROOT_MODEL_SOURCE_REMOVED: ActionType = ActionType("root/modelSourceRemoved")
         val TERMINAL_DATA: ActionType = ActionType("terminal/data")
         val TERMINAL_INPUT: ActionType = ActionType("terminal/input")
         val TERMINAL_RESIZED: ActionType = ActionType("terminal/resized")
@@ -1522,6 +1525,83 @@ data class RootConfigChangedAction(
     val replace: Boolean? = null
 )
 
+/**
+ * Adds a model source, or replaces the one with the same `id`. Only the host
+ * dispatches it, to publish a registration, a source an agent provides
+ * itself, or a change in a source's status.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class RootModelSourceSetAction(
+    val type: ActionType,
+    /**
+     * The model source to add or replace, matched by `id`.
+     */
+    val modelSource: ModelSource
+)
+
+/**
+ * Removes the model source with the given `modelSourceId`, for every client.
+ * A no-op when none matches.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class RootModelSourceRemovedAction(
+    val type: ActionType,
+    /**
+     * The model source's `id`.
+     */
+    val modelSourceId: String
+)
+
+/**
+ * Asks the host to register a model source, or to update the one with the
+ * same `modelSourceId`. The reducer leaves state unchanged. The host counts
+ * the dispatching client as a contributing client, validates the
+ * registration, and publishes the result with
+ * {@link RootModelSourceSetAction | `root/modelSourceSet`}. It keeps the
+ * source's status and credential when the registration is unchanged.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class RootModelSourceRegisterRequestedAction(
+    val type: ActionType,
+    /**
+     * The model source's `id`, chosen by the client.
+     */
+    val modelSourceId: String,
+    /**
+     * Agent provider whose agent serves the source's models.
+     */
+    val provider: String,
+    /**
+     * Human-readable name.
+     */
+    val displayName: String,
+    /**
+     * Icons for UI display.
+     */
+    val icons: List<Icon>? = null,
+    /**
+     * The source's format and definition.
+     */
+    val registration: ModelSourceRegistration,
+    /**
+     * What happens to the source when the last contributing client leaves.
+     * Absent means `contributingClient`. The host keeps it privately.
+     */
+    val retention: ModelSourceRetentionPolicy? = null,
+    /**
+     * Additional implementation-defined metadata for this model source.
+     * MUST NOT contain a credential.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
 @Serializable
 data class TerminalDataAction(
     val type: ActionType,
@@ -1973,6 +2053,9 @@ sealed interface StateAction
 @JvmInline value class StateActionAnnotationsEntryRemoved(val value: AnnotationsEntryRemovedAction) : StateAction
 @JvmInline value class StateActionRootTerminalsChanged(val value: RootTerminalsChangedAction) : StateAction
 @JvmInline value class StateActionRootConfigChanged(val value: RootConfigChangedAction) : StateAction
+@JvmInline value class StateActionRootModelSourceSet(val value: RootModelSourceSetAction) : StateAction
+@JvmInline value class StateActionRootModelSourceRemoved(val value: RootModelSourceRemovedAction) : StateAction
+@JvmInline value class StateActionRootModelSourceRegisterRequested(val value: RootModelSourceRegisterRequestedAction) : StateAction
 @JvmInline value class StateActionTerminalData(val value: TerminalDataAction) : StateAction
 @JvmInline value class StateActionTerminalInput(val value: TerminalInputAction) : StateAction
 @JvmInline value class StateActionTerminalResized(val value: TerminalResizedAction) : StateAction
@@ -2100,6 +2183,9 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "annotations/entryRemoved" -> StateActionAnnotationsEntryRemoved(input.json.decodeFromJsonElement(AnnotationsEntryRemovedAction.serializer(), element))
             "root/terminalsChanged" -> StateActionRootTerminalsChanged(input.json.decodeFromJsonElement(RootTerminalsChangedAction.serializer(), element))
             "root/configChanged" -> StateActionRootConfigChanged(input.json.decodeFromJsonElement(RootConfigChangedAction.serializer(), element))
+            "root/modelSourceSet" -> StateActionRootModelSourceSet(input.json.decodeFromJsonElement(RootModelSourceSetAction.serializer(), element))
+            "root/modelSourceRemoved" -> StateActionRootModelSourceRemoved(input.json.decodeFromJsonElement(RootModelSourceRemovedAction.serializer(), element))
+            "root/modelSourceRegisterRequested" -> StateActionRootModelSourceRegisterRequested(input.json.decodeFromJsonElement(RootModelSourceRegisterRequestedAction.serializer(), element))
             "terminal/data" -> StateActionTerminalData(input.json.decodeFromJsonElement(TerminalDataAction.serializer(), element))
             "terminal/input" -> StateActionTerminalInput(input.json.decodeFromJsonElement(TerminalInputAction.serializer(), element))
             "terminal/resized" -> StateActionTerminalResized(input.json.decodeFromJsonElement(TerminalResizedAction.serializer(), element))
@@ -2220,6 +2306,9 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionAnnotationsEntryRemoved -> output.json.encodeToJsonElement(AnnotationsEntryRemovedAction.serializer(), value.value)
             is StateActionRootTerminalsChanged -> output.json.encodeToJsonElement(RootTerminalsChangedAction.serializer(), value.value)
             is StateActionRootConfigChanged -> output.json.encodeToJsonElement(RootConfigChangedAction.serializer(), value.value)
+            is StateActionRootModelSourceSet -> output.json.encodeToJsonElement(RootModelSourceSetAction.serializer(), value.value)
+            is StateActionRootModelSourceRemoved -> output.json.encodeToJsonElement(RootModelSourceRemovedAction.serializer(), value.value)
+            is StateActionRootModelSourceRegisterRequested -> output.json.encodeToJsonElement(RootModelSourceRegisterRequestedAction.serializer(), value.value)
             is StateActionTerminalData -> output.json.encodeToJsonElement(TerminalDataAction.serializer(), value.value)
             is StateActionTerminalInput -> output.json.encodeToJsonElement(TerminalInputAction.serializer(), value.value)
             is StateActionTerminalResized -> output.json.encodeToJsonElement(TerminalResizedAction.serializer(), value.value)

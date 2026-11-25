@@ -107,6 +107,9 @@ const (
 	ActionTypeAnnotationsEntryRemoved             ActionType = "annotations/entryRemoved"
 	ActionTypeRootTerminalsChanged                ActionType = "root/terminalsChanged"
 	ActionTypeRootConfigChanged                   ActionType = "root/configChanged"
+	ActionTypeRootModelSourceRegisterRequested    ActionType = "root/modelSourceRegisterRequested"
+	ActionTypeRootModelSourceSet                  ActionType = "root/modelSourceSet"
+	ActionTypeRootModelSourceRemoved              ActionType = "root/modelSourceRemoved"
 	ActionTypeTerminalData                        ActionType = "terminal/data"
 	ActionTypeTerminalInput                       ActionType = "terminal/input"
 	ActionTypeTerminalResized                     ActionType = "terminal/resized"
@@ -178,6 +181,55 @@ type RootConfigChangedAction struct {
 	Config map[string]json.RawMessage `json:"config"`
 	// When `true`, replaces all config values instead of merging
 	Replace *bool `json:"replace,omitempty"`
+}
+
+// Adds a model source, or replaces the one with the same `id`. Only the host
+// dispatches it, to publish a registration, a source an agent provides
+// itself, or a change in a source's status.
+//
+// Stability: 1.0 - Early development.
+type RootModelSourceSetAction struct {
+	Type ActionType `json:"type"`
+	// The model source to add or replace, matched by `id`.
+	ModelSource ModelSource `json:"modelSource"`
+}
+
+// Removes the model source with the given `modelSourceId`, for every client.
+// A no-op when none matches.
+//
+// Stability: 1.0 - Early development.
+type RootModelSourceRemovedAction struct {
+	Type ActionType `json:"type"`
+	// The model source's `id`.
+	ModelSourceId string `json:"modelSourceId"`
+}
+
+// Asks the host to register a model source, or to update the one with the
+// same `modelSourceId`. The reducer leaves state unchanged. The host counts
+// the dispatching client as a contributing client, validates the
+// registration, and publishes the result with
+// {@link RootModelSourceSetAction | `root/modelSourceSet`}. It keeps the
+// source's status and credential when the registration is unchanged.
+//
+// Stability: 1.0 - Early development.
+type RootModelSourceRegisterRequestedAction struct {
+	Type ActionType `json:"type"`
+	// The model source's `id`, chosen by the client.
+	ModelSourceId string `json:"modelSourceId"`
+	// Agent provider whose agent serves the source's models.
+	Provider string `json:"provider"`
+	// Human-readable name.
+	DisplayName string `json:"displayName"`
+	// Icons for UI display.
+	Icons []Icon `json:"icons,omitempty"`
+	// The source's format and definition.
+	Registration ModelSourceRegistration `json:"registration"`
+	// What happens to the source when the last contributing client leaves.
+	// Absent means `contributingClient`. The host keeps it privately.
+	Retention *ModelSourceRetentionPolicy `json:"retention,omitempty"`
+	// Additional implementation-defined metadata for this model source.
+	// MUST NOT contain a credential.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
 // Session backend initialized successfully.
@@ -1950,6 +2002,9 @@ type isStateAction interface{ isStateAction() }
 func (*RootAgentsChangedAction) isStateAction()                   {}
 func (*RootActiveSessionsChangedAction) isStateAction()           {}
 func (*RootConfigChangedAction) isStateAction()                   {}
+func (*RootModelSourceSetAction) isStateAction()                  {}
+func (*RootModelSourceRemovedAction) isStateAction()              {}
+func (*RootModelSourceRegisterRequestedAction) isStateAction()    {}
 func (*SessionReadyAction) isStateAction()                        {}
 func (*SessionCreationFailedAction) isStateAction()               {}
 func (*SessionChatAddedAction) isStateAction()                    {}
@@ -2088,6 +2143,24 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "root/configChanged":
 		var value RootConfigChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "root/modelSourceSet":
+		var value RootModelSourceSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "root/modelSourceRemoved":
+		var value RootModelSourceRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "root/modelSourceRegisterRequested":
+		var value RootModelSourceRegisterRequestedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

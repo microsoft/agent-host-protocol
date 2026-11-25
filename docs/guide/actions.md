@@ -23,7 +23,7 @@ Individual action payloads do **not** carry their own `session: URI` or `termina
 
 ## Root Actions
 
-These mutate root state and travel on the [Root Channel](/specification/root-channel). One root action — `root/configChanged` — is client-dispatchable; the rest are server-originated.
+These mutate root state and travel on the [Root Channel](/specification/root-channel). `root/configChanged`, `root/modelSourceRegisterRequested`, and `root/modelSourceRemoved` are client-dispatchable; the rest are server-originated.
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
@@ -31,6 +31,9 @@ These mutate root state and travel on the [Root Channel](/specification/root-cha
 | `root/activeSessionsChanged` | No | Count of active sessions changed |
 | `root/terminalsChanged` | No | Lightweight terminal catalogue changed (full replacement) |
 | `root/configChanged` | **Yes** | Host-level configuration values changed |
+| `root/modelSourceRegisterRequested` | **Yes** | A client asked the host to register or update a [model source](/guide/model-sources) |
+| `root/modelSourceSet` | No | The host added or replaced a model source by `id` |
+| `root/modelSourceRemoved` | **Yes** | A model source was removed by `modelSourceId` |
 
 ## Automation Catalogue Actions
 

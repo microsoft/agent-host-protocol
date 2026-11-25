@@ -1,0 +1,526 @@
+{
+  "name": "model-source-registry-snapshot",
+  "group": "A",
+  "description": "A root snapshot lists an agent's built-in model source, with no registration, alongside registered model sources in each lifecycle state and auth reason (required, expired, rejected, and revoked), including an http endpoint and a host-registered source in a namespaced format. Each registered source carries its format and definition, including members an agent defines itself, in its registration. Sources that take a credential carry credentialResource in every state, and accountId once the host has accepted a key sent with one. The agent advertises the modelSourceRegistration capability with format objects, and its catalog lists the built-in source's model, the ready source's, and the authRequired one's whose key expired, since models stay listed after a source has been ready.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-root://",
+    "fromSeq": 4,
+    "state": {
+      "agents": [
+        {
+          "provider": "example",
+          "displayName": "Example",
+          "description": "Serves registered model sources",
+          "capabilities": {
+            "modelSourceRegistration": {
+              "formats": [
+                {
+                  "format": "openaiCompatible"
+                },
+                {
+                  "format": "anthropic"
+                },
+                {
+                  "format": "azureOpenai"
+                },
+                {
+                  "format": "gemini"
+                },
+                {
+                  "format": "example.com/model-source@1"
+                }
+              ]
+            }
+          },
+          "models": [
+            {
+              "id": "builtin-model",
+              "provider": "example",
+              "name": "Example built-in model",
+              "modelSourceId": "source-builtin"
+            },
+            {
+              "id": "source-ready.8f3a",
+              "provider": "example",
+              "name": "Example model",
+              "vendor": "OpenRouter",
+              "modelSourceId": "source-ready"
+            },
+            {
+              "id": "source-auth.c71e",
+              "provider": "example",
+              "name": "Example model",
+              "vendor": "Azure OpenAI",
+              "modelSourceId": "source-auth"
+            }
+          ]
+        }
+      ],
+      "modelSources": [
+        {
+          "id": "source-builtin",
+          "provider": "example",
+          "displayName": "Example subscription",
+          "state": {
+            "kind": "ready"
+          }
+        },
+        {
+          "id": "source-starting",
+          "provider": "example",
+          "displayName": "Starting",
+          "registration": {
+            "format": "gemini",
+            "definition": {
+              "endpoint": "https://gemini.example.com/v1beta",
+              "models": [
+                {
+                  "id": "gemini-model"
+                }
+              ]
+            }
+          },
+          "state": {
+            "kind": "starting"
+          }
+        },
+        {
+          "id": "source-ready",
+          "provider": "example",
+          "displayName": "OpenRouter",
+          "icons": [
+            {
+              "src": "https://example.com/openrouter.svg"
+            }
+          ],
+          "registration": {
+            "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "https://api.example.com/v1",
+              "wireApi": "chatCompletions",
+              "models": [
+                {
+                  "id": "vendor/model-a",
+                  "name": "Example model",
+                  "maxContextWindow": 128000,
+                  "maxOutputTokens": 16384,
+                  "supportsVision": true,
+                  "supportsTools": true
+                }
+              ],
+              "fileEndpoint": "https://files.example.com/v1"
+            }
+          },
+          "state": {
+            "kind": "ready"
+          },
+          "credentialResource": {
+            "resource": "https://api.example.com/v1",
+            "resource_name": "OpenRouter API key"
+          },
+          "accountId": "keychain-openrouter-1",
+          "_meta": {
+            "example.com/label": "Laptop"
+          }
+        },
+        {
+          "id": "source-auth",
+          "provider": "example",
+          "displayName": "Azure endpoint",
+          "registration": {
+            "format": "azureOpenai",
+            "definition": {
+              "endpoint": "https://example.openai.azure.com/openai/v1",
+              "apiVersion": "2024-10-21",
+              "models": [
+                {
+                  "id": "example-deployment"
+                }
+              ]
+            }
+          },
+          "state": {
+            "kind": "authRequired",
+            "reason": "expired",
+            "description": "The access token expired."
+          },
+          "credentialResource": {
+            "resource": "https://example.openai.azure.com/openai/v1",
+            "resource_name": "Azure OpenAI",
+            "authorization_servers": [
+              "https://login.microsoftonline.com/common/v2.0"
+            ],
+            "scopes_supported": [
+              "https://cognitiveservices.azure.com/.default"
+            ]
+          },
+          "accountId": "entra-azure-1"
+        },
+        {
+          "id": "source-local",
+          "provider": "example",
+          "displayName": "Local server",
+          "registration": {
+            "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "http://localhost:11434/v1",
+              "wireApi": "responses"
+            }
+          },
+          "state": {
+            "kind": "authRequired",
+            "reason": "required"
+          },
+          "credentialResource": {
+            "resource": "http://localhost:11434/v1",
+            "resource_name": "Local server key"
+          }
+        },
+        {
+          "id": "source-rejected",
+          "provider": "example",
+          "displayName": "Rejected key",
+          "icons": [
+            {
+              "src": "https://example.com/openrouter.svg"
+            }
+          ],
+          "registration": {
+            "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "https://api.example.com/v1",
+              "models": [
+                {
+                  "id": "vendor/model-a"
+                }
+              ]
+            }
+          },
+          "state": {
+            "kind": "authRequired",
+            "reason": "rejected",
+            "description": "The endpoint rejected the API key."
+          },
+          "credentialResource": {
+            "resource": "https://api.example.com/v1",
+            "resource_name": "OpenRouter API key"
+          },
+          "accountId": "keychain-rejected-1"
+        },
+        {
+          "id": "source-revoked",
+          "provider": "example",
+          "displayName": "Revoked key",
+          "icons": [
+            {
+              "src": "https://example.com/openrouter.svg"
+            }
+          ],
+          "registration": {
+            "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "https://api.example.com/v1",
+              "models": [
+                {
+                  "id": "vendor/model-a"
+                }
+              ]
+            }
+          },
+          "state": {
+            "kind": "authRequired",
+            "reason": "revoked"
+          },
+          "credentialResource": {
+            "resource": "https://api.example.com/v1",
+            "resource_name": "OpenRouter API key"
+          },
+          "accountId": "keychain-revoked-1"
+        },
+        {
+          "id": "source-host",
+          "provider": "example",
+          "displayName": "Host-configured",
+          "registration": {
+            "format": "example.com/model-source@1",
+            "definition": {
+              "endpoint": "https://models.internal.example.com",
+              "routing": {
+                "region": "example-1"
+              }
+            }
+          },
+          "state": {
+            "kind": "error",
+            "error": {
+              "errorType": "policy",
+              "message": "The endpoint is not allowed by host policy."
+            }
+          }
+        }
+      ]
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-root://",
+      "fromSeq": 4,
+      "state": {
+        "agents": [
+          {
+            "provider": "example",
+            "displayName": "Example",
+            "description": "Serves registered model sources",
+            "capabilities": {
+              "modelSourceRegistration": {
+                "formats": [
+                  {
+                    "format": "openaiCompatible"
+                  },
+                  {
+                    "format": "anthropic"
+                  },
+                  {
+                    "format": "azureOpenai"
+                  },
+                  {
+                    "format": "gemini"
+                  },
+                  {
+                    "format": "example.com/model-source@1"
+                  }
+                ]
+              }
+            },
+            "models": [
+              {
+                "id": "builtin-model",
+                "provider": "example",
+                "name": "Example built-in model",
+                "modelSourceId": "source-builtin"
+              },
+              {
+                "id": "source-ready.8f3a",
+                "provider": "example",
+                "name": "Example model",
+                "vendor": "OpenRouter",
+                "modelSourceId": "source-ready"
+              },
+              {
+                "id": "source-auth.c71e",
+                "provider": "example",
+                "name": "Example model",
+                "vendor": "Azure OpenAI",
+                "modelSourceId": "source-auth"
+              }
+            ]
+          }
+        ],
+        "modelSources": [
+          {
+            "id": "source-builtin",
+            "provider": "example",
+            "displayName": "Example subscription",
+            "state": {
+              "kind": "ready"
+            }
+          },
+          {
+            "id": "source-starting",
+            "provider": "example",
+            "displayName": "Starting",
+            "registration": {
+              "format": "gemini",
+              "definition": {
+                "endpoint": "https://gemini.example.com/v1beta",
+                "models": [
+                  {
+                    "id": "gemini-model"
+                  }
+                ]
+              }
+            },
+            "state": {
+              "kind": "starting"
+            }
+          },
+          {
+            "id": "source-ready",
+            "provider": "example",
+            "displayName": "OpenRouter",
+            "icons": [
+              {
+                "src": "https://example.com/openrouter.svg"
+              }
+            ],
+            "registration": {
+              "format": "openaiCompatible",
+              "definition": {
+                "endpoint": "https://api.example.com/v1",
+                "wireApi": "chatCompletions",
+                "models": [
+                  {
+                    "id": "vendor/model-a",
+                    "name": "Example model",
+                    "maxContextWindow": 128000,
+                    "maxOutputTokens": 16384,
+                    "supportsVision": true,
+                    "supportsTools": true
+                  }
+                ],
+                "fileEndpoint": "https://files.example.com/v1"
+              }
+            },
+            "state": {
+              "kind": "ready"
+            },
+            "credentialResource": {
+              "resource": "https://api.example.com/v1",
+              "resource_name": "OpenRouter API key"
+            },
+            "accountId": "keychain-openrouter-1",
+            "_meta": {
+              "example.com/label": "Laptop"
+            }
+          },
+          {
+            "id": "source-auth",
+            "provider": "example",
+            "displayName": "Azure endpoint",
+            "registration": {
+              "format": "azureOpenai",
+              "definition": {
+                "endpoint": "https://example.openai.azure.com/openai/v1",
+                "apiVersion": "2024-10-21",
+                "models": [
+                  {
+                    "id": "example-deployment"
+                  }
+                ]
+              }
+            },
+            "state": {
+              "kind": "authRequired",
+              "reason": "expired",
+              "description": "The access token expired."
+            },
+            "credentialResource": {
+              "resource": "https://example.openai.azure.com/openai/v1",
+              "resource_name": "Azure OpenAI",
+              "authorization_servers": [
+                "https://login.microsoftonline.com/common/v2.0"
+              ],
+              "scopes_supported": [
+                "https://cognitiveservices.azure.com/.default"
+              ]
+            },
+            "accountId": "entra-azure-1"
+          },
+          {
+            "id": "source-local",
+            "provider": "example",
+            "displayName": "Local server",
+            "registration": {
+              "format": "openaiCompatible",
+              "definition": {
+                "endpoint": "http://localhost:11434/v1",
+                "wireApi": "responses"
+              }
+            },
+            "state": {
+              "kind": "authRequired",
+              "reason": "required"
+            },
+            "credentialResource": {
+              "resource": "http://localhost:11434/v1",
+              "resource_name": "Local server key"
+            }
+          },
+          {
+            "id": "source-rejected",
+            "provider": "example",
+            "displayName": "Rejected key",
+            "icons": [
+              {
+                "src": "https://example.com/openrouter.svg"
+              }
+            ],
+            "registration": {
+              "format": "openaiCompatible",
+              "definition": {
+                "endpoint": "https://api.example.com/v1",
+                "models": [
+                  {
+                    "id": "vendor/model-a"
+                  }
+                ]
+              }
+            },
+            "state": {
+              "kind": "authRequired",
+              "reason": "rejected",
+              "description": "The endpoint rejected the API key."
+            },
+            "credentialResource": {
+              "resource": "https://api.example.com/v1",
+              "resource_name": "OpenRouter API key"
+            },
+            "accountId": "keychain-rejected-1"
+          },
+          {
+            "id": "source-revoked",
+            "provider": "example",
+            "displayName": "Revoked key",
+            "icons": [
+              {
+                "src": "https://example.com/openrouter.svg"
+              }
+            ],
+            "registration": {
+              "format": "openaiCompatible",
+              "definition": {
+                "endpoint": "https://api.example.com/v1",
+                "models": [
+                  {
+                    "id": "vendor/model-a"
+                  }
+                ]
+              }
+            },
+            "state": {
+              "kind": "authRequired",
+              "reason": "revoked"
+            },
+            "credentialResource": {
+              "resource": "https://api.example.com/v1",
+              "resource_name": "OpenRouter API key"
+            },
+            "accountId": "keychain-revoked-1"
+          },
+          {
+            "id": "source-host",
+            "provider": "example",
+            "displayName": "Host-configured",
+            "registration": {
+              "format": "example.com/model-source@1",
+              "definition": {
+                "endpoint": "https://models.internal.example.com",
+                "routing": {
+                  "region": "example-1"
+                }
+              }
+            },
+            "state": {
+              "kind": "error",
+              "error": {
+                "errorType": "policy",
+                "message": "The endpoint is not allowed by host policy."
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

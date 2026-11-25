@@ -1,0 +1,55 @@
+{
+  "description": "root/modelSourceSet adds a model source to an absent registry",
+  "reducer": "root",
+  "initial": {
+    "agents": []
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceSet",
+      "modelSource": {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v1",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "starting"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v1",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "starting"
+        }
+      }
+    ]
+  }
+}

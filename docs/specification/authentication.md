@@ -87,7 +87,7 @@ Different agents MAY require authentication with different providers. For exampl
 
 ## Token Delivery
 
-Clients push Bearer tokens to the server using the [`authenticate`](/reference/common#authenticate) command. The `resource` field MUST match a `resource` value the server has itself advertised — either statically via the agent's `protectedResources` metadata, or dynamically via a live MCP authentication challenge (`McpServerAuthRequiredState.resource` or, for a single blocked tool call, `ToolCallAuthRequiredState.auth.resource` — see [MCP Servers](/guide/mcp#authentication)):
+Clients push Bearer tokens to the server using the [`authenticate`](/reference/common#authenticate) command. The `resource` field MUST match a `resource` value the server has itself advertised — either statically via the agent's `protectedResources` metadata, or dynamically via a live MCP authentication challenge (`McpServerAuthRequiredState.resource` or, for a single blocked tool call, `ToolCallAuthRequiredState.auth.resource` — see [MCP Servers](/guide/mcp#authentication)) or a registered model source's `credentialResource.resource` (see [Model source credentials](#model-source-credentials)):
 
 ```jsonc
 // Client → Server
@@ -118,7 +118,7 @@ If the client retained the original token response, it MUST subtract elapsed tim
 
 `scopes` is optional and lets the client tell the server which OAuth scopes the pushed token actually grants — useful when resolving a `requiredScopes` challenge (from a live `McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth`) without the server needing to decode an opaque token.
 
-`target` is an optional, extensible discriminated union identifying the token's consumer. Clients SHOULD include it when answering a challenge from a specific MCP server (`McpServerAuthRequiredState` or `ToolCallAuthRequiredState`), and omit it for provider-level resources (`AgentInfo.protectedResources` or `AuthRequired` `-32007` error data). The currently defined variant is:
+`target` is an optional, extensible discriminated union identifying the token's consumer. Clients SHOULD include it when answering a challenge from a specific MCP server (`McpServerAuthRequiredState` or `ToolCallAuthRequiredState`), MUST include it when delivering a registered model source's credential, and omit it for provider-level resources (`AgentInfo.protectedResources` or `AuthRequired` `-32007` error data). The currently defined variants are `mcpServer` and [`modelSource`](#model-source-credentials):
 
 ```jsonc
 // MCP token delivery (the command still uses the root channel)
@@ -142,17 +142,55 @@ If the client retained the original token response, it MUST subtract elapsed tim
 
 `session` is the URI of the session whose `SessionState.customizations` contains the MCP server, either as a top-level entry or a child customization. `customizationId` is that server's session-unique `McpServerCustomization.id`. Clients only echo these host-published identifiers: `McpServerAuthRequiredState` lives on the customization, and `ToolCallAuthRequiredState.contributor.customizationId` identifies the same customization.
 
-When `target` is present, the host MUST apply the token only to that MCP server in that session — never to sibling servers, other sessions, or agent-level resources — even when they share `resource` and scopes. `resource` MUST still equal the targeted server's advertised `McpAuthRequirement.resource.resource`. If the session or customization is unknown, or the customization is not an MCP server, the host MUST reject the request with `InvalidParams` (`-32602`).
+When `target.kind` is `mcpServer`, the host MUST apply the token only to that MCP server in that session — never to sibling servers, other sessions, or agent-level resources — even when they share `resource` and scopes. `resource` MUST still equal the targeted server's advertised `McpAuthRequirement.resource.resource`. If the session or customization is unknown, or the customization is not an MCP server, the host MUST reject the request with `InvalidParams` (`-32602`).
 
-Without `target`, hosts retain resource/scope matching for backwards compatibility; a token may satisfy every matching pending challenge. Older hosts ignore the unknown field and retain this untargeted behavior, so isolation is not guaranteed with older hosts. No capability or protocol version bump is required.
+Without `target`, hosts retain resource/scope matching for backwards compatibility; a token may satisfy every matching pending challenge, except a model source's. The host rejects an untargeted `resource` that matches only model source challenges with `InvalidParams` (`-32602`). Older hosts ignore the unknown field and retain this untargeted behavior, so isolation is not guaranteed with older hosts. No capability or protocol version bump is required.
 
 If the token is invalid or the resource is unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired` `-32007` or `InvalidParams` `-32602`).
+
+### Model source credentials
+
+A [registered model source](/guide/model-sources#credentials) that takes a credential carries `credentialResource`, RFC 9728 metadata for the endpoint the credential is for, in every state. When the source needs a credential, its state is `authRequired`, with a `reason`. A client delivers the credential with `authenticate`, the source's `credentialResource.resource`, and a `modelSource` target:
+
+```jsonc
+// Model source credential delivery
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "authenticate",
+  "params": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.com/v1",
+    "token": "<secret>",
+    "accountId": "keychain-5c2a",
+    "target": {
+      "kind": "modelSource",
+      "modelSourceId": "2f6c0e1a-model-source"
+    }
+  }
+}
+```
+
+When `target.kind` is `modelSource`, the host:
+
+- MUST apply the credential only to that source, never to other model sources, MCP servers, or agent-level resources, even when they share `resource`;
+- MUST require `resource` to equal the source's current `credentialResource.resource`;
+- MUST reject an unknown `modelSourceId` with `InvalidParams` (`-32602`);
+- MUST publish the request's `accountId` as the source's `accountId` when it accepts the credential.
+
+A delivery replaces the credential the host holds for the source. `accountId` lets a client that reloads, or one on another device, tell whether the host holds its current key. It MUST NOT be derived from the secret, because every client can read it.
+
+The host holds the credential in memory only. It never places it in state, actions, notifications, logs, telemetry, or error messages, and never exposes it to the model, tools, terminals, or hooks. It attaches the credential only to the endpoints the source's definition names, never to another origin, including on redirect, and drops it when the source is removed or updated, when its lease lapses, and when the host restarts.
+
+Endpoints, including loopback and private addresses, are reached from the host machine. Hosts SHOULD deny link-local and cloud metadata addresses, and require `https` for credentialed endpoints other than loopback.
+
+See the [Model Sources guide](/guide/model-sources#credentials) for the `authRequired` reasons and when clients deliver a credential.
 
 ### Why keyed by `resource` and optional `target`?
 
 The RFC 9728 `resource` field identifies the protected resource, but not necessarily its consumer: different MCP servers can share a resource and scopes while using distinct OAuth clients or accounts. `target` adds the session URI and customization ID needed to distinguish these consumers, even when server names repeat across sessions or manifests. Provider-level authentication continues to omit `target` and remains keyed by `resource` and scopes.
 
-The `target.kind` discriminant is extensible so future consumers, such as [host-owned authentication proposed in PR #404](https://github.com/microsoft/agent-host-protocol/pull/404), can add variants rather than new fields to `authenticate`.
+The `target.kind` discriminant is extensible so new consumers, such as registered model sources or [host-owned authentication proposed in PR #404](https://github.com/microsoft/agent-host-protocol/pull/404), can add variants rather than new fields to `authenticate`.
 
 ### Account selection hints
 

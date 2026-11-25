@@ -1,0 +1,119 @@
+{
+  "description": "root/modelSourceSet replaces the model source with the same id as given, dropping fields the new source doesn't have, and keeps the registry order",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v1",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "ready"
+        },
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "accountId": "account-a-1"
+      },
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "displayName": "Source b",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apib.example.com/v1",
+            "models": [
+              {
+                "id": "model-b"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "starting"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceSet",
+      "modelSource": {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v2",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "starting"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v2",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "starting"
+        }
+      },
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "displayName": "Source b",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apib.example.com/v1",
+            "models": [
+              {
+                "id": "model-b"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "starting"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "description": "root/modelSourceRemoved removes the model source with the given modelSourceId",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v1",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "ready"
+        },
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "accountId": "account-a-1"
+      },
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "displayName": "Source b",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apib.example.com/v1",
+            "models": [
+              {
+                "id": "model-b"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "starting"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceRemoved",
+      "modelSourceId": "model-source-a"
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "displayName": "Source b",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apib.example.com/v1",
+            "models": [
+              {
+                "id": "model-b"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "starting"
+        }
+      }
+    ]
+  }
+}

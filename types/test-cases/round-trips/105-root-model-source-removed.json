@@ -1,0 +1,16 @@
+{
+  "name": "root-model-source-removed",
+  "group": "A",
+  "description": "A client removes a model source by id, for every client, with root/modelSourceRemoved.",
+  "type": "StateAction",
+  "input": {
+    "type": "root/modelSourceRemoved",
+    "modelSourceId": "source-new"
+  },
+  "acceptableOutputs": [
+    {
+      "type": "root/modelSourceRemoved",
+      "modelSourceId": "source-new"
+    }
+  ]
+}

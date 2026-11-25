@@ -680,6 +680,34 @@ public static class Reducers
 
                 state.Config.Values = MergeConfig(state.Config.Values, a.Config, a.Replace);
                 return ReduceOutcome.Applied;
+            case RootModelSourceRegisterRequestedAction:
+                return ReduceOutcome.NoOp;
+            case RootModelSourceSetAction a:
+                {
+                    List<ModelSource> list = state.ModelSources ??= new List<ModelSource>();
+                    int index = list.FindIndex(s => s.Id == a.ModelSource.Id);
+                    if (index < 0)
+                    {
+                        list.Add(a.ModelSource);
+                    }
+                    else
+                    {
+                        list[index] = a.ModelSource;
+                    }
+
+                    return ReduceOutcome.Applied;
+                }
+            case RootModelSourceRemovedAction a:
+                {
+                    int index = state.ModelSources?.FindIndex(s => s.Id == a.ModelSourceId) ?? -1;
+                    if (index < 0)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+
+                    state.ModelSources!.RemoveAt(index);
+                    return ReduceOutcome.Applied;
+                }
         }
 
         return ReduceOutcome.OutOfScope;
@@ -2709,6 +2737,8 @@ public static class Reducers
     private static readonly string[] s_clientDispatchableActionNames =
     {
         "root/configChanged",
+        "root/modelSourceRegisterRequested",
+        "root/modelSourceRemoved",
         // Chat-channel actions (post-#213)
         "chat/turnStarted",
         "chat/toolCallConfirmed",

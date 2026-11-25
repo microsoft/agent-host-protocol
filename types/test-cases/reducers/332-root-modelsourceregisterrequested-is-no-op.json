@@ -1,0 +1,81 @@
+{
+  "description": "root/modelSourceRegisterRequested leaves state unchanged; the host publishes the result with root/modelSourceSet",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v1",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "ready"
+        },
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "accountId": "account-a-1"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceRegisterRequested",
+      "modelSourceId": "model-source-b",
+      "provider": "copilot",
+      "displayName": "Source b",
+      "registration": {
+        "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apib.example.com/v1",
+          "models": [
+            {
+              "id": "model-b"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "registration": {
+          "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://apia.example.com/v1",
+            "models": [
+              {
+                "id": "model-a"
+              }
+            ]
+          }
+        },
+        "state": {
+          "kind": "ready"
+        },
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "accountId": "account-a-1"
+      }
+    ]
+  }
+}

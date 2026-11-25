@@ -31,7 +31,6 @@ fn agent(provider: &str) -> AgentInfo {
         protected_resources: None,
         customizations: None,
         capabilities: None,
-        model_sources: None,
     }
 }
 
@@ -43,6 +42,7 @@ fn root_snapshot(agents: Vec<AgentInfo>) -> Snapshot {
             active_sessions: None,
             terminals: None,
             config: None,
+            model_sources: None,
             meta: None,
         })),
         from_seq: 0,

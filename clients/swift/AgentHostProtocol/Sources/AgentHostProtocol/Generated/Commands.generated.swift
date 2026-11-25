@@ -165,6 +165,8 @@ public enum ResourceWriteMode: String, Codable, Sendable {
 /// Identifies the consumer of an authentication token.
 public enum AuthenticateTargetKind: Codable, Sendable, Equatable {
     case mcpServer
+    /// A {@link ModelSourceAuthenticateTarget}.
+    case modelSource
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
 
@@ -173,6 +175,7 @@ public enum AuthenticateTargetKind: Codable, Sendable, Equatable {
         let raw = try container.decode(String.self)
         switch raw {
         case "mcpServer": self = .mcpServer
+        case "modelSource": self = .modelSource
         default: self = .unknown(raw)
         }
     }
@@ -181,6 +184,7 @@ public enum AuthenticateTargetKind: Codable, Sendable, Equatable {
         var container = encoder.singleValueContainer()
         switch self {
         case .mcpServer: try container.encode("mcpServer")
+        case .modelSource: try container.encode("modelSource")
         case .unknown(let raw): try container.encode(raw)
         }
     }
@@ -2131,6 +2135,25 @@ public struct McpServerAuthenticateTarget: Codable, Sendable, Equatable {
     }
 }
 
+/// A registered model source. The host applies the credential only to that
+/// source, and publishes the request's `accountId` as the source's
+/// `ModelSource.accountId`.
+///
+/// Stability: 1.0 - Early development.
+public struct ModelSourceAuthenticateTarget: Codable, Sendable, Equatable {
+    public var kind: AuthenticateTargetKind
+    /// The source's `ModelSource.id`.
+    public var modelSourceId: String
+
+    public init(
+        kind: AuthenticateTargetKind,
+        modelSourceId: String
+    ) {
+        self.kind = kind
+        self.modelSourceId = modelSourceId
+    }
+}
+
 public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
@@ -2140,7 +2163,8 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// The protected resource identifier. MUST match a `resource` value the
     /// server has advertised — via `ProtectedResourceMetadata` in
     /// `AgentInfo.protectedResources`, or via a live
-    /// `McpServerAuthRequiredState.resource` / `ToolCallAuthRequiredState.auth.resource`.
+    /// `McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,
+    /// or `ModelSource.credentialResource`.
     public var resource: String
     /// Bearer token obtained from the resource's authorization server
     public var token: String
@@ -2165,15 +2189,22 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     public var scopes: [String]?
     /// Optional consumer of the token. Clients SHOULD include this when answering
     /// a specific MCP server's `McpServerAuthRequiredState` or
-    /// `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+    /// `ToolCallAuthRequiredState` challenge, MUST include it when delivering a
+    /// registered model source's credential, and omit it for provider-level
     /// resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
     ///
-    /// When present, the host MUST apply the token only to that MCP server in
-    /// that session, never to sibling servers, other sessions, or agent-level
-    /// resources, even if they share the resource and scopes. `resource` MUST
-    /// still equal that server's advertised `McpAuthRequirement.resource.resource`.
-    /// The host MUST reject an unknown session or customization, or a
-    /// customization that is not an MCP server, with `InvalidParams` (-32602).
+    /// For an `mcpServer` target, the host MUST apply the token only to that MCP
+    /// server in that session, never to sibling servers, other sessions, or
+    /// agent-level resources, even if they share the resource and scopes.
+    /// `resource` MUST still equal that server's advertised
+    /// `McpAuthRequirement.resource.resource`. The host MUST reject an unknown
+    /// session or customization, or a customization that is not an MCP server,
+    /// with `InvalidParams` (-32602).
+    ///
+    /// A registered model source takes its credential only through a
+    /// `modelSource` target, and the host rejects an untargeted `resource` that
+    /// matches only model source challenges with `InvalidParams` (-32602). See
+    /// [Model source credentials](/specification/authentication#model-source-credentials).
     ///
     /// Without a target, resource/scope matching is unchanged; the token may
     /// satisfy every matching pending challenge. Older hosts ignore this field.
@@ -2897,6 +2928,7 @@ public enum ChatMoveDestination: Codable, Sendable, Equatable {
 
 public enum AuthenticateTarget: Codable, Sendable, Equatable {
     case mcpServer(McpServerAuthenticateTarget)
+    case modelSource(ModelSourceAuthenticateTarget)
     /// Unknown or future discriminant; the raw payload is preserved
     /// and re-encoded verbatim for forward-compatibility.
     case unknown(AnyCodable)
@@ -2914,6 +2946,8 @@ public enum AuthenticateTarget: Codable, Sendable, Equatable {
         switch discriminant {
         case "mcpServer":
             self = .mcpServer(try McpServerAuthenticateTarget(from: decoder))
+        case "modelSource":
+            self = .modelSource(try ModelSourceAuthenticateTarget(from: decoder))
         default:
             self = .unknown(try AnyCodable(from: decoder))
         }
@@ -2923,6 +2957,9 @@ public enum AuthenticateTarget: Codable, Sendable, Equatable {
         switch self {
         case .mcpServer(var value):
             value.kind = .mcpServer
+            try value.encode(to: encoder)
+        case .modelSource(var value):
+            value.kind = .modelSource
             try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }

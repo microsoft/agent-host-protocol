@@ -1,0 +1,64 @@
+{
+  "name": "root-model-source-register-requested",
+  "group": "A",
+  "description": "A client asks the host to register a model source with root/modelSourceRegisterRequested, giving its registration (the format, and a definition in a common shape plus a member the agent defines) and the retention the host keeps privately.",
+  "type": "StateAction",
+  "input": {
+    "type": "root/modelSourceRegisterRequested",
+    "modelSourceId": "source-new",
+    "provider": "example",
+    "displayName": "OpenRouter",
+    "registration": {
+      "format": "openaiCompatible",
+      "definition": {
+        "endpoint": "https://openrouter.ai/api/v1",
+        "wireApi": "chatCompletions",
+        "models": [
+          {
+            "id": "vendor/model-a",
+            "name": "Model A",
+            "maxContextWindow": 200000,
+            "supportsTools": true
+          },
+          {
+            "id": "vendor/model-b"
+          }
+        ],
+        "headers": {
+          "x-title": "Example"
+        }
+      }
+    },
+    "retention": "host"
+  },
+  "acceptableOutputs": [
+    {
+      "type": "root/modelSourceRegisterRequested",
+      "modelSourceId": "source-new",
+      "provider": "example",
+      "displayName": "OpenRouter",
+      "registration": {
+        "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://openrouter.ai/api/v1",
+          "wireApi": "chatCompletions",
+          "models": [
+            {
+              "id": "vendor/model-a",
+              "name": "Model A",
+              "maxContextWindow": 200000,
+              "supportsTools": true
+            },
+            {
+              "id": "vendor/model-b"
+            }
+          ],
+          "headers": {
+            "x-title": "Example"
+          }
+        }
+      },
+      "retention": "host"
+    }
+  ]
+}

@@ -103,10 +103,36 @@ public struct AHPRootReducer: Reducer {
             config.values = a.replace == true ? a.config : config.values.merging(a.config) { _, new in new }
             state.config = config
 
+        case .rootModelSourceSet(let a):
+            applyModelSourceSet(&state, a.modelSource)
+
+        case .rootModelSourceRemoved(let a):
+            _ = applyModelSourceRemoved(&state, id: a.modelSourceId)
+
         default:
             break
         }
     }
+}
+
+/// Adds `source`, or replaces the entry with the same `id`.
+func applyModelSourceSet(_ state: inout RootState, _ source: ModelSource) {
+    var list = state.modelSources ?? []
+    if let idx = list.firstIndex(where: { $0.id == source.id }) {
+        list[idx] = source
+    } else {
+        list.append(source)
+    }
+    state.modelSources = list
+}
+
+/// Removes the model source with `id`. Returns `false` when none matches.
+func applyModelSourceRemoved(_ state: inout RootState, id: String) -> Bool {
+    guard var list = state.modelSources,
+          let idx = list.firstIndex(where: { $0.id == id }) else { return false }
+    list.remove(at: idx)
+    state.modelSources = list
+    return true
 }
 
 

@@ -1,7 +1,7 @@
 {
   "name": "model-source-catalog",
   "group": "A",
-  "description": "An agent labels and groups its models by model source, including a source with no models. Two sources serving the same upstream model get distinct model IDs. Another agent has no model sources.",
+  "description": "Root state lists the model sources an agent labels and groups its models by, each naming its agent provider, including a source with no models. Two sources serving the same upstream model get distinct model IDs. Another agent has no model sources.",
   "type": "InitializeResult",
   "input": {
     "protocolVersion": "1.1.0",
@@ -16,20 +16,6 @@
               "provider": "example",
               "displayName": "Example",
               "description": "Groups models by source",
-              "modelSources": [
-                {
-                  "id": "source-a",
-                  "displayName": "Service A"
-                },
-                {
-                  "id": "source-b",
-                  "displayName": "Service B"
-                },
-                {
-                  "id": "source-c",
-                  "displayName": "Service C"
-                }
-              ],
               "models": [
                 {
                   "id": "shared-model-a",
@@ -58,6 +44,32 @@
                 }
               ]
             }
+          ],
+          "modelSources": [
+            {
+              "id": "source-a",
+              "provider": "example",
+              "displayName": "Service A",
+              "state": {
+                "kind": "ready"
+              }
+            },
+            {
+              "id": "source-b",
+              "provider": "example",
+              "displayName": "Service B",
+              "state": {
+                "kind": "ready"
+              }
+            },
+            {
+              "id": "source-c",
+              "provider": "example",
+              "displayName": "Service C",
+              "state": {
+                "kind": "ready"
+              }
+            }
           ]
         }
       }
@@ -77,20 +89,6 @@
                 "provider": "example",
                 "displayName": "Example",
                 "description": "Groups models by source",
-                "modelSources": [
-                  {
-                    "id": "source-a",
-                    "displayName": "Service A"
-                  },
-                  {
-                    "id": "source-b",
-                    "displayName": "Service B"
-                  },
-                  {
-                    "id": "source-c",
-                    "displayName": "Service C"
-                  }
-                ],
                 "models": [
                   {
                     "id": "shared-model-a",
@@ -118,6 +116,32 @@
                     "name": "Shared model"
                   }
                 ]
+              }
+            ],
+            "modelSources": [
+              {
+                "id": "source-a",
+                "provider": "example",
+                "displayName": "Service A",
+                "state": {
+                  "kind": "ready"
+                }
+              },
+              {
+                "id": "source-b",
+                "provider": "example",
+                "displayName": "Service B",
+                "state": {
+                  "kind": "ready"
+                }
+              },
+              {
+                "id": "source-c",
+                "provider": "example",
+                "displayName": "Service C",
+                "state": {
+                  "kind": "ready"
+                }
               }
             ]
           }

@@ -116,6 +116,7 @@
 //!     active_sessions: None,
 //!     terminals: None,
 //!     config: None,
+//!     model_sources: None,
 //!     meta: None,
 //! };
 //!

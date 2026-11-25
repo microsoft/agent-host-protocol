@@ -922,6 +922,115 @@ internal object McpAuthRequiredReasonSerializer : KSerializer<McpAuthRequiredRea
 }
 
 /**
+ * Discriminant for the {@link ModelSourceState} union.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable(with = ModelSourceStatusSerializer::class)
+@JvmInline
+value class ModelSourceStatus(val rawValue: String) {
+    companion object {
+        /**
+         * The agent is reading and validating the definition.
+         */
+        val STARTING: ModelSourceStatus = ModelSourceStatus("starting")
+        /**
+         * The source is usable, and its models are in the agent's catalog.
+         */
+        val READY: ModelSourceStatus = ModelSourceStatus("ready")
+        /**
+         * The source needs a credential before it can be used.
+         */
+        val AUTH_REQUIRED: ModelSourceStatus = ModelSourceStatus("authRequired")
+        /**
+         * The source failed, or the host declined it.
+         */
+        val ERROR: ModelSourceStatus = ModelSourceStatus("error")
+    }
+}
+
+internal object ModelSourceStatusSerializer : KSerializer<ModelSourceStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ModelSourceStatus", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ModelSourceStatus) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): ModelSourceStatus =
+        ModelSourceStatus(decoder.decodeString())
+}
+
+/**
+ * How long a registered model source lasts once its last contributing client
+ * leaves.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable(with = ModelSourceRetentionPolicySerializer::class)
+@JvmInline
+value class ModelSourceRetentionPolicy(val rawValue: String) {
+    companion object {
+        /**
+         * Removed when the last contributing client leaves, once running turns finish.
+         */
+        val CONTRIBUTING_CLIENT: ModelSourceRetentionPolicy = ModelSourceRetentionPolicy("contributingClient")
+        /**
+         * Kept until a client removes it, or host policy expires it.
+         */
+        val HOST: ModelSourceRetentionPolicy = ModelSourceRetentionPolicy("host")
+    }
+}
+
+internal object ModelSourceRetentionPolicySerializer : KSerializer<ModelSourceRetentionPolicy> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ModelSourceRetentionPolicy", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ModelSourceRetentionPolicy) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): ModelSourceRetentionPolicy =
+        ModelSourceRetentionPolicy(decoder.decodeString())
+}
+
+/**
+ * Why a model source needs a credential. Specific to model sources: the
+ * shared `AuthRequiredReason` folds rejection and revocation into `expired`.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable(with = ModelSourceAuthRequiredReasonSerializer::class)
+@JvmInline
+value class ModelSourceAuthRequiredReason(val rawValue: String) {
+    companion object {
+        /**
+         * The host holds no credential yet.
+         */
+        val REQUIRED: ModelSourceAuthRequiredReason = ModelSourceAuthRequiredReason("required")
+        /**
+         * The credential's lifetime or lease lapsed. A client may renew it.
+         */
+        val EXPIRED: ModelSourceAuthRequiredReason = ModelSourceAuthRequiredReason("expired")
+        /**
+         * The endpoint refused the credential. Clients don't send a credential with
+         * the same {@link ModelSource.accountId} again.
+         */
+        val REJECTED: ModelSourceAuthRequiredReason = ModelSourceAuthRequiredReason("rejected")
+        /**
+         * A client revoked the credential. Clients don't send one again without a user's action.
+         */
+        val REVOKED: ModelSourceAuthRequiredReason = ModelSourceAuthRequiredReason("revoked")
+    }
+}
+
+internal object ModelSourceAuthRequiredReasonSerializer : KSerializer<ModelSourceAuthRequiredReason> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ModelSourceAuthRequiredReason", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ModelSourceAuthRequiredReason) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): ModelSourceAuthRequiredReason =
+        ModelSourceAuthRequiredReason(decoder.decodeString())
+}
+
+/**
  * Computation lifecycle of a {@link ChangesetState}.
  */
 @Serializable(with = ChangesetStatusSerializer::class)
@@ -1659,6 +1768,14 @@ data class RootState(
      */
     val config: RootConfigState? = null,
     /**
+     * Model sources on this host, keyed by `id`: the sources agents offer
+     * models from, including ones clients registered. Clients use them to
+     * label and group each agent's {@link AgentInfo.models}.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val modelSources: List<ModelSource>? = null,
+    /**
      * Additional implementation-defined metadata about the agent host itself.
      *
      * Clients MAY look for well-known keys here to provide enhanced UI.
@@ -1726,12 +1843,7 @@ data class AgentInfo(
      * to gate features (multi-chat, fork) instead of switching on the provider
      * id.
      */
-    val capabilities: AgentCapabilities? = null,
-    /**
-     * Sources this agent offers models from. Clients use them to label and
-     * group {@link models}. A source may have no models.
-     */
-    val modelSources: List<ModelSourceInfo>? = null
+    val capabilities: AgentCapabilities? = null
 )
 
 @Serializable
@@ -1755,7 +1867,14 @@ data class AgentCapabilities(
      * set and MUST NOT set more than one entry in
      * {@link CreateSessionParams.workingDirectories}.
      */
-    val multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = null
+    val multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = null,
+    /**
+     * The agent serves models from registered model sources, in the listed
+     * definition formats.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val modelSourceRegistration: ModelSourceRegistrationCapability? = null
 )
 
 @Serializable
@@ -1817,16 +1936,205 @@ data class MultipleWorkingDirectoriesCapability(
     val primaryReplacement: Boolean? = null
 )
 
+/**
+ * Options for the {@link AgentCapabilities.modelSourceRegistration} capability.
+ *
+ * Stability: 1.0 - Early development.
+ */
 @Serializable
-data class ModelSourceInfo(
+data class ModelSourceRegistrationCapability(
     /**
-     * Model source identifier, unique within the agent's {@link AgentInfo.modelSources}.
+     * Definition formats the agent reads, most preferred first.
+     */
+    val formats: List<ModelSourceFormatInfo>
+)
+
+/**
+ * A definition format an agent reads. An object so it can grow, for example
+ * with a JSON Schema for the format's definitions.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ModelSourceFormatInfo(
+    /**
+     * A {@link ModelSourceRegistration.format} value.
+     */
+    val format: String
+)
+
+/**
+ * A source that an agent provider offers models from, such as a service,
+ * subscription, or endpoint. The host lists the sources an agent provides
+ * itself, and clients can register more with a definition.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ModelSource(
+    /**
+     * Host-unique ID, chosen by whoever registers the source. Also the
+     * {@link SessionModelInfo.modelSourceId} of its models.
      */
     val id: String,
     /**
-     * Human-readable name
+     * Agent provider whose agent serves the source's models.
      */
-    val displayName: String
+    val provider: String,
+    /**
+     * Human-readable name.
+     */
+    val displayName: String,
+    /**
+     * Icons for UI display.
+     */
+    val icons: List<Icon>? = null,
+    /**
+     * How the source was registered. Absent on a source the agent provides
+     * itself.
+     */
+    val registration: ModelSourceRegistration? = null,
+    /**
+     * The source's status.
+     */
+    val state: ModelSourceState,
+    /**
+     * RFC 9728 metadata for the endpoint a registered source's credential is
+     * for. Present whenever the source takes a credential, in every state, so
+     * any client can deliver or rotate one.
+     *
+     * `credentialResource.resource` is the endpoint URL as the definition
+     * names it, in any scheme the agent supports (for example
+     * `http://localhost:11434/v1`). It's the value a client passes back as
+     * `authenticate({ resource })`.
+     */
+    val credentialResource: ProtectedResourceMetadata? = null,
+    /**
+     * The {@link AuthenticateParams.accountId} sent with the credential the
+     * host most recently accepted.
+     */
+    val accountId: String? = null,
+    /**
+     * Additional implementation-defined metadata for this model source.
+     * MUST NOT contain a credential.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+/**
+ * How a client, or the host from its own configuration, registered a model
+ * source.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ModelSourceRegistration(
+    /**
+     * The format of `definition`: the `format` of one of the agent's
+     * {@link ModelSourceRegistrationCapability.formats}.
+     *
+     * Agents choose the formats they read. Some may read these common names:
+     *
+     * - `'openaiCompatible'`: an endpoint that implements OpenAI's API.
+     * - `'anthropic'`: an endpoint that implements Anthropic's Messages API.
+     * - `'azureOpenai'`: an Azure OpenAI deployment.
+     * - `'gemini'`: Google's Gemini API.
+     *
+     * Other formats are named with a namespace, such as
+     * `example.com/model-source@1`, so they don't collide.
+     */
+    val format: String,
+    /**
+     * How to reach the source, in `format`: endpoint, wire API, models, and so
+     * on. The agent reads it. Every client can read it, so it MUST NOT contain
+     * a credential.
+     *
+     * An agent that reads one of the common format names might expect a shape
+     * like `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is
+     * the API's base URI and each `models` entry is `{ id, name?,
+     * maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
+     * named as in {@link SessionModelInfo}.
+     */
+    val definition: Map<String, JsonElement>
+)
+
+/**
+ * The agent is reading and validating the definition, or listing the
+ * source's models again after a credential change.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ModelSourceStartingState(
+    val kind: ModelSourceStatus
+)
+
+/**
+ * The source is usable, and its models are in the catalog of the agent named
+ * by the model source's `provider`. They stay listed through later `starting`
+ * and `authRequired` states.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ModelSourceReadyState(
+    val kind: ModelSourceStatus
+)
+
+/**
+ * Why a model source needs a credential before it can be ready. Deliberately
+ * carries no credential. The endpoint the credential is for is the
+ * model source's {@link ModelSource.credentialResource}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ModelSourceAuthRequirement(
+    /**
+     * Why a credential is needed.
+     */
+    val reason: ModelSourceAuthRequiredReason,
+    /**
+     * Human-readable hint the host writes, for example "The endpoint rejected
+     * the API key."
+     */
+    val description: String? = null
+)
+
+/**
+ * The source needs a credential before it can be used. A client answers with
+ * `authenticate`, the model source's `credentialResource.resource`, and a
+ * {@link ModelSourceAuthenticateTarget}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ModelSourceAuthRequiredState(
+    /**
+     * Why a credential is needed.
+     */
+    val reason: ModelSourceAuthRequiredReason,
+    /**
+     * Human-readable hint the host writes, for example "The endpoint rejected
+     * the API key."
+     */
+    val description: String? = null,
+    val kind: ModelSourceStatus
+)
+
+/**
+ * The source failed, or the host declined it, for example by policy.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ModelSourceErrorState(
+    val kind: ModelSourceStatus,
+    /**
+     * Error details the host writes. MUST NOT contain the credential.
+     */
+    val error: ErrorInfo
 )
 
 @Serializable
@@ -1891,8 +2199,9 @@ data class SessionModelInfo(
      */
     val vendor: String? = null,
     /**
-     * The source this model comes from. MUST match a {@link ModelSourceInfo.id}
-     * in the agent's {@link AgentInfo.modelSources}.
+     * The source this model comes from: the {@link ModelSource.id} of an entry
+     * in {@link RootState.modelSources} whose `provider` is this model's
+     * {@link provider}.
      */
     val modelSourceId: String? = null
 )
@@ -5928,6 +6237,14 @@ data class ErrorInfo(
      */
     val errorType: String,
     /**
+     * The {@link AhpErrorCodes} value for this error, when one applies. For
+     * example, a turn whose registered model source can't serve it ends with
+     * `ModelSourceUnavailable`.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val errorCode: Int? = null,
+    /**
      * Human-readable error message
      */
     val message: String,
@@ -8419,6 +8736,63 @@ internal object McpServerStateSerializer : KSerializer<McpServerState> {
             is McpServerStateError -> output.json.encodeToJsonElement(McpServerErrorState.serializer(), value.value)
             is McpServerStateStopped -> output.json.encodeToJsonElement(McpServerStoppedState.serializer(), value.value)
             is McpServerStateUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
+@Serializable(with = ModelSourceStateSerializer::class)
+sealed interface ModelSourceState
+
+@JvmInline
+value class ModelSourceStateStarting(val value: ModelSourceStartingState) : ModelSourceState
+@JvmInline
+value class ModelSourceStateReady(val value: ModelSourceReadyState) : ModelSourceState
+@JvmInline
+value class ModelSourceStateAuthRequired(val value: ModelSourceAuthRequiredState) : ModelSourceState
+@JvmInline
+value class ModelSourceStateError(val value: ModelSourceErrorState) : ModelSourceState
+/**
+ * Forward-compat catch-all for unknown ModelSourceState discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class ModelSourceStateUnknown(val raw: JsonObject) : ModelSourceState
+
+internal object ModelSourceStateSerializer : KSerializer<ModelSourceState> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("ModelSourceState")
+
+    override fun deserialize(decoder: Decoder): ModelSourceState {
+        val input = decoder as? JsonDecoder
+            ?: error("ModelSourceState can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for ModelSourceState")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return ModelSourceStateUnknown(obj)
+        return when (discriminant) {
+            "starting" -> ModelSourceStateStarting(input.json.decodeFromJsonElement(ModelSourceStartingState.serializer(), element))
+            "ready" -> ModelSourceStateReady(input.json.decodeFromJsonElement(ModelSourceReadyState.serializer(), element))
+            "authRequired" -> ModelSourceStateAuthRequired(input.json.decodeFromJsonElement(ModelSourceAuthRequiredState.serializer(), element))
+            "error" -> ModelSourceStateError(input.json.decodeFromJsonElement(ModelSourceErrorState.serializer(), element))
+            else -> ModelSourceStateUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: ModelSourceState) {
+        val output = encoder as? JsonEncoder
+            ?: error("ModelSourceState can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is ModelSourceStateStarting -> output.json.encodeToJsonElement(ModelSourceStartingState.serializer(), value.value)
+            is ModelSourceStateReady -> output.json.encodeToJsonElement(ModelSourceReadyState.serializer(), value.value)
+            is ModelSourceStateAuthRequired -> output.json.encodeToJsonElement(ModelSourceAuthRequiredState.serializer(), value.value)
+            is ModelSourceStateError -> output.json.encodeToJsonElement(ModelSourceErrorState.serializer(), value.value)
+            is ModelSourceStateUnknown -> value.raw
         }
         output.encodeJsonElement(element)
     }

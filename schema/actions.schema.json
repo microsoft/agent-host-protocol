@@ -127,6 +127,88 @@
         "config"
       ]
     },
+    "RootModelSourceRegisterRequestedAction": {
+      "type": "object",
+      "description": "Asks the host to register a model source, or to update the one with the\nsame `modelSourceId`. The reducer leaves state unchanged. The host counts\nthe dispatching client as a contributing client, validates the\nregistration, and publishes the result with\n{@link RootModelSourceSetAction | `root/modelSourceSet`}. It keeps the\nsource's status and credential when the registration is unchanged.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "root/modelSourceRegisterRequested"
+        },
+        "modelSourceId": {
+          "type": "string",
+          "description": "The model source's `id`, chosen by the client."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider whose agent serves the source's models."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable name."
+        },
+        "icons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Icon"
+          },
+          "description": "Icons for UI display."
+        },
+        "registration": {
+          "$ref": "#/$defs/ModelSourceRegistration",
+          "description": "The source's format and definition."
+        },
+        "retention": {
+          "$ref": "#/$defs/ModelSourceRetentionPolicy",
+          "description": "What happens to the source when the last contributing client leaves.\nAbsent means `contributingClient`. The host keeps it privately."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for this model source.\nMUST NOT contain a credential."
+        }
+      },
+      "required": [
+        "type",
+        "modelSourceId",
+        "provider",
+        "displayName",
+        "registration"
+      ]
+    },
+    "RootModelSourceSetAction": {
+      "type": "object",
+      "description": "Adds a model source, or replaces the one with the same `id`. Only the host\ndispatches it, to publish a registration, a source an agent provides\nitself, or a change in a source's status.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "root/modelSourceSet"
+        },
+        "modelSource": {
+          "$ref": "#/$defs/ModelSource",
+          "description": "The model source to add or replace, matched by `id`."
+        }
+      },
+      "required": [
+        "type",
+        "modelSource"
+      ]
+    },
+    "RootModelSourceRemovedAction": {
+      "type": "object",
+      "description": "Removes the model source with the given `modelSourceId`, for every client.\nA no-op when none matches.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "root/modelSourceRemoved"
+        },
+        "modelSourceId": {
+          "type": "string",
+          "description": "The model source's `id`."
+        }
+      },
+      "required": [
+        "type",
+        "modelSourceId"
+      ]
+    },
     "SessionReadyAction": {
       "type": "object",
       "description": "Session backend initialized successfully.",
@@ -3259,6 +3341,10 @@
           "type": "string",
           "description": "Error type identifier"
         },
+        "errorCode": {
+          "$ref": "#/$defs/AhpErrorCode",
+          "description": "The {@link AhpErrorCodes} value for this error, when one applies. For\nexample, a turn whose registered model source can't serve it ends with\n`ModelSourceUnavailable`.\n\nStability: 1.0 - Early development."
+        },
         "message": {
           "type": "string",
           "description": "Human-readable error message"
@@ -3369,6 +3455,13 @@
           "$ref": "#/$defs/RootConfigState",
           "description": "Agent host configuration schema and current values"
         },
+        "modelSources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelSource"
+          },
+          "description": "Model sources on this host, keyed by `id`: the sources agents offer\nmodels from, including ones clients registered. Clients use them to\nlabel and group each agent's {@link AgentInfo.models}.\n\nStability: 1.0 - Early development."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -3418,13 +3511,6 @@
         "capabilities": {
           "$ref": "#/$defs/AgentCapabilities",
           "description": "Static capabilities the agent advertises about itself. Clients use these\nto gate features (multi-chat, fork) instead of switching on the provider\nid."
-        },
-        "modelSources": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ModelSourceInfo"
-          },
-          "description": "Sources this agent offers models from. Clients use them to label and\ngroup {@link models}. A source may have no models."
         }
       },
       "required": [
@@ -3445,6 +3531,10 @@
         "multipleWorkingDirectories": {
           "$ref": "#/$defs/MultipleWorkingDirectoriesCapability",
           "description": "The session's agent can be granted tool access to more than one working\ndirectory. The directories are treated as equal peers except where the\nagent advertises a protected primary-slot option (some backends pin or\nreplace their first directory as a process root).\n\nWhen absent, clients MUST NOT mutate a session's or chat's working-directory\nset and MUST NOT set more than one entry in\n{@link CreateSessionParams.workingDirectories}."
+        },
+        "modelSourceRegistration": {
+          "$ref": "#/$defs/ModelSourceRegistrationCapability",
+          "description": "The agent serves models from registered model sources, in the listed\ndefinition formats.\n\nStability: 1.0 - Early development."
         }
       }
     },
@@ -3475,24 +3565,6 @@
           "description": "The agent's first working-directory slot (index `0`) is a protected primary\nwhose URI can be atomically replaced with\n`session/workingDirectoryReplaced`. Clients MUST NOT remove that slot with\ngeneric membership actions; additional directories remain equal peers.\n\nBackends use this when their cwd-bearing directory can move during a\nsession. It MAY be `true` together with {@link immutablePrimary}; this\npreserves the immutable-primary guarantee for older clients that do not\nrecognize this capability. Clients that recognize this capability MUST\nallow a targeted replacement even when `immutablePrimary` is also `true`."
         }
       }
-    },
-    "ModelSourceInfo": {
-      "type": "object",
-      "description": "A source that an agent provider offers models from, such as a service or\nsubscription.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Model source identifier, unique within the agent's {@link AgentInfo.modelSources}."
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Human-readable name"
-        }
-      },
-      "required": [
-        "id",
-        "displayName"
-      ]
     },
     "SessionModelInfo": {
       "type": "object",
@@ -3544,7 +3616,7 @@
         },
         "modelSourceId": {
           "type": "string",
-          "description": "The source this model comes from. MUST match a {@link ModelSourceInfo.id}\nin the agent's {@link AgentInfo.modelSources}."
+          "description": "The source this model comes from: the {@link ModelSource.id} of an entry\nin {@link RootState.modelSources} whose `provider` is this model's\n{@link provider}."
         }
       },
       "required": [
@@ -3571,6 +3643,185 @@
       },
       "required": [
         "id"
+      ]
+    },
+    "ModelSourceRegistrationCapability": {
+      "type": "object",
+      "description": "Options for the {@link AgentCapabilities.modelSourceRegistration} capability.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "formats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelSourceFormatInfo"
+          },
+          "description": "Definition formats the agent reads, most preferred first."
+        }
+      },
+      "required": [
+        "formats"
+      ]
+    },
+    "ModelSourceFormatInfo": {
+      "type": "object",
+      "description": "A definition format an agent reads. An object so it can grow, for example\nwith a JSON Schema for the format's definitions.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "format": {
+          "type": "string",
+          "description": "A {@link ModelSourceRegistration.format} value."
+        }
+      },
+      "required": [
+        "format"
+      ]
+    },
+    "ModelSource": {
+      "type": "object",
+      "description": "A source that an agent provider offers models from, such as a service,\nsubscription, or endpoint. The host lists the sources an agent provides\nitself, and clients can register more with a definition.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Host-unique ID, chosen by whoever registers the source. Also the\n{@link SessionModelInfo.modelSourceId} of its models."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider whose agent serves the source's models."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable name."
+        },
+        "icons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Icon"
+          },
+          "description": "Icons for UI display."
+        },
+        "registration": {
+          "$ref": "#/$defs/ModelSourceRegistration",
+          "description": "How the source was registered. Absent on a source the agent provides\nitself."
+        },
+        "state": {
+          "$ref": "#/$defs/ModelSourceState",
+          "description": "The source's status."
+        },
+        "credentialResource": {
+          "$ref": "#/$defs/ProtectedResourceMetadata",
+          "description": "RFC 9728 metadata for the endpoint a registered source's credential is\nfor. Present whenever the source takes a credential, in every state, so\nany client can deliver or rotate one.\n\n`credentialResource.resource` is the endpoint URL as the definition\nnames it, in any scheme the agent supports (for example\n`http://localhost:11434/v1`). It's the value a client passes back as\n`authenticate({ resource })`."
+        },
+        "accountId": {
+          "type": "string",
+          "description": "The {@link AuthenticateParams.accountId} sent with the credential the\nhost most recently accepted."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for this model source.\nMUST NOT contain a credential."
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "displayName",
+        "state"
+      ]
+    },
+    "ModelSourceRegistration": {
+      "type": "object",
+      "description": "How a client, or the host from its own configuration, registered a model\nsource.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "format": {
+          "type": "string",
+          "description": "The format of `definition`: the `format` of one of the agent's\n{@link ModelSourceRegistrationCapability.formats}.\n\nAgents choose the formats they read. Some may read these common names:\n\n- `'openaiCompatible'`: an endpoint that implements OpenAI's API.\n- `'anthropic'`: an endpoint that implements Anthropic's Messages API.\n- `'azureOpenai'`: an Azure OpenAI deployment.\n- `'gemini'`: Google's Gemini API.\n\nOther formats are named with a namespace, such as\n`example.com/model-source@1`, so they don't collide."
+        },
+        "definition": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "How to reach the source, in `format`: endpoint, wire API, models, and so\non. The agent reads it. Every client can read it, so it MUST NOT contain\na credential.\n\nAn agent that reads one of the common format names might expect a shape\nlike `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is\nthe API's base URI and each `models` entry is `{ id, name?,\nmaxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,\nnamed as in {@link SessionModelInfo}."
+        }
+      },
+      "required": [
+        "format",
+        "definition"
+      ]
+    },
+    "ModelSourceStartingState": {
+      "type": "object",
+      "description": "The agent is reading and validating the definition, or listing the\nsource's models again after a credential change.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "kind": {
+          "const": "starting"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "ModelSourceReadyState": {
+      "type": "object",
+      "description": "The source is usable, and its models are in the catalog of the agent named\nby the model source's `provider`. They stay listed through later `starting`\nand `authRequired` states.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "kind": {
+          "const": "ready"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "ModelSourceAuthRequirement": {
+      "type": "object",
+      "description": "Why a model source needs a credential before it can be ready. Deliberately\ncarries no credential. The endpoint the credential is for is the\nmodel source's {@link ModelSource.credentialResource}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/ModelSourceAuthRequiredReason",
+          "description": "Why a credential is needed."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable hint the host writes, for example \"The endpoint rejected\nthe API key.\""
+        }
+      },
+      "required": [
+        "reason"
+      ]
+    },
+    "ModelSourceAuthRequiredState": {
+      "type": "object",
+      "description": "The source needs a credential before it can be used. A client answers with\n`authenticate`, the model source's `credentialResource.resource`, and a\n{@link ModelSourceAuthenticateTarget}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/ModelSourceAuthRequiredReason",
+          "description": "Why a credential is needed."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable hint the host writes, for example \"The endpoint rejected\nthe API key.\""
+        },
+        "kind": {
+          "const": "authRequired"
+        }
+      },
+      "required": [
+        "reason",
+        "kind"
+      ]
+    },
+    "ModelSourceErrorState": {
+      "type": "object",
+      "description": "The source failed, or the host declined it, for example by policy.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "kind": {
+          "const": "error"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Error details the host writes. MUST NOT contain the credential."
+        }
+      },
+      "required": [
+        "kind",
+        "error"
       ]
     },
     "RootConfigState": {
@@ -9558,6 +9809,23 @@
       ],
       "description": "A primitive JSON value: a string, number, boolean, or `null`."
     },
+    "ModelSourceState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ModelSourceStartingState"
+        },
+        {
+          "$ref": "#/$defs/ModelSourceReadyState"
+        },
+        {
+          "$ref": "#/$defs/ModelSourceAuthRequiredState"
+        },
+        {
+          "$ref": "#/$defs/ModelSourceErrorState"
+        }
+      ],
+      "description": "Lifecycle state of a {@link ModelSource}, discriminated by\n`kind` (a {@link ModelSourceStatus} value)."
+    },
     "SessionOrigin": {
       "$ref": "#/$defs/AutomationSessionOrigin",
       "description": "Durable provenance for sessions created by a higher-level AHP workflow."
@@ -10184,6 +10452,15 @@
           "$ref": "#/$defs/RootConfigChangedAction"
         },
         {
+          "$ref": "#/$defs/RootModelSourceRegisterRequestedAction"
+        },
+        {
+          "$ref": "#/$defs/RootModelSourceSetAction"
+        },
+        {
+          "$ref": "#/$defs/RootModelSourceRemovedAction"
+        },
+        {
           "$ref": "#/$defs/SessionReadyAction"
         },
         {
@@ -10513,6 +10790,14 @@
       "type": "string",
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
     },
+    "ModelSourceRetentionPolicy": {
+      "enum": [
+        "contributingClient",
+        "host"
+      ],
+      "type": "string",
+      "description": "How long a registered model source lasts once its last contributing client\nleaves."
+    },
     "SessionStatus": {
       "type": "integer",
       "minimum": 0,
@@ -10583,6 +10868,10 @@
       "type": "string",
       "description": "How the server resumes sending data on a windowed subscription after\nreconnection."
     },
+    "AhpErrorCode": {
+      "type": "integer",
+      "description": "An AHP application error code, such as a value of `AhpErrorCodes`."
+    },
     "PolicyState": {
       "enum": [
         "enabled",
@@ -10591,6 +10880,16 @@
       ],
       "type": "string",
       "description": "Policy configuration state for a model."
+    },
+    "ModelSourceAuthRequiredReason": {
+      "enum": [
+        "required",
+        "expired",
+        "rejected",
+        "revoked"
+      ],
+      "type": "string",
+      "description": "Why a model source needs a credential. Specific to model sources: the\nshared `AuthRequiredReason` folds rejection and revocation into `expired`."
     },
     "SessionLifecycle": {
       "enum": [

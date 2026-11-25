@@ -23,6 +23,7 @@ fn main() {
         active_sessions: None,
         terminals: None,
         config: None,
+        model_sources: None,
         meta: None,
     };
 
@@ -38,7 +39,6 @@ fn main() {
                     protected_resources: None,
                     customizations: None,
                     capabilities: None,
-                    model_sources: None,
                 }],
             }),
             server_seq: 1,

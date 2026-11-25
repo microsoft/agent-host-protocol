@@ -1,0 +1,19 @@
+{
+  "type": "added",
+  "message": "Add a model source registry so clients can register bring-your-own-key model sources with the host, and use their models in any session or automation.",
+  "details": [
+    "```ts",
+    "// A client asks the host to register a source in a format the agent reads.",
+    "dispatch({",
+    "  type: 'root/modelSourceRegisterRequested',",
+    "  modelSourceId: 'byok/openrouter', provider: 'copilot', displayName: 'OpenRouter',",
+    "  registration: { format: 'openaiCompatible', definition: { endpoint: 'https://openrouter.ai/api/v1' } },",
+    "});",
+    "// The host publishes it with root/modelSourceSet. While its state is authRequired,",
+    "// the client delivers the key with an authenticate target of kind 'modelSource'.",
+    "```",
+    "Agents advertise the formats they read in `AgentCapabilities.modelSourceRegistration`. Requests and turns that need an unavailable source fail with `AhpErrorCodes.ModelSourceUnavailable` (`-32013`), which a turn's error part carries in the new optional `ErrorInfo.errorCode`.",
+    "Read more in [Model Sources](https://microsoft.github.io/agent-host-protocol/guide/model-sources)."
+  ],
+  "issues": [619]
+}

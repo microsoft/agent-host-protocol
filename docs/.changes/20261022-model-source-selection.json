@@ -1,14 +1,14 @@
 {
   "type": "added",
-  "message": "Add model source metadata (`ModelSourceInfo`, `AgentInfo.modelSources`, and `SessionModelInfo.modelSourceId`) so clients can label and group models by service or subscription while keeping model IDs unique and stable per agent.",
+  "message": "Add model source metadata (`RootState.modelSources` and `SessionModelInfo.modelSourceId`) so clients can label and group an agent's models by service or subscription while keeping model IDs unique and stable per agent.",
   "details": [
     "```json",
     "{",
-    "  \"provider\": \"example\",",
-    "  \"modelSources\": [{ \"id\": \"source-a\", \"displayName\": \"Service A\" }],",
-    "  \"models\": [",
-    "    { \"id\": \"model-a\", \"provider\": \"example\", \"name\": \"Model\", \"modelSourceId\": \"source-a\" }",
-    "  ]",
+    "  \"modelSources\": [{ \"id\": \"source-a\", \"provider\": \"example\", \"displayName\": \"Service A\", \"state\": { \"kind\": \"ready\" } }],",
+    "  \"agents\": [{",
+    "    \"provider\": \"example\",",
+    "    \"models\": [{ \"id\": \"model-a\", \"provider\": \"example\", \"name\": \"Model\", \"modelSourceId\": \"source-a\" }]",
+    "  }]",
     "}",
     "```",
     "Read more in [Root Channel — Model sources](https://microsoft.github.io/agent-host-protocol/specification/root-channel#model-sources)."

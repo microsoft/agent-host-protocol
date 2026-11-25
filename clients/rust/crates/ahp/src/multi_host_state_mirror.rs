@@ -200,6 +200,7 @@ impl MultiHostStateMirror {
                     active_sessions: None,
                     terminals: None,
                     config: None,
+                    model_sources: None,
                     meta: None,
                 });
             apply_action_to_root(root, &envelope.action);

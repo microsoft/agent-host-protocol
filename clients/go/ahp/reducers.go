@@ -537,8 +537,34 @@ func ApplyActionToRoot(state *ahptypes.RootState, action ahptypes.StateAction) R
 			state.Config.Values[k] = v
 		}
 		return ReduceOutcomeApplied
+	case *ahptypes.RootModelSourceRegisterRequestedAction:
+		return ReduceOutcomeNoOp
+	case *ahptypes.RootModelSourceSetAction:
+		idx := modelSourceIndex(state.ModelSources, a.ModelSource.Id)
+		if idx >= 0 {
+			state.ModelSources[idx] = a.ModelSource
+		} else {
+			state.ModelSources = append(state.ModelSources, a.ModelSource)
+		}
+		return ReduceOutcomeApplied
+	case *ahptypes.RootModelSourceRemovedAction:
+		idx := modelSourceIndex(state.ModelSources, a.ModelSourceId)
+		if idx < 0 {
+			return ReduceOutcomeNoOp
+		}
+		state.ModelSources = append(state.ModelSources[:idx], state.ModelSources[idx+1:]...)
+		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope
+}
+
+func modelSourceIndex(list []ahptypes.ModelSource, id string) int {
+	for i := range list {
+		if list[i].Id == id {
+			return i
+		}
+	}
+	return -1
 }
 
 // ─── Chat Reducer ──────────────────────────────────────────────────────

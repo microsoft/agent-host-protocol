@@ -67,6 +67,7 @@ export default withMermaid(defineConfigWithTheme<DocThemeConfig>({
             { text: 'Terminals', link: '/guide/terminals' },
             { text: 'Customizations', link: '/guide/customizations' },
             { text: 'MCP Servers', link: '/guide/mcp' },
+            { text: 'Model Sources', link: '/guide/model-sources' },
             { text: 'Write-Ahead Reconciliation', link: '/guide/reconciliation' },
           ],
         },
