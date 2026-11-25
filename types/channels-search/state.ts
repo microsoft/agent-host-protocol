@@ -51,6 +51,13 @@ export interface SearchQuery {
   wholeWord?: boolean;
   /** Treat `text` as a regular expression. Defaults to `false`. */
   isRegex?: boolean;
+  /**
+   * A hint that precise matching isn't expected, for example because the
+   * search powers a quick-find picker. The host MAY then match loosely, rank
+   * results by how well they match, and ignore {@link isRegex} and
+   * {@link wholeWord}. Defaults to `false`.
+   */
+  fuzzy?: boolean;
   /** Where to search. MUST contain at least one target. */
   targets: SearchTarget[];
   /**

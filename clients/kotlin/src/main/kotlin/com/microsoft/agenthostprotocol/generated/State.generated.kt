@@ -7114,6 +7114,13 @@ data class SearchQuery(
      */
     val isRegex: Boolean? = null,
     /**
+     * A hint that precise matching isn't expected, for example because the
+     * search powers a quick-find picker. The host MAY then match loosely, rank
+     * results by how well they match, and ignore {@link isRegex} and
+     * {@link wholeWord}. Defaults to `false`.
+     */
+    val fuzzy: Boolean? = null,
+    /**
      * Where to search. MUST contain at least one target.
      */
     val targets: List<SearchTarget>,

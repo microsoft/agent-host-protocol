@@ -7089,6 +7089,12 @@ pub struct SearchQuery {
     /// Treat `text` as a regular expression. Defaults to `false`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_regex: Option<bool>,
+    /// A hint that precise matching isn't expected, for example because the
+    /// search powers a quick-find picker. The host MAY then match loosely, rank
+    /// results by how well they match, and ignore {@link isRegex} and
+    /// {@link wholeWord}. Defaults to `false`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fuzzy: Option<bool>,
     /// Where to search. MUST contain at least one target.
     pub targets: Vec<SearchTarget>,
     /// The maximum number of results. The host MAY apply a lower limit, and

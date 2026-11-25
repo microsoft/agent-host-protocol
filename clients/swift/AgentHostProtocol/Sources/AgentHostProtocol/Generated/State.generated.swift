@@ -9032,6 +9032,11 @@ public struct SearchQuery: Codable, Sendable, Equatable {
     public var wholeWord: Bool?
     /// Treat `text` as a regular expression. Defaults to `false`.
     public var isRegex: Bool?
+    /// A hint that precise matching isn't expected, for example because the
+    /// search powers a quick-find picker. The host MAY then match loosely, rank
+    /// results by how well they match, and ignore {@link isRegex} and
+    /// {@link wholeWord}. Defaults to `false`.
+    public var fuzzy: Bool?
     /// Where to search. MUST contain at least one target.
     public var targets: [SearchTarget]
     /// The maximum number of results. The host MAY apply a lower limit, and
@@ -9046,6 +9051,7 @@ public struct SearchQuery: Codable, Sendable, Equatable {
         case matchCase
         case wholeWord
         case isRegex
+        case fuzzy
         case targets
         case maxResults
     }
@@ -9055,6 +9061,7 @@ public struct SearchQuery: Codable, Sendable, Equatable {
         matchCase: Bool? = nil,
         wholeWord: Bool? = nil,
         isRegex: Bool? = nil,
+        fuzzy: Bool? = nil,
         targets: [SearchTarget],
         maxResults: Int? = nil,
         extra: [String: AnyCodable] = [:]
@@ -9063,6 +9070,7 @@ public struct SearchQuery: Codable, Sendable, Equatable {
         self.matchCase = matchCase
         self.wholeWord = wholeWord
         self.isRegex = isRegex
+        self.fuzzy = fuzzy
         self.targets = targets
         self.maxResults = maxResults
         self.extra = extra
@@ -9074,6 +9082,7 @@ public struct SearchQuery: Codable, Sendable, Equatable {
         self.matchCase = try container.decodeIfPresent(Bool.self, forKey: .matchCase)
         self.wholeWord = try container.decodeIfPresent(Bool.self, forKey: .wholeWord)
         self.isRegex = try container.decodeIfPresent(Bool.self, forKey: .isRegex)
+        self.fuzzy = try container.decodeIfPresent(Bool.self, forKey: .fuzzy)
         self.targets = try container.decode([SearchTarget].self, forKey: .targets)
         self.maxResults = try container.decodeIfPresent(Int.self, forKey: .maxResults)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
@@ -9085,6 +9094,7 @@ public struct SearchQuery: Codable, Sendable, Equatable {
         try container.encodeIfPresent(self.matchCase, forKey: .matchCase)
         try container.encodeIfPresent(self.wholeWord, forKey: .wholeWord)
         try container.encodeIfPresent(self.isRegex, forKey: .isRegex)
+        try container.encodeIfPresent(self.fuzzy, forKey: .fuzzy)
         try container.encode(self.targets, forKey: .targets)
         try container.encodeIfPresent(self.maxResults, forKey: .maxResults)
         try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))

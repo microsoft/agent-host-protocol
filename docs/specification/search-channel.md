@@ -67,6 +67,7 @@ and releases the channel.
 | `matchCase` | Match case. Defaults to `false`. |
 | `wholeWord` | Match only whole words. Defaults to `false`. |
 | `isRegex` | Treat `text` as a regular expression. Defaults to `false`. |
+| `fuzzy` | A hint that precise matching isn't expected, for example in a quick-find picker. The host MAY then match loosely and ignore `isRegex` and `wholeWord`. Defaults to `false`. |
 | `targets` | Where to search. At least one target. |
 | `maxResults` | The maximum number of results. The host MAY apply a lower limit. |
 

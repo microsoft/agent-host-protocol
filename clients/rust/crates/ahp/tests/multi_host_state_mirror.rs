@@ -231,6 +231,7 @@ fn searches_are_reduced_and_reset_per_host() {
                 match_case: None,
                 whole_word: None,
                 is_regex: None,
+                fuzzy: None,
                 targets: vec![SearchTarget::Sessions(SessionsSearchTarget {
                     extra: Default::default(),
                 })],

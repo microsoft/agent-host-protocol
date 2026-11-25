@@ -7923,6 +7923,13 @@ public sealed record SearchQuery
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? IsRegex { get; init; }
 
+    /// <summary>A hint that precise matching isn't expected, for example because the
+    /// search powers a quick-find picker. The host MAY then match loosely, rank
+    /// results by how well they match, and ignore {@link isRegex} and
+    /// {@link wholeWord}. Defaults to `false`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Fuzzy { get; init; }
+
     /// <summary>Where to search. MUST contain at least one target.</summary>
     public required List<SearchTarget> Targets { get; init; }
 

@@ -6371,6 +6371,10 @@
           "type": "boolean",
           "description": "Treat `text` as a regular expression. Defaults to `false`."
         },
+        "fuzzy": {
+          "type": "boolean",
+          "description": "A hint that precise matching isn't expected, for example because the\nsearch powers a quick-find picker. The host MAY then match loosely, rank\nresults by how well they match, and ignore {@link isRegex} and\n{@link wholeWord}. Defaults to `false`."
+        },
         "targets": {
           "type": "array",
           "items": {

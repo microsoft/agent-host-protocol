@@ -5486,6 +5486,11 @@ type SearchQuery struct {
 	WholeWord *bool `json:"wholeWord,omitempty"`
 	// Treat `text` as a regular expression. Defaults to `false`.
 	IsRegex *bool `json:"isRegex,omitempty"`
+	// A hint that precise matching isn't expected, for example because the
+	// search powers a quick-find picker. The host MAY then match loosely, rank
+	// results by how well they match, and ignore {@link isRegex} and
+	// {@link wholeWord}. Defaults to `false`.
+	Fuzzy *bool `json:"fuzzy,omitempty"`
 	// Where to search. MUST contain at least one target.
 	Targets []SearchTarget `json:"targets"`
 	// The maximum number of results. The host MAY apply a lower limit, and
@@ -5498,12 +5503,12 @@ type SearchQuery struct {
 
 func (v *SearchQuery) UnmarshalJSON(data []byte) error {
 	type wire SearchQuery
-	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "text", "matchCase", "wholeWord", "isRegex", "targets", "maxResults")
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "text", "matchCase", "wholeWord", "isRegex", "fuzzy", "targets", "maxResults")
 }
 
 func (v SearchQuery) MarshalJSON() ([]byte, error) {
 	type wire SearchQuery
-	return marshalWithExtra(wire(v), v.Extra, "text", "matchCase", "wholeWord", "isRegex", "targets", "maxResults")
+	return marshalWithExtra(wire(v), v.Extra, "text", "matchCase", "wholeWord", "isRegex", "fuzzy", "targets", "maxResults")
 }
 
 // Searches file paths under {@link FileSearchTargetBase.roots}.

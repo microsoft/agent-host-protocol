@@ -1,12 +1,13 @@
 {
   "name": "search-querychanged-action",
   "group": "A",
-  "description": "The client-dispatched search/queryChanged action preserves the replacement query.",
+  "description": "The client-dispatched search/queryChanged action preserves the replacement query, including the fuzzy hint.",
   "type": "StateAction",
   "input": {
     "type": "search/queryChanged",
     "query": {
       "text": "parseConf",
+      "fuzzy": true,
       "targets": [
         {
           "kind": "fileNames",
@@ -22,6 +23,7 @@
       "type": "search/queryChanged",
       "query": {
         "text": "parseConf",
+        "fuzzy": true,
         "targets": [
           {
             "kind": "fileNames",
