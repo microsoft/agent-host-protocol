@@ -1,7 +1,7 @@
 {
   "name": "model-source-registry-snapshot",
   "group": "A",
-  "description": "A root snapshot carries registered model sources with no reported state and in each lifecycle state and auth reason (required, expired, rejected, and revoked), including an http endpoint, a host-retained source, and a host-registered source in a namespaced format. Each source carries its definition, in the suggested shape for its recognized format or an agent's own shape, including members the suggested shapes don't name, and a nonce for it. Sources that take a credential carry a host-reported credentialResource in every state, and accountId once the host has accepted a key sent with one. The agent advertises the modelSourceRegistration capability with format objects for the recognized formats it reads and a namespaced one, and its catalog lists the ready source and the authRequired one whose key expired, since models stay listed after a source has been ready.",
+  "description": "A root snapshot lists an agent's built-in model source, with no format, definition, or nonce, alongside registered model sources with no reported state and in each lifecycle state and auth reason (required, expired, rejected, and revoked), including an http endpoint, a host-retained source, and a host-registered source in a namespaced format. Each registered source carries its definition, including members an agent defines itself, and a nonce for it. Sources that take a credential carry a host-reported credentialResource in every state, and accountId once the host has accepted a key sent with one. The agent advertises the modelSourceRegistration capability with format objects, and its catalog lists the built-in source's model, the ready source's, and the authRequired one's whose key expired, since models stay listed after a source has been ready.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-root://",
@@ -33,17 +33,13 @@
               ]
             }
           },
-          "modelSources": [
-            {
-              "id": "source-ready",
-              "displayName": "OpenRouter"
-            },
-            {
-              "id": "source-auth",
-              "displayName": "Azure endpoint"
-            }
-          ],
           "models": [
+            {
+              "id": "builtin-model",
+              "provider": "example",
+              "name": "Example built-in model",
+              "modelSourceId": "source-builtin"
+            },
             {
               "id": "source-ready.8f3a",
               "provider": "example",
@@ -62,6 +58,11 @@
         }
       ],
       "modelSources": [
+        {
+          "id": "source-builtin",
+          "provider": "example",
+          "displayName": "Example subscription"
+        },
         {
           "id": "source-unreported",
           "provider": "example",
@@ -296,17 +297,13 @@
                 ]
               }
             },
-            "modelSources": [
-              {
-                "id": "source-ready",
-                "displayName": "OpenRouter"
-              },
-              {
-                "id": "source-auth",
-                "displayName": "Azure endpoint"
-              }
-            ],
             "models": [
+              {
+                "id": "builtin-model",
+                "provider": "example",
+                "name": "Example built-in model",
+                "modelSourceId": "source-builtin"
+              },
               {
                 "id": "source-ready.8f3a",
                 "provider": "example",
@@ -325,6 +322,11 @@
           }
         ],
         "modelSources": [
+          {
+            "id": "source-builtin",
+            "provider": "example",
+            "displayName": "Example subscription"
+          },
           {
             "id": "source-unreported",
             "provider": "example",

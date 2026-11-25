@@ -189,14 +189,14 @@ type RootConfigChangedAction struct {
 //     host-reported fields are absent until the host reports again with
 //     {@link RootModelSourceStateChangedAction}.
 //
-// A client dispatches this without any host-reported field. The host learns
-// which client registered the source from the envelope's `origin`.
+// A client registers a source with its `format`, `definition`, and `nonce`,
+// and without any host-reported field. The host learns which client
+// registered it from the envelope's `origin`.
 //
 // Stability: 1.0 - Early development.
 type RootModelSourceSetAction struct {
 	Type ActionType `json:"type"`
-	// The model source to add or update, matched by `id`, including its
-	// `definition`, without host-reported fields.
+	// The model source to add or update, matched by `id`.
 	ModelSource ModelSource `json:"modelSource"`
 }
 

@@ -1885,18 +1885,20 @@ public sealed record McpServerAuthenticateTarget
     public required string CustomizationId { get; init; }
 }
 
-/// <summary>A registered model source.
+/// <summary>A registered model source. The host applies the credential only to that
+/// source, and publishes the request's `accountId` as the source's
+/// `ModelSource.accountId`.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ModelSourceAuthenticateTarget
 {
     public AuthenticateTargetKind Kind { get; init; } = AuthenticateTargetKind.ModelSource;
 
-    /// <summary>The registration's `ModelSource.id`.</summary>
+    /// <summary>The source's `ModelSource.id`.</summary>
     public required string ModelSourceId { get; init; }
 }
 
-/// <summary>Pushes a credential for a protected resource. The `resource` field MUST
+/// <summary>Pushes a Bearer token for a protected resource. The `resource` field MUST
 /// match a protected-resource identifier the client has discovered from the
 /// server — whether declared statically in `AgentInfo.protectedResources`,
 /// or discovered dynamically from a live `McpServerAuthRequiredState.resource`
@@ -1905,14 +1907,13 @@ public sealed record ModelSourceAuthenticateTarget
 /// from a registered model source's `ModelSource.credentialResource`.
 /// Servers MUST accept any `resource` value they have themselves advertised
 /// through one of these mechanisms, subject to the `target` rules. A
-/// `modelSource` target takes only the registration's current
+/// `modelSource` target takes only the source's current
 /// `credentialResource.resource`.
 ///
 /// Tokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)
 /// (Bearer Token Usage) semantics. The client obtains the token from the
 /// authorization server(s) listed in the resource's metadata and pushes it
-/// to the server via this command. A model source's token is instead an
-/// opaque secret, such as an API key.</summary>
+/// to the server via this command.</summary>
 public sealed record AuthenticateParams
 {
     public required string Channel { get; init; }
@@ -1930,8 +1931,7 @@ public sealed record AuthenticateParams
     /// or `ModelSource.credentialResource`.</summary>
     public required string Resource { get; init; }
 
-    /// <summary>Bearer token obtained from the resource's authorization server, or an
-    /// opaque secret for a model source. An empty string revokes the credential.</summary>
+    /// <summary>Bearer token obtained from the resource's authorization server</summary>
     public required string Token { get; init; }
 
     /// <summary>The access token's remaining lifetime, in seconds, when this
@@ -1943,8 +1943,6 @@ public sealed record AuthenticateParams
     /// authorization server did not supply an expiry or the expiry is otherwise
     /// unknown. When supplied, the value MUST be a positive integer.
     ///
-    /// An API key omits this field.
-    ///
     /// This field is irrelevant when `token` is empty to revoke authentication
     /// and SHOULD be omitted in that case.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1955,7 +1953,7 @@ public sealed record AuthenticateParams
     /// `McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth` — is
     /// satisfied without decoding the (opaque, server-specific) token itself.
     /// Omit when the client doesn't track granted scopes separately from the
-    /// token. Scopes apply to OAuth-issued tokens only.</summary>
+    /// token.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Scopes { get; init; }
 
@@ -1975,10 +1973,8 @@ public sealed record AuthenticateParams
     ///
     /// A registered model source takes its credential only through a
     /// `modelSource` target, and the host rejects an untargeted `resource` that
-    /// matches only model source challenges with `InvalidParams` (-32602). A
-    /// delivery replaces whatever credential the host holds for the source. See
-    /// [Model source credentials](/specification/authentication#model-source-credentials)
-    /// for its rules.
+    /// matches only model source challenges with `InvalidParams` (-32602). See
+    /// [Model source credentials](/specification/authentication#model-source-credentials).
     ///
     /// Without a target, resource/scope matching is unchanged; the token may
     /// satisfy every matching pending challenge. Older hosts ignore this field.</summary>
@@ -1988,13 +1984,7 @@ public sealed record AuthenticateParams
     /// <summary>Optional identifier for the client's selected account, sent alongside the token.
     /// Hosts can compare `accountId` values to detect when the underlying account has changed.
     /// Hosts MUST treat `accountId` as an opaque string.
-    /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
-    ///
-    /// With a `modelSource` target, clients SHOULD include it when delivering a
-    /// credential and omit it when revoking one, and the host publishes it as
-    /// the source's `ModelSource.accountId`. It MUST NOT be derived from the
-    /// secret. For an API key with no account of its own, a client uses an ID
-    /// that changes whenever the user replaces the key.</summary>
+    /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? AccountId { get; init; }
 }

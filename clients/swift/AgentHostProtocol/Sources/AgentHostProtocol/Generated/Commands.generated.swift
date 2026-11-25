@@ -1970,12 +1970,14 @@ public struct McpServerAuthenticateTarget: Codable, Sendable, Equatable {
     }
 }
 
-/// A registered model source.
+/// A registered model source. The host applies the credential only to that
+/// source, and publishes the request's `accountId` as the source's
+/// `ModelSource.accountId`.
 ///
 /// Stability: 1.0 - Early development.
 public struct ModelSourceAuthenticateTarget: Codable, Sendable, Equatable {
     public var kind: AuthenticateTargetKind
-    /// The registration's `ModelSource.id`.
+    /// The source's `ModelSource.id`.
     public var modelSourceId: String
 
     public init(
@@ -1999,8 +2001,7 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// `McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,
     /// or `ModelSource.credentialResource`.
     public var resource: String
-    /// Bearer token obtained from the resource's authorization server, or an
-    /// opaque secret for a model source. An empty string revokes the credential.
+    /// Bearer token obtained from the resource's authorization server
     public var token: String
     /// The access token's remaining lifetime, in seconds, when this
     /// `authenticate` request is sent. This corresponds to `expires_in` in an
@@ -2011,8 +2012,6 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// authorization server did not supply an expiry or the expiry is otherwise
     /// unknown. When supplied, the value MUST be a positive integer.
     ///
-    /// An API key omits this field.
-    ///
     /// This field is irrelevant when `token` is empty to revoke authentication
     /// and SHOULD be omitted in that case.
     public var expiresIn: Int?
@@ -2021,7 +2020,7 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// `McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth` — is
     /// satisfied without decoding the (opaque, server-specific) token itself.
     /// Omit when the client doesn't track granted scopes separately from the
-    /// token. Scopes apply to OAuth-issued tokens only.
+    /// token.
     public var scopes: [String]?
     /// Optional consumer of the token. Clients SHOULD include this when answering
     /// a specific MCP server's `McpServerAuthRequiredState` or
@@ -2039,10 +2038,8 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     ///
     /// A registered model source takes its credential only through a
     /// `modelSource` target, and the host rejects an untargeted `resource` that
-    /// matches only model source challenges with `InvalidParams` (-32602). A
-    /// delivery replaces whatever credential the host holds for the source. See
-    /// [Model source credentials](/specification/authentication#model-source-credentials)
-    /// for its rules.
+    /// matches only model source challenges with `InvalidParams` (-32602). See
+    /// [Model source credentials](/specification/authentication#model-source-credentials).
     ///
     /// Without a target, resource/scope matching is unchanged; the token may
     /// satisfy every matching pending challenge. Older hosts ignore this field.
@@ -2051,12 +2048,6 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// Hosts can compare `accountId` values to detect when the underlying account has changed.
     /// Hosts MUST treat `accountId` as an opaque string.
     /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
-    ///
-    /// With a `modelSource` target, clients SHOULD include it when delivering a
-    /// credential and omit it when revoking one, and the host publishes it as
-    /// the source's `ModelSource.accountId`. It MUST NOT be derived from the
-    /// secret. For an API key with no account of its own, a client uses an ID
-    /// that changes whenever the user replaces the key.
     public var accountId: String?
 
     enum CodingKeys: String, CodingKey {

@@ -787,7 +787,6 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'ModelSourceAuthRequirement' },
   { name: 'ModelSourceAuthRequiredState' },
   { name: 'ModelSourceErrorState' },
-  { name: 'ModelSourceInfo' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
   { name: 'AgentSelection' },
@@ -2283,6 +2282,8 @@ const (
 \tErrorCodeAlreadyExists               int32 = -32010
 \t// ErrorCodeTcpConnectionOpenFailed indicates that the host could not open a TCP connection.
 \tErrorCodeTcpConnectionOpenFailed     int32 = -32012
+\t// ErrorCodeModelSourceUnavailable indicates that a request selects a model whose registered model source can't serve it.
+\tErrorCodeModelSourceUnavailable       int32 = -32013
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.

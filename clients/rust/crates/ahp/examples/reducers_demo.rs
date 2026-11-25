@@ -39,7 +39,6 @@ fn main() {
                     protected_resources: None,
                     customizations: None,
                     capabilities: None,
-                    model_sources: None,
                 }],
             }),
             server_seq: 1,

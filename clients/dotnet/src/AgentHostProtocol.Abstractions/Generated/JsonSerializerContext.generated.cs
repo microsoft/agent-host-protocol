@@ -305,7 +305,6 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(ModelSourceAuthRequirement))]
 [JsonSerializable(typeof(ModelSourceErrorState))]
 [JsonSerializable(typeof(ModelSourceFormatInfo))]
-[JsonSerializable(typeof(ModelSourceInfo))]
 [JsonSerializable(typeof(ModelSourceReadyState))]
 [JsonSerializable(typeof(ModelSourceRegistrationCapability))]
 [JsonSerializable(typeof(ModelSourceRetentionPolicy))]

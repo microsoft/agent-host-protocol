@@ -888,7 +888,6 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'ModelSourceAuthRequirement' },
   { name: 'ModelSourceAuthRequiredState', omitDiscriminants: true },
   { name: 'ModelSourceErrorState', omitDiscriminants: true },
-  { name: 'ModelSourceInfo' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
   { name: 'AgentSelection' },
@@ -2330,6 +2329,8 @@ pub mod ahp_error_codes {
     pub const CONFLICT: i32 = -32011;
     /// The host could not open the requested TCP connection.
     pub const TCP_CONNECTION_OPEN_FAILED: i32 = -32012;
+    /// A request selects a model whose registered model source can't serve it.
+    pub const MODEL_SOURCE_UNAVAILABLE: i32 = -32013;
 }
 
 /// Type alias: AHP application error code.

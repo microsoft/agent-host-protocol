@@ -1759,17 +1759,6 @@ pub enum AutomationRunOriginKind {
     Trigger,
 }
 
-fn deserialize_extra_without_kind<'de, D>(
-    deserializer: D,
-) -> Result<serde_json::Map<String, serde_json::Value>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let mut extra = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
-    extra.remove("kind");
-    Ok(extra)
-}
-
 fn deserialize_extra_without_type<'de, D>(
     deserializer: D,
 ) -> Result<serde_json::Map<String, serde_json::Value>, D::Error>
@@ -1778,6 +1767,17 @@ where
 {
     let mut extra = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
     extra.remove("type");
+    Ok(extra)
+}
+
+fn deserialize_extra_without_kind<'de, D>(
+    deserializer: D,
+) -> Result<serde_json::Map<String, serde_json::Value>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let mut extra = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
+    extra.remove("kind");
     Ok(extra)
 }
 
@@ -1903,8 +1903,6 @@ pub struct Icon {
 pub struct ProtectedResourceMetadata {
     /// REQUIRED. The protected resource's resource identifier, a URL using the
     /// `https` scheme with no fragment component (e.g. `"https://api.github.com"`).
-    /// A registered model source's endpoint may use any scheme the agent
-    /// supports, because nothing fetches it.
     pub resource: String,
     /// OPTIONAL. Human-readable name of the protected resource.
     #[serde(
@@ -1996,9 +1994,9 @@ pub struct RootState {
     /// Agent host configuration schema and current values
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<RootConfigState>,
-    /// Model sources registered on this host, keyed by `id`. When one is
-    /// ready, it also appears in its agent's {@link AgentInfo.modelSources}
-    /// catalog.
+    /// Model sources on this host, keyed by `id`: the sources agents offer
+    /// models from, including ones clients registered. Clients use them to
+    /// label and group each agent's {@link AgentInfo.models}.
     ///
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2061,10 +2059,6 @@ pub struct AgentInfo {
     /// id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<AgentCapabilities>,
-    /// Sources this agent offers models from. Clients use them to label and
-    /// group {@link models}. A source may have no models.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model_sources: Option<Vec<ModelSourceInfo>>,
 }
 
 /// Static capabilities an {@link AgentInfo} advertises. Modelled after MCP
@@ -2168,9 +2162,6 @@ pub struct MultipleWorkingDirectoriesCapability {
 pub struct ModelSourceRegistrationCapability {
     /// Definition formats the agent reads, most preferred first.
     pub formats: Vec<ModelSourceFormatInfo>,
-    /// Unrecognized wire members retained for full-object edits.
-    #[serde(flatten)]
-    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A definition format an agent reads. An object so it can grow, for example
@@ -2180,68 +2171,61 @@ pub struct ModelSourceRegistrationCapability {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelSourceFormatInfo {
-    /// A recognized {@link ModelSource.format} value, or a namespaced name for
-    /// a format the agent defines itself.
+    /// A {@link ModelSource.format} value.
     pub format: String,
-    /// Unrecognized wire members retained for full-object edits.
-    #[serde(flatten)]
-    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
-/// A model source registered on this host by a client, or by the host itself.
-/// Nothing here is a credential.
+/// A source that an agent provider offers models from, such as a service,
+/// subscription, or endpoint. The host lists the sources an agent provides
+/// itself, and clients can register more with a definition. Nothing here is
+/// a credential.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelSource {
     /// Host-unique ID, chosen by whoever registers the source. Also the
-    /// source's {@link ModelSourceInfo.id} in the agent's catalog, and the
     /// {@link SessionModelInfo.modelSourceId} of its models.
     pub id: String,
-    /// Agent provider whose agent reads the definition and serves the models.
+    /// Agent provider whose agent serves the source's models.
     pub provider: String,
-    /// Human-readable name, published as {@link ModelSourceInfo.displayName}.
+    /// Human-readable name.
     pub display_name: String,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
-    /// The definition's format: the `format` of one of the agent's
-    /// {@link ModelSourceRegistrationCapability.formats}. Recognized values
-    /// include:
+    /// The format of `definition`: the `format` of one of the agent's
+    /// {@link ModelSourceRegistrationCapability.formats}. Present on a
+    /// registered source.
     ///
-    /// - `'openaiCompatible'`: an endpoint that implements OpenAI's API, such as
-    ///   OpenAI, OpenRouter, xAI, or a local server like Ollama or LM Studio.
+    /// Agents choose the formats they read. Some may read these common names:
+    ///
+    /// - `'openaiCompatible'`: an endpoint that implements OpenAI's API.
     /// - `'anthropic'`: an endpoint that implements Anthropic's Messages API.
     /// - `'azureOpenai'`: an Azure OpenAI deployment.
     /// - `'gemini'`: Google's Gemini API.
     ///
-    /// Agents MAY read other formats, named with a namespace such as
-    /// `example.com/model-source@1` so they don't collide.
-    pub format: String,
+    /// Other formats are named with a namespace, such as
+    /// `example.com/model-source@1`, so they don't collide.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
     /// How to reach the source, in `format`: endpoint, wire API, models, and so
-    /// on. The agent reads it, and AHP doesn't validate it. Every client can
-    /// read it, so it MUST NOT contain a credential.
+    /// on. The agent reads it. Every client can read it, so it MUST NOT contain
+    /// a credential. Present on a registered source.
     ///
-    /// Suggested shapes for the recognized formats. Agents MAY read more
-    /// members, and MAY discover models when `models` is absent.
-    ///
-    /// - `openaiCompatible`: `{ endpoint, wireApi?: 'chatCompletions' | 'responses', models? }`
-    /// - `anthropic`: `{ endpoint, models? }`
-    /// - `azureOpenai`: `{ endpoint, apiVersion?, models? }`, with each
-    ///   deployment name as a model `id`
-    /// - `gemini`: `{ endpoint, models? }`
-    ///
-    /// `endpoint` is the API's base URI, such as `https://api.example.com/v1`.
-    /// Each `models` entry is `{ id, name?, maxContextWindow?, maxOutputTokens?,
-    /// supportsVision?, supportsTools? }`, named as in {@link SessionModelInfo},
-    /// where `id` is the endpoint's own model identifier.
-    pub definition: JsonObject,
+    /// An agent that reads one of the common format names might expect a shape
+    /// like `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is
+    /// the API's base URI and each `models` entry is `{ id, name?,
+    /// maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
+    /// named as in {@link SessionModelInfo}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub definition: Option<JsonObject>,
     /// Opaque version token for `definition`, such as a hash of it, chosen by
-    /// whoever registers the source. Reducers compare it, instead of the
-    /// definition, to tell an update from a re-registration of the same
-    /// definition.
-    pub nonce: String,
+    /// whoever registers the source. Present on a registered source. Reducers
+    /// compare it, instead of the definition, to tell an update from a
+    /// re-registration of the same definition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
     /// What happens when the last contributing client leaves. Absent means `contributingClient`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retention: Option<ModelSourceRetentionPolicy>,
@@ -2250,26 +2234,18 @@ pub struct ModelSource {
     /// definition until the host reports again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<ModelSourceState>,
-    /// RFC 9728 metadata for the endpoint the credential is for. Present
-    /// whenever the source takes a credential, in every state, so any client
-    /// can deliver, rotate, or revoke one. Absent for a source that needs no
-    /// credential. Set with `state`.
+    /// RFC 9728 metadata for the endpoint a registered source's credential is
+    /// for. Present whenever the source takes a credential, in every state, so
+    /// any client can deliver or rotate one. Set with `state`.
     ///
     /// `credentialResource.resource` is the endpoint URL as the definition
     /// names it, in any scheme the agent supports (for example
     /// `http://localhost:11434/v1`). It's the value a client passes back as
     /// `authenticate({ resource })`, and nothing fetches it.
-    /// `credentialResource.resource_name` labels the prompt (for example
-    /// "OpenRouter API key"). A source that accepts OAuth access tokens
-    /// advertises `authorization_servers` and `scopes_supported`. A source that
-    /// takes a user-supplied secret omits them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_resource: Option<ProtectedResourceMetadata>,
-    /// The {@link AuthenticateParams.accountId} the client sent with the
-    /// credential the host most recently accepted. While the state is
-    /// `starting` or `ready`, the host holds that credential. While it's
-    /// `authRequired`, the `reason` says what happened to it. Absent until the
-    /// host accepts a credential sent with an `accountId`. Set with `state`.
+    /// The {@link AuthenticateParams.accountId} sent with the credential the
+    /// host most recently accepted. Set with `state`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account_id: Option<String>,
     /// Additional implementation-defined metadata for this model source.
@@ -2287,11 +2263,7 @@ pub struct ModelSource {
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ModelSourceStartingState {
-    /// Unrecognized wire members retained for full-object edits.
-    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
-    pub extra: serde_json::Map<String, serde_json::Value>,
-}
+pub struct ModelSourceStartingState {}
 
 /// The source is usable, and its models are in the catalog of the agent named
 /// by the model source's `provider`. They stay listed through later `starting`
@@ -2300,11 +2272,7 @@ pub struct ModelSourceStartingState {
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ModelSourceReadyState {
-    /// Unrecognized wire members retained for full-object edits.
-    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
-    pub extra: serde_json::Map<String, serde_json::Value>,
-}
+pub struct ModelSourceReadyState {}
 
 /// Why a model source needs a credential before it can be ready. Deliberately
 /// carries no credential. The endpoint the credential is for is the
@@ -2320,9 +2288,6 @@ pub struct ModelSourceAuthRequirement {
     /// the API key."
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    /// Unrecognized wire members retained for full-object edits.
-    #[serde(flatten)]
-    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// The source needs a credential before it can be used. A client answers with
@@ -2339,9 +2304,6 @@ pub struct ModelSourceAuthRequiredState {
     /// the API key."
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    /// Unrecognized wire members retained for full-object edits.
-    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
-    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// The source failed, or the host declined it, for example by policy.
@@ -2352,24 +2314,6 @@ pub struct ModelSourceAuthRequiredState {
 pub struct ModelSourceErrorState {
     /// Error details the host writes. MUST NOT contain the credential.
     pub error: ErrorInfo,
-    /// Unrecognized wire members retained for full-object edits.
-    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
-    pub extra: serde_json::Map<String, serde_json::Value>,
-}
-
-/// A source that an agent provider offers models from, such as a service or
-/// subscription.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ModelSourceInfo {
-    /// Model source identifier, unique within the agent's
-    /// {@link AgentInfo.modelSources}. For a registered model source, this is
-    /// the {@link ModelSource.id}. A source is registered when
-    /// {@link RootState.modelSources} has an entry with this `id`
-    /// whose `provider` is the agent.
-    pub id: String,
-    /// Human-readable name
-    pub display_name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2419,11 +2363,9 @@ pub struct SessionModelInfo {
     /// recognize.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vendor: Option<String>,
-    /// The source this model comes from. MUST match a {@link ModelSourceInfo.id}
-    /// in the agent's {@link AgentInfo.modelSources}. For a model from a
-    /// registered model source, this is the {@link ModelSource.id}.
-    /// An agent's own sources use it too, so it doesn't by itself mark a
-    /// registered source.
+    /// The source this model comes from: the {@link ModelSource.id} of an entry
+    /// in {@link RootState.modelSources} whose `provider` is this model's
+    /// {@link provider}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_source_id: Option<String>,
 }
@@ -6039,11 +5981,9 @@ pub struct UsageInfo {
 pub struct ErrorInfo {
     /// Error type identifier. Well-known values:
     ///
-    /// - `modelSourceUnavailable`: a registered model source the turn uses
-    ///   can't serve it, for example because its credential is missing,
-    ///   expired, rejected, or revoked, or the source was removed. The error
-    ///   part is resumable. See
-    ///   [Model source credentials](/specification/authentication#model-source-credentials).
+    /// - `modelSourceUnavailable`: a turn's registered model source can't serve
+    ///   it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.
+    ///   See [Model source credentials](/specification/authentication#model-source-credentials).
     pub error_type: String,
     /// Human-readable error message
     pub message: String,

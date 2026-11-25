@@ -39,6 +39,8 @@ public enum AhpErrorCodes {
     public static let permissionDenied = -32009
     /// The target resource already exists and the operation does not allow overwriting
     public static let alreadyExists = -32010
+    /// A request selects a model whose registered model source can't serve it
+    public static let modelSourceUnavailable = -32013
 }
 
 // MARK: - Error Detail Payloads

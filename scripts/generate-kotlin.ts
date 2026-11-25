@@ -1032,7 +1032,7 @@ const STATE_STRUCTS = [
   'ModelSourceRegistrationCapability', 'ModelSourceFormatInfo', 'ModelSource', 'ModelSourceStartingState',
   'ModelSourceReadyState', 'ModelSourceAuthRequirement', 'ModelSourceAuthRequiredState',
   'ModelSourceErrorState',
-  'ModelSourceInfo', 'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
+  'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'BackgroundShellWork', 'BackgroundSubagentWork',
   'CanvasReference', 'CanvasState',
@@ -2276,6 +2276,8 @@ function generateErrorsFile(project: Project): string {
   lines.push('    const val PERMISSION_DENIED: Int = -32009');
   lines.push('    /** The target resource already exists and the operation does not allow overwriting */');
   lines.push('    const val ALREADY_EXISTS: Int = -32010');
+  lines.push("    /** A request selects a model whose registered model source can't serve it */");
+  lines.push('    const val MODEL_SOURCE_UNAVAILABLE: Int = -32013');
   lines.push('}');
   lines.push('');
 

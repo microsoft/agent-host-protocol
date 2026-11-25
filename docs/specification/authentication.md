@@ -1,6 +1,6 @@
 # Authentication
 
-AHP uses [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0 Protected Resource Metadata) semantics for authentication discovery, and [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750) (Bearer Token Usage) semantics for token delivery. Communication is JSON-RPC, not HTTP, but the vocabulary and flow mirror the HTTP standards. A [registered model source](#model-source-credentials) takes an opaque secret, such as an API key, instead of a Bearer token.
+AHP uses [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0 Protected Resource Metadata) semantics for authentication discovery, and [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750) (Bearer Token Usage) semantics for token delivery. Communication is JSON-RPC, not HTTP, but the vocabulary and flow mirror the HTTP standards.
 
 ## Overview
 
@@ -87,7 +87,7 @@ Different agents MAY require authentication with different providers. For exampl
 
 ## Token Delivery
 
-Clients push Bearer tokens to the server using the [`authenticate`](/reference/common#authenticate) command. The `resource` field MUST match a `resource` value the server has itself advertised — either statically via the agent's `protectedResources` metadata, or dynamically via a live MCP authentication challenge (`McpServerAuthRequiredState.resource` or, for a single blocked tool call, `ToolCallAuthRequiredState.auth.resource` — see [MCP Servers](/guide/mcp#authentication)) or a registered model source's `ModelSource.credentialResource.resource`, which stays available while the source is ready for rotation and revocation (see [Model source credentials](#model-source-credentials)):
+Clients push Bearer tokens to the server using the [`authenticate`](/reference/common#authenticate) command. The `resource` field MUST match a `resource` value the server has itself advertised — either statically via the agent's `protectedResources` metadata, or dynamically via a live MCP authentication challenge (`McpServerAuthRequiredState.resource` or, for a single blocked tool call, `ToolCallAuthRequiredState.auth.resource` — see [MCP Servers](/guide/mcp#authentication)) or a registered model source's `credentialResource.resource` (see [Model source credentials](#model-source-credentials)):
 
 ```jsonc
 // Client → Server
@@ -150,12 +150,7 @@ If the token is invalid or the resource is unrecognized, the server MUST return 
 
 ### Model source credentials
 
-A client can [register a model source](/specification/root-channel#model-source-registry), such as an endpoint configured with the user's own API key, with the host. While the source takes a credential, the model source carries host-reported credential fields in every state:
-
-- `credentialResource`: RFC 9728 metadata for the endpoint the credential is for;
-- `accountId`: the `accountId` the client sent with the key the host most recently accepted.
-
-When the source needs a credential, the host also sets the source's state to `ModelSourceAuthRequiredState`, with a `reason`. A client answers with a `modelSource` target that names the source, and names the key with the existing `accountId` parameter:
+A [registered model source](/specification/root-channel#registering-sources) that takes a credential carries `credentialResource`, RFC 9728 metadata for the endpoint the credential is for, in every state. When the source needs a credential, its state is `authRequired`, with a `reason`. A client delivers the credential with `authenticate`, the source's `credentialResource.resource`, and a `modelSource` target:
 
 ```jsonc
 // Model source credential delivery
@@ -176,60 +171,35 @@ When the source needs a credential, the host also sets the source's state to `Mo
 }
 ```
 
-The `token` is an opaque secret rather than an RFC 6750 Bearer token. The agent applies it as the source's definition specifies, for example as an `Authorization: Bearer` or `x-api-key` header. A source that accepts OAuth access tokens, such as Microsoft Entra ID tokens, advertises `authorization_servers` and `scopes_supported`, and the client sends `expiresIn` with each short-lived token. A source that takes a user-supplied secret omits them, and the client omits `scopes`. `credentialResource.resource_name` labels the prompt, for example "OpenRouter API key".
-
-`credentialResource.resource` is the endpoint URL as the definition names it, and the value the client passes as `resource`. It may use any scheme the agent supports, such as `http://localhost:11434/v1` for a local server. Unlike other protected resources, it doesn't need to be an `https` URL: the client only echoes it in `authenticate`, and nothing fetches it. Where the host actually sends the credential is governed by the source's definition and the egress rules below.
-
-Clients SHOULD include `accountId` when they deliver a credential, and omit it when they revoke one. The host publishes it as the source's `accountId`, which lets a client that reloads, or one on another device, tell whether the host holds its current key. It's opaque and MUST NOT be derived from the secret, because every client can read it. For an API key that has no account of its own, a client uses an ID that changes whenever the user replaces the key, such as one derived from where it stores the key and when the key last changed. [Host-owned authentication](https://github.com/microsoft/agent-host-protocol/pull/404) may later supersede the `modelSource` target and this use of `accountId`.
-
 When `target.kind` is `modelSource`, the host:
 
-- MUST apply the credential only to that model source, never to other model sources, MCP servers, or agent-level resources, even when they share `resource`;
+- MUST apply the credential only to that source, never to other model sources, MCP servers, or agent-level resources, even when they share `resource`;
 - MUST require `resource` to equal the source's current `credentialResource.resource`;
 - MUST reject an unknown `modelSourceId` with `InvalidParams` (`-32602`);
-- MUST publish the request's `accountId` as the source's `accountId` when it accepts a credential, and clear it when the request has none;
-- MUST treat an empty `token` as revocation: it stops using the credential at once, drops it, and reports `authRequired` with `reason: revoked`.
+- MUST publish the request's `accountId` as the source's `accountId` when it accepts the credential.
 
-Any client may deliver or revoke a model source's credential, as any client may answer an MCP server's challenge. A host that restricts sources by principal rejects a credential for another principal's source with `PermissionDenied` (`-32009`).
-
-As with MCP servers, the target names the source but not a version of it. A delivery replaces whatever credential the host holds for the source, so when two clients answer the same `authRequired`, the later one wins.
+A delivery replaces the credential the host holds for the source. `accountId` lets a client that reloads, or one on another device, tell whether the host holds its current key. It MUST NOT be derived from the secret, because every client can read it.
 
 #### Reasons
-
-An `authRequired` state's `reason` is a `ModelSourceAuthRequiredReason`, specific to model sources. The shared `AuthRequiredReason` folds rejection and revocation into `expired`, so a client that renews automatically could undo a user's revocation.
 
 | `reason` | Meaning | What a client may send |
 | --- | --- | --- |
 | `required` | The host holds no credential yet. | Its key. |
-| `expired` | The credential's lifetime or lease lapsed. | A renewed credential: a fresh token, or the same static key with a new lease. |
-| `rejected` | The endpoint refused the credential. `accountId` still names it. | Only a key whose `accountId` differs. Otherwise it asks the user for a new one. |
+| `expired` | The credential's lifetime, or the lease a client set with `expiresIn`, lapsed. | A renewed credential. |
+| `rejected` | The endpoint refused the credential. `accountId` still names it. | Only a key whose `accountId` differs. |
 | `revoked` | A client revoked the credential. | Nothing, until a user asks. |
 
-`expiresIn` keeps its meaning for short-lived tokens. With a static key, it's a lease: the host drops the key when the lease elapses and reports `expired`, and a client renews the lease by sending the key again. An API key without a lease omits `expiresIn`.
+#### Delivering and handling
 
-#### Delivering
+Clients MUST NOT cache a model source credential they delivered, or replay one, for example after a reconnect. A client delivers one only in answer to the source's current state, and MUST NOT send a stored secret unless the source's `provider` and `format` match its own copy and every endpoint in the source's `definition` that the key would reach is one its own copy sends the key to.
 
-Clients MUST NOT cache a model source credential they delivered, or replay one, for example after a reconnect. A client delivers a credential only in answer to the source's current state, reading it from its own secure storage or token provider each time:
+The host holds the credential in memory only. It never places it in state, actions, notifications, logs, telemetry, or error messages, and never exposes it to the model, tools, terminals, or hooks. It attaches the credential only to the endpoints the source's definition names, never to another origin, including on redirect, and drops it when the source is removed or updated, when its lease lapses, and when the host restarts.
 
-- when the state is `authRequired`, as the table above allows;
-- when the state is `starting` or `ready`, and the source's `accountId` names a key this client has since replaced, for example one it delivered before the user changed it. A client whose key simply differs leaves the host's credential alone, so two devices with different working keys don't replace each other's in turn;
-- when a lease or token it delivered is about to expire.
-
-Clients SHOULD NOT prompt the user for a key they don't have. A client MUST NOT send a stored secret unless the source's `provider` and `format` match its own copy, and every endpoint in the source's `definition` that the key would reach is one its own copy sends the key to. It checks the definition itself rather than trusting `nonce`, which another client chooses.
-
-#### Handling and egress
-
-The host holds the credential in memory only and never persists it. It never places the credential in state, actions, notifications, the definition, the source's `nonce`, `_meta`, or credential fields, `ErrorInfo`, environment variables, command lines, logs, telemetry, or error messages, and never exposes it to the model, tools, terminals, or hooks. The host SHOULD also redact it from tool output before storing that output or sending it to the model. That's best effort: the same secret can also live where the agent can read it, such as a `.env` file, and a host can only redact values it knows. The host writes `ModelSourceAuthRequirement.description` and `ErrorInfo` itself, and SHOULD NOT copy upstream response bodies or headers into them: an endpoint's error text can echo part of a key, and every client can read root state.
-
-The host attaches the credential only to that source's requests, as its definition specifies, and only to the endpoints its definition names, never to another origin, including on redirect. It drops the credential when the source is removed, when `root/modelSourceSet` updates it, when it's revoked, when its lease lapses, and when the host restarts.
-
-Endpoints in a definition, including loopback and private addresses, are resolved and reached from the host machine: `localhost` in a source registered with a remote host is that host, not the client's machine. Hosts SHOULD apply an egress policy to registered endpoints: deny link-local and cloud metadata addresses, and require `https` for any credentialed endpoint that isn't a loopback address, unless the host has opted in to plain `http`.
+Endpoints, including loopback and private addresses, are reached from the host machine. Hosts SHOULD deny link-local and cloud metadata addresses, and require `https` for credentialed endpoints other than loopback.
 
 #### Turns
 
-When a turn can't use its source, because the credential is missing, expired, rejected, or revoked, or because the source was removed, the host ends the turn with `chat/error`. The error part's `error.errorType` is `modelSourceUnavailable`, and `resumable` is `true`. A client tells why from the registered source of the turn's model: its `state`, or its absence. Once the source is ready again, a client can continue the turn with `chat/turnResume`, and the host checks the turn's selection again first. The host never switches the turn to a different model.
-
-When the last contributing client leaves a `contributingClient`-retained source, turns already running on it finish, and no new ones start. When any client removes the source, or revokes its credential, the host stops using the credential immediately and ends every running turn that uses it with the `modelSourceUnavailable` error.
+When a turn can't use its source, the host ends the turn with an error part whose `errorType` is `modelSourceUnavailable` and whose `resumable` is `true`. A request that selects such a model fails with `ModelSourceUnavailable` (`-32013`). The host never switches to a different model. When a client removes a source or revokes its credential, the host ends running turns that use it.
 
 ### Why keyed by `resource` and optional `target`?
 

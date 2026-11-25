@@ -594,7 +594,16 @@ func copyModelSourceHostFields(to *ahptypes.ModelSource, from ahptypes.ModelSour
 // sameModelSourceVersion reports whether two model sources have the same
 // provider, format, and definition nonce.
 func sameModelSourceVersion(a, b ahptypes.ModelSource) bool {
-	return a.Provider == b.Provider && a.Format == b.Format && a.Nonce == b.Nonce
+	return a.Provider == b.Provider && sameOptionalString(a.Format, b.Format) && sameOptionalString(a.Nonce, b.Nonce)
+}
+
+// sameOptionalString reports whether two optional strings are both absent, or
+// both present and equal.
+func sameOptionalString(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // ─── Chat Reducer ──────────────────────────────────────────────────────

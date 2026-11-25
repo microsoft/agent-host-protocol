@@ -31,7 +31,7 @@ These mutate root state and travel on the [Root Channel](/specification/root-cha
 | `root/activeSessionsChanged` | No | Count of active sessions changed |
 | `root/terminalsChanged` | No | Lightweight terminal catalogue changed (full replacement) |
 | `root/configChanged` | **Yes** | Host-level configuration values changed |
-| `root/modelSourceSet` | **Yes** | A [model source](/specification/root-channel#model-source-registry) was added, re-registered, or updated by `id` |
+| `root/modelSourceSet` | **Yes** | A [model source](/specification/root-channel#registering-sources) was added, re-registered, or updated by `id` |
 | `root/modelSourceRemoved` | **Yes** | A model source was removed by `id` |
 | `root/modelSourceStateChanged` | No | The host reported a model source's status and credential fields |
 

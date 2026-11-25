@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "`ModelSourceInfo`, `AgentInfo.modelSources`, and `SessionModelInfo.modelSourceId` let an agent label and group its models by source. Model IDs are unique within an agent and stable across catalog updates."
+  "message": "`RootState.modelSources` and `SessionModelInfo.modelSourceId` let an agent label and group its models by source. Model IDs are unique within an agent and stable across catalog updates."
 }

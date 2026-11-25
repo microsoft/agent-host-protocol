@@ -755,7 +755,7 @@ const STATE_STRUCTS = [
   'ModelSourceRegistrationCapability', 'ModelSourceFormatInfo', 'ModelSource', 'ModelSourceStartingState',
   'ModelSourceReadyState', 'ModelSourceAuthRequirement', 'ModelSourceAuthRequiredState',
   'ModelSourceErrorState',
-  'ModelSourceInfo', 'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
+  'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'BackgroundShellWork', 'BackgroundSubagentWork',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
@@ -2248,6 +2248,8 @@ function generateErrorsFile(project: Project): string {
   lines.push('    public static let permissionDenied = -32009');
   lines.push('    /// The target resource already exists and the operation does not allow overwriting');
   lines.push('    public static let alreadyExists = -32010');
+  lines.push("    /// A request selects a model whose registered model source can't serve it");
+  lines.push('    public static let modelSourceUnavailable = -32013');
   lines.push('}');
   lines.push('');
 
