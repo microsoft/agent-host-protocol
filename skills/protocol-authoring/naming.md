@@ -1,17 +1,11 @@
----
-description: Dictionary of protocol terms and naming conventions for AHP types
-applyTo: 'types/**/*.ts,docs/specification/**/*.md,docs/guide/**/*.md'
----
-
 # Protocol naming dictionary
 
 Use this dictionary when you name or describe anything in `types/` or the
 protocol docs. Prefer the established name over a near-synonym, even when the
 synonym reads better locally. Structural rules (enum compatibility tags,
 bitsets, keyed-collection actions, `{ items }` wrappers,
-`@preserveUnknownMembers`) are in
-[general-instructions](./general-instructions.instructions.md); this file
-covers vocabulary and naming.
+`@preserveUnknownMembers`) are in [`SKILL.md`](./SKILL.md); this file covers
+vocabulary and naming.
 
 Some existing names predate these rules. They are listed under
 [Legacy names](#legacy-names-do-not-copy). Keep them for wire compatibility,
@@ -112,8 +106,8 @@ channel, `channels-automation` is the **Automation catalogue**, and
 
 ## Enums and discriminants
 
-- `*Kind` is a typological discriminant and `*Status` is a lifecycle (see the
-  general instructions). `*Reason` explains an outcome, `*Mode` selects a
+- `*Kind` is a typological discriminant and `*Status` is a lifecycle (see
+  [`SKILL.md`](./SKILL.md)). `*Reason` explains an outcome, `*Mode` selects a
   behaviour, and `*Policy` selects a rule.
 - **Don't name new discriminants `*Type`** (except `ActionType`), and don't
   name an enum `*State`: `*State` is reserved for state objects and union
@@ -172,7 +166,7 @@ free-text fields named `status`: `status` is a typed lifecycle or bitset.
 
 | Suffix | Use for |
 | --- | --- |
-| `Set` / `Removed` / `Updated` | Upsert, remove, or partially update a keyed collection entry (see the general instructions). |
+| `Set` / `Removed` / `Updated` | Upsert, remove, or partially update a keyed collection entry (see [`SKILL.md`](./SKILL.md)). |
 | `Changed` | Replace one field or one whole value, such as `session/titleChanged` or `chat/changesetsChanged` (a full catalog replacement). |
 | `Requested` | A client asks the host to do something whose outcome the host reflects later (`session/mcpServerStartRequested`, `automation/createRequested`). |
 | `Reordered` / `Replaced` / `Toggled` / `Cleared` | Reorder a list / swap one entry for another / flip an enablement / empty a collection. |

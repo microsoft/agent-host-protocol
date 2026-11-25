@@ -66,7 +66,11 @@ Before touching anything, confirm with the user:
 
 Create `release/ahp-<version>` off `main`. Then in a single commit:
 
-- **CHANGELOGs** — run
+- **CHANGELOGs** — first review `docs/.changes/*.json` against the
+  [`changelog`](../changelog/SKILL.md) skill: merge any follow-up iterations on
+  the same unreleased feature into a single fragment, keep descriptions
+  consumer-friendly, and verify complex features include a brief code snippet
+  and public docs link in `details`. Then run
   `npm run changelog:release -- --version X.Y.Z --date <today YYYY-MM-DD>`
   to collapse `docs/.changes/*.json` into the seven changelogs. This creates
   or replaces each `## [X.Y.Z] — <today YYYY-MM-DD>` section and adds the

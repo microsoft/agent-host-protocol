@@ -1,5 +1,5 @@
 {
   "type": "added",
-  "message": "Optional `isSymlink` boolean flag on `DirectoryEntry` in `resourceList` results.",
+  "message": "Add an optional `DirectoryEntry.isSymlink` flag to `resourceList` results so clients can identify symbolic links without resolving every entry individually.",
   "issues": [624]
 }

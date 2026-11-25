@@ -1,5 +1,5 @@
 {
   "type": "changed",
-  "message": "`CompletionItem.rangeStart` and `rangeEnd` are now typed as integers in the JSON Schema, with minimums of 0 and 1.",
+  "message": "Update the JSON Schema for `CompletionItem.rangeStart` and `rangeEnd` to require integers with minimums of `0` and `1`.",
   "targets": ["spec"]
 }
