@@ -95,6 +95,7 @@ value class ActionType(val rawValue: String) {
         val SESSION_MCP_SERVER_BACKGROUND_REQUESTED: ActionType = ActionType("session/mcpServerBackgroundRequested")
         val CHAT_TRUNCATED: ActionType = ActionType("chat/truncated")
         val CHAT_TURNS_LOADED: ActionType = ActionType("chat/turnsLoaded")
+        val CHAT_TURNS_MATERIALIZED: ActionType = ActionType("chat/turnsMaterialized")
         val SESSION_IS_READ_CHANGED: ActionType = ActionType("session/isReadChanged")
         val SESSION_IS_ARCHIVED_CHANGED: ActionType = ActionType("session/isArchivedChanged")
         val SESSION_ACTIVITY_CHANGED: ActionType = ActionType("session/activityChanged")
@@ -1262,6 +1263,22 @@ data class ChatTruncatedAction(
     val turnId: String? = null
 )
 
+/**
+ * Loads older completed turns into this chat's state.
+ *
+ * Hosts dispatch this before responding to `fetchTurns`, and before applying
+ * any operation that references a turn older than the currently loaded window.
+ * `turns` is ordered oldest-first and is prepended to the current `turns`
+ * window. `turnsNextCursor` replaces the state's cursor; omit it when all
+ * retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+ * only for clients that declared
+ * {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+ *
+ * This belongs to the legacy tail-window paging scheme, which deferred turns
+ * replace. See {@link FetchTurnsParams | `fetchTurns`}.
+ *
+ * Stability: 3 - Legacy.
+ */
 @Serializable
 data class ChatTurnsLoadedAction(
     val type: ActionType,
@@ -1273,6 +1290,26 @@ data class ChatTurnsLoadedAction(
      * Opaque cursor for loading the next older page, if one remains.
      */
     val turnsNextCursor: String? = null
+)
+
+/**
+ * Replaces {@link DeferredTurn | deferred turns} in place with their full
+ * {@link MaterializedTurn | turns}.
+ *
+ * Hosts dispatch this before responding to `fetchDeferredTurns`, and before
+ * applying any operation that needs a deferred turn's response, such as
+ * `chat/turnResume`. Each entry replaces the deferred turn with the same `id`.
+ * Entries whose `id` does not name a deferred turn in state are ignored.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChatTurnsMaterializedAction(
+    val type: ActionType,
+    /**
+     * Full turns to replace their deferred entries.
+     */
+    val turns: List<MaterializedTurn>
 )
 
 @Serializable
@@ -1836,6 +1873,7 @@ sealed interface StateAction
 @JvmInline value class StateActionSessionMcpServerBackgroundRequested(val value: SessionMcpServerBackgroundRequestedAction) : StateAction
 @JvmInline value class StateActionChatTruncated(val value: ChatTruncatedAction) : StateAction
 @JvmInline value class StateActionChatTurnsLoaded(val value: ChatTurnsLoadedAction) : StateAction
+@JvmInline value class StateActionChatTurnsMaterialized(val value: ChatTurnsMaterializedAction) : StateAction
 @JvmInline value class StateActionSessionConfigChanged(val value: SessionConfigChangedAction) : StateAction
 @JvmInline value class StateActionSessionMetaChanged(val value: SessionMetaChangedAction) : StateAction
 @JvmInline value class StateActionChangesetStatusChanged(val value: ChangesetStatusChangedAction) : StateAction
@@ -1959,6 +1997,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "session/mcpServerBackgroundRequested" -> StateActionSessionMcpServerBackgroundRequested(input.json.decodeFromJsonElement(SessionMcpServerBackgroundRequestedAction.serializer(), element))
             "chat/truncated" -> StateActionChatTruncated(input.json.decodeFromJsonElement(ChatTruncatedAction.serializer(), element))
             "chat/turnsLoaded" -> StateActionChatTurnsLoaded(input.json.decodeFromJsonElement(ChatTurnsLoadedAction.serializer(), element))
+            "chat/turnsMaterialized" -> StateActionChatTurnsMaterialized(input.json.decodeFromJsonElement(ChatTurnsMaterializedAction.serializer(), element))
             "session/configChanged" -> StateActionSessionConfigChanged(input.json.decodeFromJsonElement(SessionConfigChangedAction.serializer(), element))
             "session/metaChanged" -> StateActionSessionMetaChanged(input.json.decodeFromJsonElement(SessionMetaChangedAction.serializer(), element))
             "changeset/statusChanged" -> StateActionChangesetStatusChanged(input.json.decodeFromJsonElement(ChangesetStatusChangedAction.serializer(), element))
@@ -2075,6 +2114,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionSessionMcpServerBackgroundRequested -> output.json.encodeToJsonElement(SessionMcpServerBackgroundRequestedAction.serializer(), value.value)
             is StateActionChatTruncated -> output.json.encodeToJsonElement(ChatTruncatedAction.serializer(), value.value)
             is StateActionChatTurnsLoaded -> output.json.encodeToJsonElement(ChatTurnsLoadedAction.serializer(), value.value)
+            is StateActionChatTurnsMaterialized -> output.json.encodeToJsonElement(ChatTurnsMaterializedAction.serializer(), value.value)
             is StateActionSessionConfigChanged -> output.json.encodeToJsonElement(SessionConfigChangedAction.serializer(), value.value)
             is StateActionSessionMetaChanged -> output.json.encodeToJsonElement(SessionMetaChangedAction.serializer(), value.value)
             is StateActionChangesetStatusChanged -> output.json.encodeToJsonElement(ChangesetStatusChangedAction.serializer(), value.value)

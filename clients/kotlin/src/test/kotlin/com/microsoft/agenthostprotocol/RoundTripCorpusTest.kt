@@ -33,6 +33,7 @@ import com.microsoft.agenthostprotocol.generated.AuthenticateParams
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationTarget
 import com.microsoft.agenthostprotocol.generated.ChatSource
 import com.microsoft.agenthostprotocol.generated.CreateChatParams
+import com.microsoft.agenthostprotocol.generated.FetchDeferredTurnsParams
 import com.microsoft.agenthostprotocol.generated.Customization
 import com.microsoft.agenthostprotocol.generated.Implementation
 import com.microsoft.agenthostprotocol.generated.InitializeParams
@@ -271,6 +272,7 @@ class RoundTripCorpusTest {
             "InitializeParams" -> rt(InitializeParams.serializer())
             "InitializeResult" -> rt(InitializeResult.serializer())
             "CreateChatParams" -> rt(CreateChatParams.serializer())
+            "FetchDeferredTurnsParams" -> rt(FetchDeferredTurnsParams.serializer())
             "ChatSource" -> rt(ChatSource.serializer())
             "Snapshot" -> rt(Snapshot.serializer())
             "SubscribeParams" -> rt(SubscribeParams.serializer())

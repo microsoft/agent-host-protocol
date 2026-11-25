@@ -76,6 +76,10 @@ The custom serializer handles both wire values during decode; encode preserves w
 
 The TS source models `ChangesetOperationTarget` as a discriminated union over two inline variant shapes that aren't exported as their own interfaces. The generator emits the whole subgraph — the sealed `ChangesetOperationTarget`, the two variant data classes (`ChangesetOperationResourceTarget` and `ChangesetOperationRangeTarget`), the `ChangesetOperationTargetRange` helper, and the custom serializer — by hand from `generateChangesetOperationTargetKotlin()` so the Kotlin wire surface stays aligned with the Swift and Rust clients.
 
+### Hand-rolled `Turn` union
+
+`ChatState.turns` and `ChatTurnsLoadedAction.turns` are `List<Turn>`, a sealed interface emitted by `generateTurnKotlin()` because its discriminator is the boolean `isDeferred`. `"isDeferred": true` decodes to `Turn.Deferred(DeferredTurn)`; absent, `false`, or anything else decodes to `Turn.Materialized(MaterializedTurn)`. `ChatTurnsMaterializedAction.turns` is `List<MaterializedTurn>`. Neither `MaterializedTurn` nor `DeferredTurn` has an `isDeferred` property: the serializer injects `"isDeferred": true` for deferred turns and omits it for materialized turns. The shared `TurnBase` fields (`id`, `message`, `state`, …) are readable directly on `Turn`.
+
 ### Bitset enums
 
 `SessionStatus` is currently the only enum marked `@bitset` in the protocol. It's emitted as a `@JvmInline value class` over `UInt` so that **unknown future flags survive a decode/encode round-trip** without being silently dropped. Use `or`/`and`/`in` for combinator/containment ops:

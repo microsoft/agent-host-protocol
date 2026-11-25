@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Deferred turns: clients that declare `ClientCapabilities.deferredTurns` may receive `DeferredTurn` entries (`isDeferred: true`, no `responseParts`) in `ChatState.turns`, and can expand a range of them with the `fetchDeferredTurns` command and `chat/turnsMaterialized` action."
+}

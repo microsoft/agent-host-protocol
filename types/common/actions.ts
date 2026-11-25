@@ -88,6 +88,7 @@ import type {
   ChatInputCompletedAction,
   ChatTruncatedAction,
   ChatTurnsLoadedAction,
+  ChatTurnsMaterializedAction,
 } from '../channels-chat/actions.js';
 
 import type {
@@ -219,6 +220,7 @@ export const enum ActionType {
   SessionMcpServerBackgroundRequested = 'session/mcpServerBackgroundRequested',
   ChatTruncated = 'chat/truncated',
   ChatTurnsLoaded = 'chat/turnsLoaded',
+  ChatTurnsMaterialized = 'chat/turnsMaterialized',
   SessionIsReadChanged = 'session/isReadChanged',
   SessionIsArchivedChanged = 'session/isArchivedChanged',
   SessionActivityChanged = 'session/activityChanged',
@@ -371,6 +373,7 @@ export type StateAction =
   | ChatInputCompletedAction
   | ChatTruncatedAction
   | ChatTurnsLoadedAction
+  | ChatTurnsMaterializedAction
   | ChangesetStatusChangedAction
   | ChangesetFileSetAction
   | ChangesetFileRemovedAction

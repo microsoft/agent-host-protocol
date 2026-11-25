@@ -1,5 +1,6 @@
 /**
- * Chat Channel Commands — `createChat`, `moveChat`, and `disposeChat`.
+ * Chat Channel Commands — `createChat`, `moveChat`, `disposeChat`, and
+ * `fetchDeferredTurns`.
  *
  * @module channels-chat/commands
  */
@@ -257,3 +258,52 @@ export interface MoveChatResult {
  * @version 1
  */
 export interface DisposeChatParams extends BaseParams {}
+
+// ─── fetchDeferredTurns ──────────────────────────────────────────────────────
+
+/**
+ * Requests the full responses of a range of {@link DeferredTurn | deferred
+ * turns} in a chat state.
+ *
+ * The range runs from `turnId` through `endTurnId`, inclusive, in
+ * {@link ChatState.turns | `ChatState.turns`} order. The command result does
+ * not carry turns. Instead, before responding, the host MUST dispatch
+ * `chat/turnsMaterialized` to replace every deferred turn in the range in place
+ * with its full {@link MaterializedTurn}. Full turns in the range are left unchanged.
+ *
+ * The host MUST reject the request with `InvalidParams` if `turnId` or
+ * `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.
+ * Hosts MAY also reject ranges that exceed an implementation-defined size limit
+ * with `InvalidParams`.
+ *
+ * Requires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+ *
+ * @category Commands
+ * @method fetchDeferredTurns
+ * @direction Client → Server
+ * @messageType Request
+ * @version 1
+ * @stability 1.0
+ * @example
+ * ```jsonc
+ * // Client → Server (open turn t45 and the turns through t49)
+ * { "jsonrpc": "2.0", "id": 9, "method": "fetchDeferredTurns",
+ *   "params": { "channel": "ahp-chat:/<uuid>", "turnId": "t45", "endTurnId": "t49" } }
+ *
+ * // Server dispatches chat/turnsMaterialized, then responds
+ * { "jsonrpc": "2.0", "id": 9, "result": {} }
+ * ```
+ */
+export interface FetchDeferredTurnsParams extends BaseParams {
+  /** Chat URI */
+  channel: URI;
+  /** ID of the first turn in the range. */
+  turnId: string;
+  /** ID of the last turn in the range, inclusive. Omit to request only `turnId`. */
+  endTurnId?: string;
+}
+
+/**
+ * Result of the `fetchDeferredTurns` command.
+ */
+export interface FetchDeferredTurnsResult {}

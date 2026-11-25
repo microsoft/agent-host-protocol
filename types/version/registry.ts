@@ -171,6 +171,7 @@ export const ACTION_INTRODUCED_IN: { readonly [K in StateAction['type']]: string
   [ActionType.ChatInputCompleted]: '0.4.0',
   [ActionType.ChatTruncated]: '0.4.0',
   [ActionType.ChatTurnsLoaded]: '0.5.1',
+  [ActionType.ChatTurnsMaterialized]: '1.1.0',
   [ActionType.ChangesetStatusChanged]: '0.2.0',
   [ActionType.ChangesetFileSet]: '0.2.0',
   [ActionType.ChangesetFileRemoved]: '0.2.0',

@@ -13,7 +13,7 @@ import type {
   ToolCallResponsePart,
   InputRequestResponsePart,
   ErrorResponsePart,
-  Turn,
+  MaterializedTurn,
   PendingMessage,
   ConfirmationOption,
   ToolCallContributor,
@@ -123,7 +123,7 @@ function findOpenInputRequestPart(
   return part.kind === ResponsePartKind.InputRequest ? { index, part } : undefined;
 }
 
-function hasResumableError(turn: Turn): boolean {
+function hasResumableError(turn: MaterializedTurn): boolean {
   const part = turn.responseParts[turn.responseParts.length - 1];
   return part?.kind === ResponsePartKind.Error && part.resumable === true;
 }
@@ -212,7 +212,7 @@ function endTurn(
     responseParts.push(errorPart);
   }
 
-  const turn: Turn = {
+  const turn: MaterializedTurn = {
     id: active.id,
     startedAt: active.startedAt,
     // Defensive clamp: the duration is producer-supplied and opaque to this
@@ -424,7 +424,7 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
       }
       const turnIndex = state.turns.length - 1;
       const turn = state.turns[turnIndex];
-      if (!turn || turn.id !== action.turnId || turn.state !== TurnState.Error || !hasResumableError(turn)) {
+      if (!turn || turn.isDeferred || turn.id !== action.turnId || turn.state !== TurnState.Error || !hasResumableError(turn)) {
         return state;
       }
       const turns = state.turns.slice();
@@ -828,6 +828,20 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
         turns: [...olderTurns, ...state.turns],
         turnsNextCursor: action.turnsNextCursor,
       };
+    }
+
+    case ActionType.ChatTurnsMaterialized: {
+      const materialized = new Map(action.turns.map(turn => [turn.id, turn]));
+      let changed = false;
+      const turns = state.turns.map(turn => {
+        const replacement = turn.isDeferred ? materialized.get(turn.id) : undefined;
+        if (!replacement) {
+          return turn;
+        }
+        changed = true;
+        return replacement;
+      });
+      return changed ? { ...state, turns } : state;
     }
 
     // ── Session Input Requests ─────────────────────────────────────────────

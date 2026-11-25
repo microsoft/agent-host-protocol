@@ -295,6 +295,21 @@ type ClientCapabilities struct {
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
 	McpApps *map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	// Client understands {@link DeferredTurn} entries in
+	// {@link ChatState.turns | `ChatState.turns`} and can request their responses with
+	// {@link FetchDeferredTurnsParams | `fetchDeferredTurns`}.
+	//
+	// Hosts MAY then defer any completed turn they send this client. Hosts
+	// MUST NOT send deferred turns to clients that omit this capability.
+	//
+	// Stability: 1.0 - Early development.
+	DeferredTurns *DeferredTurnsCapability `json:"deferredTurns,omitempty"`
+}
+
+// Presence-only client capability for {@link ClientCapabilities.deferredTurns}.
+//
+// Stability: 1.0 - Early development.
+type DeferredTurnsCapability struct {
 }
 
 // Automation features supported by this host authority.
@@ -566,6 +581,12 @@ type SubscribeView struct {
 	// returned {@link ChatState} carries `turnsNextCursor`; clients pass that
 	// cursor to `fetchTurns` to ask the host to page more turns into the chat
 	// state.
+	//
+	// Clients that declare
+	// {@link ClientCapabilities.deferredTurns | `deferredTurns`} SHOULD omit this
+	// field and read history through deferred turns instead.
+	//
+	// Stability: 3 - Legacy.
 	Turns *int64 `json:"turns,omitempty"`
 }
 
@@ -838,6 +859,39 @@ type MoveChatParams struct {
 type MoveChatResult struct {
 	// Authoritative owning session URI after the move.
 	Session URI `json:"session"`
+}
+
+// Requests the full responses of a range of {@link DeferredTurn | deferred
+// turns} in a chat state.
+//
+// The range runs from `turnId` through `endTurnId`, inclusive, in
+// {@link ChatState.turns | `ChatState.turns`} order. The command result does
+// not carry turns. Instead, before responding, the host MUST dispatch
+// `chat/turnsMaterialized` to replace every deferred turn in the range in place
+// with its full {@link MaterializedTurn}. Full turns in the range are left unchanged.
+//
+// The host MUST reject the request with `InvalidParams` if `turnId` or
+// `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.
+// Hosts MAY also reject ranges that exceed an implementation-defined size limit
+// with `InvalidParams`.
+//
+// Requires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+//
+// Stability: 1.0 - Early development.
+type FetchDeferredTurnsParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// ID of the first turn in the range.
+	TurnId string `json:"turnId"`
+	// ID of the last turn in the range, inclusive. Omit to request only `turnId`.
+	EndTurnId *string `json:"endTurnId,omitempty"`
+}
+
+// Result of the `fetchDeferredTurns` command.
+type FetchDeferredTurnsResult struct {
 }
 
 // Returns a list of session summaries. Used to populate session lists and sidebars.
@@ -1298,6 +1352,15 @@ type CreateResourceWatchResult struct {
 // Before applying any operation that references a turn outside the currently
 // loaded window, the host MUST eagerly load enough older turns into state for
 // that operation to reduce against valid state.
+//
+// Hosts MAY load turns as {@link DeferredTurn | deferred} for clients that
+// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+//
+// Tail-window paging is legacy. It remains supported for 1.x clients, but new
+// clients SHOULD declare `deferredTurns` and read history with
+// {@link FetchDeferredTurnsParams | `fetchDeferredTurns`} instead.
+//
+// Stability: 3 - Legacy.
 type FetchTurnsParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -1313,6 +1376,8 @@ type FetchTurnsParams struct {
 }
 
 // Result of the `fetchTurns` command.
+//
+// Stability: 3 - Legacy.
 type FetchTurnsResult struct {
 }
 

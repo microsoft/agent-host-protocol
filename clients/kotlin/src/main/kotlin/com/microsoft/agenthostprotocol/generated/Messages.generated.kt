@@ -131,6 +131,9 @@ object AhpCommands {
     fun fetchTurns(id: Long, params: FetchTurnsParams): JsonRpcRequest<FetchTurnsParams> =
         JsonRpcRequest(id = id, method = "fetchTurns", params = params)
 
+    fun fetchDeferredTurns(id: Long, params: FetchDeferredTurnsParams): JsonRpcRequest<FetchDeferredTurnsParams> =
+        JsonRpcRequest(id = id, method = "fetchDeferredTurns", params = params)
+
     fun authenticate(id: Long, params: AuthenticateParams): JsonRpcRequest<AuthenticateParams> =
         JsonRpcRequest(id = id, method = "authenticate", params = params)
 

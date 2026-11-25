@@ -767,9 +767,11 @@ struct TurnView: View {
             // User message
             UserBubble(text: turn.message.text, attachments: turn.message.attachments)
 
-            // Response parts
-            ForEach(Array(turn.responseParts.enumerated()), id: \.offset) { _, part in
-                ResponsePartView(part: part)
+            // Response parts (a deferred turn has none until materialized)
+            if case .materialized(let materialized) = turn {
+                ForEach(Array(materialized.responseParts.enumerated()), id: \.offset) { _, part in
+                    ResponsePartView(part: part)
+                }
             }
 
             if turn.state == .cancelled {

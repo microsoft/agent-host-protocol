@@ -2664,7 +2664,10 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatConfigState? Config { get; set; }
 
-    /// <summary>Completed turns</summary>
+    /// <summary>Completed turns, oldest first.
+    ///
+    /// Entries may be {@link DeferredTurn | deferred} only for clients that
+    /// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.</summary>
     public required List<Turn> Turns { get; set; }
 
     /// <summary>Cursor for loading older completed turns into this chat state.
@@ -2672,7 +2675,14 @@ public sealed class ChatState
     /// Presence means `turns` is a tail window and more historical turns are
     /// available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
     /// the loaded turns into state and update or clear this cursor before
-    /// responding. Absence means the state contains all retained turns.</summary>
+    /// responding. Absence means the state contains all retained turns.
+    ///
+    /// Hosts SHOULD NOT set this for clients that declared
+    /// {@link ClientCapabilities.deferredTurns | `deferredTurns`}. Instead, they
+    /// SHOULD send every retained turn and defer the ones the client doesn't need
+    /// yet.
+    ///
+    /// Stability: 3 - Legacy.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? TurnsNextCursor { get; set; }
 
@@ -3662,8 +3672,8 @@ public sealed class ChatConfigState
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
-/// <summary>A completed request/response cycle.</summary>
-public sealed class Turn
+/// <summary>A completed request/response cycle, including its full response.</summary>
+public sealed class MaterializedTurn
 {
     /// <summary>Turn identifier</summary>
     public required string Id { get; set; }
@@ -3679,11 +3689,49 @@ public sealed class Turn
     /// <summary>The message that initiated the turn</summary>
     public required Message Message { get; set; }
 
+    /// <summary>Token usage info</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UsageInfo? Usage { get; set; }
+
+    /// <summary>How the turn ended</summary>
+    public TurnState State { get; set; }
+
     /// <summary>All response content in stream order: text, tool calls, reasoning, and content refs.
     ///
     /// Consumers should derive display text by concatenating markdown parts,
     /// and find tool calls by filtering for `ToolCall` parts.</summary>
     public required List<ResponsePart> ResponseParts { get; set; }
+}
+
+/// <summary>A completed turn whose response the host has not sent yet.
+///
+/// The turn keeps its position in {@link ChatState.turns}, so clients can show
+/// the initiating message and outcome without downloading the response.
+/// Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
+/// the host replaces the entry in place with a {@link MaterializedTurn} via
+/// {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
+///
+/// Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
+/// action, or command result. Those clients receive the corresponding
+/// {@link MaterializedTurn}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed class DeferredTurn
+{
+    /// <summary>Turn identifier</summary>
+    public required string Id { get; set; }
+
+    /// <summary>ISO 8601 timestamp when this turn started.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; set; }
+
+    /// <summary>Turn duration in milliseconds.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; set; }
+
+    /// <summary>The message that initiated the turn</summary>
+    public required Message Message { get; set; }
 
     /// <summary>Token usage info</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3691,6 +3739,9 @@ public sealed class Turn
 
     /// <summary>How the turn ended</summary>
     public TurnState State { get; set; }
+
+    /// <summary>Marks a turn without `responseParts`.</summary>
+    public bool IsDeferred { get; set; } = true;
 }
 
 /// <summary>An in-progress turn — the assistant is actively streaming.</summary>
@@ -8438,6 +8489,68 @@ internal sealed class ChatOriginConverter : UnionConverter<ChatOrigin>
             },
             allowUnknown: true)
     {
+    }
+}
+
+/// <summary>
+/// Turn is a completed turn in ChatState.Turns: either a
+/// <see cref="MaterializedTurn"/> or a <see cref="DeferredTurn"/>,
+/// discriminated by <c>isDeferred</c>.
+/// </summary>
+[JsonConverter(typeof(TurnConverter))]
+public sealed class Turn : AhpUnion
+{
+    /// <summary>Creates an empty Turn (no active variant).</summary>
+    public Turn() { }
+
+    /// <summary>Creates a Turn wrapping a <see cref="MaterializedTurn"/> or <see cref="DeferredTurn"/>.</summary>
+    public Turn(object? value) : base(value) { }
+
+    /// <summary>The materialized variant, or <see langword="null"/> when this turn is not materialized.</summary>
+    [JsonIgnore]
+    public MaterializedTurn? Materialized => Value as MaterializedTurn;
+
+    /// <summary>The deferred variant, or <see langword="null"/> when this turn is not deferred.</summary>
+    [JsonIgnore]
+    public DeferredTurn? Deferred => Value as DeferredTurn;
+}
+
+/// <summary>System.Text.Json converter for the Turn union.</summary>
+internal sealed class TurnConverter : JsonConverter<Turn>
+{
+    public override Turn? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return null;
+        }
+
+        using JsonDocument doc = JsonDocument.ParseValue(ref reader);
+        JsonElement root = doc.RootElement;
+        bool isDeferred = root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("isDeferred", out JsonElement flag)
+            && flag.ValueKind == JsonValueKind.True;
+        return isDeferred
+            ? new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<DeferredTurn>(options)))
+            : new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<MaterializedTurn>(options)));
+    }
+
+    public override void Write(Utf8JsonWriter writer, Turn value, JsonSerializerOptions options)
+    {
+        switch (value.Value)
+        {
+            case MaterializedTurn materialized:
+                JsonSerializer.Serialize(writer, materialized, AhpJsonTypeInfo.Get<MaterializedTurn>(options));
+                return;
+            case DeferredTurn deferred:
+                JsonSerializer.Serialize(writer, deferred, AhpJsonTypeInfo.Get<DeferredTurn>(options));
+                return;
+            case null:
+                writer.WriteNullValue();
+                return;
+            default:
+                throw new JsonException("Turn cannot hold a " + value.Value.GetType().Name + ".");
+        }
     }
 }
 

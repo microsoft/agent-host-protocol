@@ -85,6 +85,7 @@ const (
 	ActionTypeSessionMcpServerBackgroundRequested ActionType = "session/mcpServerBackgroundRequested"
 	ActionTypeChatTruncated                       ActionType = "chat/truncated"
 	ActionTypeChatTurnsLoaded                     ActionType = "chat/turnsLoaded"
+	ActionTypeChatTurnsMaterialized               ActionType = "chat/turnsMaterialized"
 	ActionTypeSessionIsReadChanged                ActionType = "session/isReadChanged"
 	ActionTypeSessionIsArchivedChanged            ActionType = "session/isArchivedChanged"
 	ActionTypeSessionActivityChanged              ActionType = "session/activityChanged"
@@ -651,7 +652,8 @@ type ChatErrorAction struct {
 // The turn MUST be the latest turn, its state MUST be `error`, and its final
 // response part MUST be a resumable error. The reducer reopens the same turn
 // with its existing message, response parts, and usage intact. The host then
-// resumes the provider's execution for that turn.
+// resumes the provider's execution for that turn. A deferred turn cannot be
+// resumed until it is materialized.
 type ChatTurnResumeAction struct {
 	Type ActionType `json:"type"`
 	// Identifier of the errored turn.
@@ -977,13 +979,35 @@ type ChatTruncatedAction struct {
 // any operation that references a turn older than the currently loaded window.
 // `turns` is ordered oldest-first and is prepended to the current `turns`
 // window. `turnsNextCursor` replaces the state's cursor; omit it when all
-// retained turns are now loaded.
+// retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+// only for clients that declared
+// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+//
+// This belongs to the legacy tail-window paging scheme, which deferred turns
+// replace. See {@link FetchTurnsParams | `fetchTurns`}.
+//
+// Stability: 3 - Legacy.
 type ChatTurnsLoadedAction struct {
 	Type ActionType `json:"type"`
 	// Older completed turns loaded into the state, ordered oldest-first.
 	Turns []Turn `json:"turns"`
 	// Opaque cursor for loading the next older page, if one remains.
 	TurnsNextCursor *string `json:"turnsNextCursor,omitempty"`
+}
+
+// Replaces {@link DeferredTurn | deferred turns} in place with their full
+// {@link MaterializedTurn | turns}.
+//
+// Hosts dispatch this before responding to `fetchDeferredTurns`, and before
+// applying any operation that needs a deferred turn's response, such as
+// `chat/turnResume`. Each entry replaces the deferred turn with the same `id`.
+// Entries whose `id` does not name a deferred turn in state are ignored.
+//
+// Stability: 1.0 - Early development.
+type ChatTurnsMaterializedAction struct {
+	Type ActionType `json:"type"`
+	// Full turns to replace their deferred entries.
+	Turns []MaterializedTurn `json:"turns"`
 }
 
 // The read state of the session changed.
@@ -1907,6 +1931,7 @@ func (*ChatInputAnswerChangedAction) isStateAction()              {}
 func (*ChatInputCompletedAction) isStateAction()                  {}
 func (*ChatTruncatedAction) isStateAction()                       {}
 func (*ChatTurnsLoadedAction) isStateAction()                     {}
+func (*ChatTurnsMaterializedAction) isStateAction()               {}
 func (*SessionIsReadChangedAction) isStateAction()                {}
 func (*SessionIsArchivedChangedAction) isStateAction()            {}
 func (*SessionActivityChangedAction) isStateAction()              {}
@@ -2271,6 +2296,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/turnsLoaded":
 		var value ChatTurnsLoadedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/turnsMaterialized":
+		var value ChatTurnsMaterializedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

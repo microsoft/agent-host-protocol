@@ -335,6 +335,13 @@ function extractProps(iface: InterfaceDeclaration, project: Project): CsProp[] {
     let literalValue: string | undefined;
     let literalMemberName: string | undefined;
 
+    // A required boolean literal (e.g. `DeferredTurn.isDeferred: true`) is a
+    // boolean discriminant: pin it to its only valid value.
+    if ((tsType === 'true' || tsType === 'false') && !p.hasQuestionToken()) {
+      isLiteralDiscriminant = true;
+      literalValue = tsType;
+    }
+
     const tsPropLower = tsName.toLowerCase();
     if (['type', 'kind', 'status', 'state'].includes(tsPropLower)) {
       if (enumMember) {
@@ -562,6 +569,8 @@ function generateEnum(enumDecl: EnumDeclaration): string {
 interface StructOpts {
   preserveUnknownMembers?: boolean;
   omitDiscriminants?: boolean;
+  /** TS property names to leave off the emitted type. */
+  omitProps?: string[];
   doc?: string;
   includeDiscriminants?: boolean;
   /**
@@ -609,6 +618,9 @@ function csPropDefault(csType: string, optional: boolean, prop?: CsProp): string
   if (prop?.isLiteralDiscriminant && prop.literalMemberName && csIsValueType(csType)) {
     return ` = ${csType}.${prop.literalMemberName};`;
   }
+  if (prop?.isLiteralDiscriminant && csType === 'bool' && prop.literalValue) {
+    return ` = ${prop.literalValue};`;
+  }
   // Required value types get the C# default (matches Go's numeric/bool zero).
   if (csIsValueType(csType)) return '';
   // Required reference types (string, StringOrMarkdown, nested object,
@@ -623,7 +635,8 @@ function generateCsClass(csName: string, props: CsProp[], opts: StructOpts = {})
   emitDocComment('', opts.doc, lines);
   const include = opts.includeDiscriminants === true;
   const emittedProps = props.filter(
-    (p) => include || !(opts.omitDiscriminants && p.isLiteralDiscriminant),
+    (p) => (include || !(opts.omitDiscriminants && p.isLiteralDiscriminant))
+      && !opts.omitProps?.includes(p.wireName),
   );
 
   // Mutable STATE types are classes (reducers mutate in place); every other
@@ -782,7 +795,7 @@ const STATE_ENUMS = [
 
 // `mutable: true` marks the STATE types the reducers mutate in place — these
 // stay `class` with `{ get; set; }`. Everything else is a write-once `record`.
-const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string; mutable?: boolean }[] = [
+const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string; mutable?: boolean; omitProps?: string[] }[] = [
   { name: 'TcpConnectionsCapability' },
   { name: 'ChannelReceiveLimits' },
   { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
@@ -835,7 +848,11 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState', mutable: true },
   { name: 'ChatConfigState', mutable: true },
-  { name: 'Turn', mutable: true },
+  // `MaterializedTurn.isDeferred` is only ever absent or `false`; the Turn
+  // converter selects the variant, so MaterializedTurn keeps no discriminator
+  // property.
+  { name: 'MaterializedTurn', mutable: true, omitProps: ['isDeferred'] },
+  { name: 'DeferredTurn', mutable: true },
   { name: 'ActiveTurn', mutable: true },
   { name: 'SideChatSelection' },
   { name: 'MessageOrigin' },
@@ -1032,6 +1049,76 @@ const TERMINAL_CONTENT_PART_UNION: UnionConfig = {
   ],
   unknown: true,
 };
+
+// `Turn` (types/channels-chat/state.ts) is `MaterializedTurn | DeferredTurn`,
+// discriminated by the BOOLEAN `isDeferred` with MaterializedTurn as the
+// default variant (absent or `false`). UnionConverter<T> only handles string
+// discriminators with a required tag, so emit a small dedicated converter. A
+// boolean has no unknown values, so there is no raw-JSON fallback. DeferredTurn
+// carries its own `IsDeferred = true`, so encoding by runtime type writes the
+// tag; MaterializedTurn has no such property, so encoding never emits
+// `isDeferred`.
+const TURN_UNION_CS = `/// <summary>
+/// Turn is a completed turn in ChatState.Turns: either a
+/// <see cref="MaterializedTurn"/> or a <see cref="DeferredTurn"/>,
+/// discriminated by <c>isDeferred</c>.
+/// </summary>
+[JsonConverter(typeof(TurnConverter))]
+public sealed class Turn : AhpUnion
+{
+    /// <summary>Creates an empty Turn (no active variant).</summary>
+    public Turn() { }
+
+    /// <summary>Creates a Turn wrapping a <see cref="MaterializedTurn"/> or <see cref="DeferredTurn"/>.</summary>
+    public Turn(object? value) : base(value) { }
+
+    /// <summary>The materialized variant, or <see langword="null"/> when this turn is not materialized.</summary>
+    [JsonIgnore]
+    public MaterializedTurn? Materialized => Value as MaterializedTurn;
+
+    /// <summary>The deferred variant, or <see langword="null"/> when this turn is not deferred.</summary>
+    [JsonIgnore]
+    public DeferredTurn? Deferred => Value as DeferredTurn;
+}
+
+/// <summary>System.Text.Json converter for the Turn union.</summary>
+internal sealed class TurnConverter : JsonConverter<Turn>
+{
+    public override Turn? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return null;
+        }
+
+        using JsonDocument doc = JsonDocument.ParseValue(ref reader);
+        JsonElement root = doc.RootElement;
+        bool isDeferred = root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("isDeferred", out JsonElement flag)
+            && flag.ValueKind == JsonValueKind.True;
+        return isDeferred
+            ? new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<DeferredTurn>(options)))
+            : new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<MaterializedTurn>(options)));
+    }
+
+    public override void Write(Utf8JsonWriter writer, Turn value, JsonSerializerOptions options)
+    {
+        switch (value.Value)
+        {
+            case MaterializedTurn materialized:
+                JsonSerializer.Serialize(writer, materialized, AhpJsonTypeInfo.Get<MaterializedTurn>(options));
+                return;
+            case DeferredTurn deferred:
+                JsonSerializer.Serialize(writer, deferred, AhpJsonTypeInfo.Get<DeferredTurn>(options));
+                return;
+            case null:
+                writer.WriteNullValue();
+                return;
+            default:
+                throw new JsonException("Turn cannot hold a " + value.Value.GetType().Name + ".");
+        }
+    }
+}`;
 
 // `ToolInput` (types/channels-chat/state.ts) is `string | ContentRef` — an
 // UNTAGGED union with no discriminant field, so it cannot go through
@@ -1613,6 +1700,7 @@ function generateStateFile(project: Project): string {
         generateClassFromInterface(project, entry.name, entry.csName, {
           omitDiscriminants: entry.omitDiscriminants,
           mutable: entry.mutable,
+          omitProps: entry.omitProps,
         }),
       );
       lines.push('');
@@ -1641,6 +1729,8 @@ function generateStateFile(project: Project): string {
     lines.push('');
   }
   lines.push(generateChatOriginUnionCs(project));
+  lines.push('');
+  lines.push(TURN_UNION_CS);
   lines.push('');
   lines.push(TOOL_INPUT_UNION_CS);
   lines.push('');
@@ -1738,6 +1828,7 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'chat/reasoning', variantName: 'ChatReasoning', tsInterface: 'ChatReasoningAction' },
   { type: 'chat/truncated', variantName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'chat/turnsLoaded', variantName: 'ChatTurnsLoaded', tsInterface: 'ChatTurnsLoadedAction' },
+  { type: 'chat/turnsMaterialized', variantName: 'ChatTurnsMaterialized', tsInterface: 'ChatTurnsMaterializedAction' },
   { type: 'chat/pendingMessageSet', variantName: 'ChatPendingMessageSet', tsInterface: 'ChatPendingMessageSetAction' },
   { type: 'chat/pendingMessageRemoved', variantName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', variantName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
@@ -2339,6 +2430,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   // record or those fields reference a non-existent type (CS0246).
   { name: 'Implementation' },
   { name: 'ClientCapabilities' },
+  { name: 'DeferredTurnsCapability' },
   { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
@@ -2367,6 +2459,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'ForkChatSource' }, { name: 'SideChatSource' },
   { name: 'CreateChatParams' },
   { name: 'DisposeChatParams' },
+  { name: 'FetchDeferredTurnsParams' }, { name: 'FetchDeferredTurnsResult' },
   { name: 'ChatMoveToSessionDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
@@ -2957,6 +3050,9 @@ function checkExhaustiveness(project: Project): void {
     'AhpError', 'AhpErrorDetailsMap', 'AhpErrorCode', 'AhpErrorCodeWithData',
     'JsonRpcErrorCode', 'ChangesetOperationTarget', 'CustomizationEnablement',
     'ChatOrigin', 'ChatInputQuestion', 'ChatInputAnswerValue', 'ChatInputAnswer',
+    // TurnBase is denormalized into MaterializedTurn and DeferredTurn; Turn is
+    // emitted by hand (TURN_UNION_CS) for its boolean discriminator.
+    'TurnBase', 'Turn',
     // ToolInput is `string | ContentRef` — emitted by hand as an untagged union
     // (TOOL_INPUT_UNION_CS), not through the discriminated-union list.
     'ToolInput',

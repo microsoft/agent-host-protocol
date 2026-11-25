@@ -2005,7 +2005,10 @@ data class ChatState(
      */
     val config: ChatConfigState? = null,
     /**
-     * Completed turns
+     * Completed turns, oldest first.
+     *
+     * Entries may be {@link DeferredTurn | deferred} only for clients that
+     * declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
      */
     val turns: List<Turn>,
     /**
@@ -2015,6 +2018,13 @@ data class ChatState(
      * available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
      * the loaded turns into state and update or clear this cursor before
      * responding. Absence means the state contains all retained turns.
+     *
+     * Hosts SHOULD NOT set this for clients that declared
+     * {@link ClientCapabilities.deferredTurns | `deferredTurns`}. Instead, they
+     * SHOULD send every retained turn and defer the ones the client doesn't need
+     * yet.
+     *
+     * Stability: 3 - Legacy.
      */
     val turnsNextCursor: String? = null,
     /**
@@ -2730,7 +2740,7 @@ data class ChatConfigState(
 )
 
 @Serializable
-data class Turn(
+data class MaterializedTurn(
     /**
      * Turn identifier
      */
@@ -2754,6 +2764,50 @@ data class Turn(
      * and find tool calls by filtering for `ToolCall` parts.
      */
     val responseParts: List<ResponsePart>,
+    /**
+     * Token usage info
+     */
+    val usage: UsageInfo? = null,
+    /**
+     * How the turn ended
+     */
+    val state: TurnState
+)
+
+/**
+ * A completed turn whose response the host has not sent yet.
+ *
+ * The turn keeps its position in {@link ChatState.turns}, so clients can show
+ * the initiating message and outcome without downloading the response.
+ * Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
+ * the host replaces the entry in place with a {@link MaterializedTurn} via
+ * {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
+ *
+ * Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
+ * {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
+ * action, or command result. Those clients receive the corresponding
+ * {@link MaterializedTurn}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class DeferredTurn(
+    /**
+     * Turn identifier
+     */
+    val id: String,
+    /**
+     * ISO 8601 timestamp when this turn started.
+     */
+    val startedAt: String? = null,
+    /**
+     * Turn duration in milliseconds.
+     */
+    val duration: Long? = null,
+    /**
+     * The message that initiated the turn
+     */
+    val message: Message,
     /**
      * Token usage info
      */
@@ -8356,6 +8410,90 @@ internal object AutomationRunLifecycleSerializer : KSerializer<AutomationRunLife
         }
         if (discriminant != null) encodedObject["status"] = JsonPrimitive(discriminant)
         output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+/**
+ * A completed request/response cycle: either a {@link MaterializedTurn} with
+ * its full response or a {@link DeferredTurn}, discriminated by `isDeferred`.
+ */
+@Serializable(with = TurnSerializer::class)
+sealed interface Turn {
+    /**
+     * Turn identifier
+     */
+    val id: String
+    /**
+     * ISO 8601 timestamp when this turn started.
+     */
+    val startedAt: String?
+    /**
+     * Turn duration in milliseconds.
+     */
+    val duration: Long?
+    /**
+     * The message that initiated the turn
+     */
+    val message: Message
+    /**
+     * Token usage info
+     */
+    val usage: UsageInfo?
+    /**
+     * How the turn ended
+     */
+    val state: TurnState
+
+    /** A [MaterializedTurn] carrying its full response. */
+    @JvmInline value class Materialized(val value: MaterializedTurn) : Turn {
+        override val id: String get() = value.id
+        override val startedAt: String? get() = value.startedAt
+        override val duration: Long? get() = value.duration
+        override val message: Message get() = value.message
+        override val usage: UsageInfo? get() = value.usage
+        override val state: TurnState get() = value.state
+    }
+
+    /** A [DeferredTurn] whose response has not been sent yet. */
+    @JvmInline value class Deferred(val value: DeferredTurn) : Turn {
+        override val id: String get() = value.id
+        override val startedAt: String? get() = value.startedAt
+        override val duration: Long? get() = value.duration
+        override val message: Message get() = value.message
+        override val usage: UsageInfo? get() = value.usage
+        override val state: TurnState get() = value.state
+    }
+}
+
+internal object TurnSerializer : KSerializer<Turn> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("Turn")
+
+    override fun deserialize(decoder: Decoder): Turn {
+        val input = decoder as? JsonDecoder
+            ?: error("Turn can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for Turn")
+        val isDeferred = (obj["isDeferred"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
+        return if (isDeferred) {
+            Turn.Deferred(input.json.decodeFromJsonElement(DeferredTurn.serializer(), element))
+        } else {
+            Turn.Materialized(input.json.decodeFromJsonElement(MaterializedTurn.serializer(), element))
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: Turn) {
+        val output = encoder as? JsonEncoder
+            ?: error("Turn can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is Turn.Materialized -> output.json.encodeToJsonElement(MaterializedTurn.serializer(), value.value)
+            is Turn.Deferred -> JsonObject(
+                output.json.encodeToJsonElement(DeferredTurn.serializer(), value.value).jsonObject +
+                    ("isDeferred" to JsonPrimitive(true)),
+            )
+        }
+        output.encodeJsonElement(element)
     }
 }
 

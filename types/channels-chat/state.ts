@@ -143,7 +143,12 @@ export interface ChatState {
   config?: ChatConfigState;
 
   // ── Conversation contents ──────────────────────────────────────────
-  /** Completed turns */
+  /**
+   * Completed turns, oldest first.
+   *
+   * Entries may be {@link DeferredTurn | deferred} only for clients that
+   * declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+   */
   turns: Turn[];
   /**
    * Cursor for loading older completed turns into this chat state.
@@ -152,6 +157,14 @@ export interface ChatState {
    * available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
    * the loaded turns into state and update or clear this cursor before
    * responding. Absence means the state contains all retained turns.
+   *
+   * Hosts SHOULD NOT set this for clients that declared
+   * {@link ClientCapabilities.deferredTurns | `deferredTurns`}. Instead, they
+   * SHOULD send every retained turn and defer the ones the client doesn't need
+   * yet.
+   *
+   * @deprecated Use {@link DeferredTurn | deferred turns}.
+   * @stability 3
    */
   turnsNextCursor?: string;
   /** Currently in-progress turn */
@@ -771,11 +784,11 @@ export const enum MessageAttachmentKind {
 }
 
 /**
- * A completed request/response cycle.
+ * Fields shared by {@link MaterializedTurn} and {@link DeferredTurn}.
  *
  * @category Turn Types
  */
-export interface Turn {
+export interface TurnBase {
   /** Turn identifier */
   id: string;
   /** ISO 8601 timestamp when this turn started. */
@@ -784,6 +797,20 @@ export interface Turn {
   duration?: number;
   /** The message that initiated the turn */
   message: Message;
+  /** Token usage info */
+  usage: UsageInfo | undefined;
+  /** How the turn ended */
+  state: TurnState;
+}
+
+/**
+ * A completed request/response cycle, including its full response.
+ *
+ * @category Turn Types
+ */
+export interface MaterializedTurn extends TurnBase {
+  /** Absent or `false`: this turn carries its full response. */
+  isDeferred?: false;
   /**
    * All response content in stream order: text, tool calls, reasoning, and content refs.
    *
@@ -791,11 +818,37 @@ export interface Turn {
    * and find tool calls by filtering for `ToolCall` parts.
    */
   responseParts: ResponsePart[];
-  /** Token usage info */
-  usage: UsageInfo | undefined;
-  /** How the turn ended */
-  state: TurnState;
 }
+
+/**
+ * A completed turn whose response the host has not sent yet.
+ *
+ * The turn keeps its position in {@link ChatState.turns}, so clients can show
+ * the initiating message and outcome without downloading the response.
+ * Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
+ * the host replaces the entry in place with a {@link MaterializedTurn} via
+ * {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
+ *
+ * Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
+ * {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
+ * action, or command result. Those clients receive the corresponding
+ * {@link MaterializedTurn}.
+ *
+ * @category Turn Types
+ * @stability 1.0
+ */
+export interface DeferredTurn extends TurnBase {
+  /** Marks a turn without `responseParts`. */
+  isDeferred: true;
+}
+
+/**
+ * A completed request/response cycle: either a {@link MaterializedTurn} with
+ * its full response or a {@link DeferredTurn}, discriminated by `isDeferred`.
+ *
+ * @category Turn Types
+ */
+export type Turn = MaterializedTurn | DeferredTurn;
 
 /**
  * An in-progress turn — the assistant is actively streaming.

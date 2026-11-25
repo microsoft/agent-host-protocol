@@ -30,8 +30,8 @@ use ahp_types::{
     actions::{ActionEnvelope, StateAction},
     commands::{
         AuthenticateParams, ChangesetOperationTarget, ChatSource, CreateChatParams,
-        CreateTcpConnectionParams, Implementation, InitializeParams, InitializeResult,
-        ReconnectParams, ReconnectResult, ResourceListResult, ResourceReadParams,
+        CreateTcpConnectionParams, FetchDeferredTurnsParams, Implementation, InitializeParams,
+        InitializeResult, ReconnectParams, ReconnectResult, ResourceListResult, ResourceReadParams,
         ResourceReadResult, SubscribeParams, SubscribeResult,
     },
     common::StringOrMarkdown,
@@ -233,6 +233,7 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "InitializeParams" => round_trip!(InitializeParams),
         "InitializeResult" => round_trip!(InitializeResult),
         "CreateChatParams" => round_trip!(CreateChatParams),
+        "FetchDeferredTurnsParams" => round_trip!(FetchDeferredTurnsParams),
         "ChatSource" => round_trip!(ChatSource),
         "Snapshot" => round_trip!(Snapshot),
         "SubscribeParams" => round_trip!(SubscribeParams),
