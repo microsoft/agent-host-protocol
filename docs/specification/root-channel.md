@@ -48,42 +48,21 @@ A [`ModelSelection`](/reference/root#modelselection) names a model by its `id`, 
 
 #### Registering sources
 
-An agent that serves models from client-registered sources advertises [`AgentCapabilities.modelSourceRegistration`](/reference/root#modelsourceregistrationcapability) with the formats it reads. A client registers a source with `root/modelSourceSet`, giving its `format`, a `definition` that tells the agent how to reach it, and a `nonce` that versions the definition, such as a hash of it. Each agent decides which formats it reads. Every client can read a definition, so it MUST NOT contain a credential: a client delivers that separately, with [`authenticate`](/specification/authentication#model-source-credentials).
+An agent that serves models from client-registered sources advertises [`AgentCapabilities.modelSourceRegistration`](/reference/root#modelsourceregistrationcapability) with the formats it reads. A client registers a source with `root/modelSourceSet`, giving its `format`, a `definition` that tells the agent how to reach it, and a `nonce` that versions the definition. Every client can read a definition, so it MUST NOT contain a credential. Clients deliver credentials with [`authenticate`](/specification/authentication#model-source-credentials).
 
-`root/modelSourceSet` adds a source, or updates the one with the same `id`:
+`Set` adds the source, or replaces the one with the same `id`. When `provider`, `format`, and `nonce` are unchanged, it keeps the host-reported fields (`state`, `credentialResource`, and `accountId`), so re-registering doesn't disturb a working source. Otherwise it clears them, and the host drops the source's credential. `root/modelSourceRemoved` removes a source for every client.
 
-- **Add.** When no source has the `id`, it appends the source.
-- **Re-register.** When one has, with the same `provider`, `format`, and `nonce`, it keeps the host-reported fields (`state`, `credentialResource`, and `accountId`) and takes everything else from the action.
-- **Update.** When any of the three differs, it replaces the source, whose host-reported fields are absent until the host reports again. The host drops the source's credential.
+The host rejects a client's `Set` that lacks `format`, `definition`, or `nonce`, uses a format the agent doesn't list, includes a host-reported field, changes `definition` without changing `nonce`, changes a source the host registered itself, or asks for a `retention` the host won't honor.
 
-`root/modelSourceRemoved` removes a source for every client. The host rejects a client's `Set`, through `rejectionReason`, when:
-
-- the agent doesn't advertise `modelSourceRegistration` or list `format`, or the source lacks `format`, `definition`, or `nonce`;
-- the source includes a host-reported field;
-- its `provider`, `format`, and `nonce` match the existing source's, but its `definition` differs;
-- it would change a source the host registered itself, including an agent's own;
-- the host won't honor the requested `retention`.
-
-A client registers its sources when it starts or reconnects, and when the user changes one. It SHOULD derive `id` from a stable key in its own configuration, so every window and device with the same source shares one, and SHOULD NOT update a source whose `nonce` differs from its own copy unless the user changed that source. Re-registering an unchanged source makes the client a contributing client. The host tracks contributing clients itself, from `ActionEnvelope.origin`.
-
-Every connected client may change, supply credentials for, and select every source. A host that can verify principals MAY restrict a source to clients of the principal that registered it.
+A client registers its sources when it starts or reconnects, and when the user changes one. It SHOULD derive `id` from a stable key in its configuration, so every window and device shares one source, and SHOULD NOT replace a source with a different `nonce` unless the user changed it. The host counts each client that registers a source as a contributing client, from `ActionEnvelope.origin`. A host that can verify principals MAY restrict a source to clients of the principal that registered it.
 
 #### Status and catalog
 
-The host reports a registered source's status with `root/modelSourceStateChanged`, which sets `state`, `credentialResource`, and `accountId` together, and ignores an unknown `id`. The state is `starting`, `ready`, `authRequired` with a `reason`, or `error`.
-
-Once a registered source has been `ready`, the host keeps its models in the agent's `models` through later `starting` and `authRequired` states, so rotating a key doesn't break a selection. It withdraws them when the source is removed or enters `error`, or when an update changes its endpoint. A host SHOULD derive each model's ID deterministically from the source's `id`, `provider`, and `format`, its endpoint, and the endpoint's own model identifier, so a source registered again gets the same IDs.
-
-The host checks a selection whenever it uses one, and never runs the work on a different model. A turn that can't use its source fails as described in [Model source credentials](/specification/authentication#turns).
+The host reports a registered source's status with `root/modelSourceStateChanged`, which sets `state`, `credentialResource`, and `accountId` together and ignores an unknown `id`. Once a source has been `ready`, its models stay in the agent's `models` through later `starting` and `authRequired` states. They leave when the source is removed or enters `error`, or when an update changes its endpoint. A host SHOULD derive model IDs deterministically from the source and the endpoint's model identifiers, so a source registered again keeps its IDs. The host never runs work on a model other than the one selected. See [Model source credentials](/specification/authentication#turns) for turns on an unavailable source.
 
 #### Retention
 
-A source's `retention` decides what happens when its last contributing client disconnects and doesn't return within a grace period the host chooses:
-
-- `contributingClient`, the default: the host stops new work on the source, lets running turns finish, and then removes it.
-- `host`: the source stays until a client removes it or host policy expires it.
-
-The host SHOULD reject an automation that names a model from a `contributingClient`-retained source, because the automation would outlive the source.
+When a source's last contributing client disconnects and doesn't return within the host's grace period, `contributingClient` retention, the default, removes the source once running turns finish. `host` retention keeps it until a client removes it or host policy expires it. The host SHOULD reject an automation that names a model from a `contributingClient`-retained source.
 
 ### Paginating the catalogue
 
