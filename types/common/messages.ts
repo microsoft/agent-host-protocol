@@ -59,6 +59,8 @@ import type {
   MoveChatParams,
   MoveChatResult,
   DisposeChatParams,
+  FetchDeferredTurnsParams,
+  FetchDeferredTurnsResult,
 } from '../channels-chat/commands.js';
 import type {
   CreateTerminalParams,
@@ -175,6 +177,7 @@ export interface CommandMap {
   'createTcpConnection': { params: CreateTcpConnectionParams; result: CreateTcpConnectionResult };
   'moveChat': { params: MoveChatParams; result: MoveChatResult };
   'disposeChat': { params: DisposeChatParams; result: null };
+  'fetchDeferredTurns': { params: FetchDeferredTurnsParams; result: FetchDeferredTurnsResult };
   'createTerminal': { params: CreateTerminalParams; result: null };
   'disposeTerminal': { params: DisposeTerminalParams; result: null };
   'createResourceWatch': { params: CreateResourceWatchParams; result: CreateResourceWatchResult };

@@ -54,7 +54,7 @@ route any message using only its `method` and `params.channel`.
 | `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch` | `ahp-root://`. Either peer can send these requests. |
 | `runAutomation`, `fetchAutomationRuns` | `ahp-automations://` |
 | `createSession`, `disposeSession`, `createChat` | The session URI. For `createSession`, this is the URI of the new session. |
-| `fetchTurns`, `completions`, `disposeChat` | The chat URI |
+| `fetchTurns`, `fetchDeferredTurns`, `completions`, `disposeChat` | The chat URI |
 | `moveChat` | The URI of the chat to move |
 | `createTerminal`, `disposeTerminal` | The terminal URI. For `createTerminal`, this is the URI of the new terminal. |
 | `createTcpConnection` | The URI of the new TCP channel |
@@ -180,7 +180,9 @@ not support a requested view ignores it. Clients MUST accept a snapshot that
 contains more state than they requested.
 
 For a chat channel, `view.turns` is the number of most recent completed turns
-that the client wants in the snapshot:
+that the client wants in the snapshot. This tail window is legacy; clients that
+declare `capabilities.deferredTurns` SHOULD omit it and use
+[deferred turns](./chat-channel#deferred-turns) instead:
 
 ```json
 {

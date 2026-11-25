@@ -556,7 +556,8 @@ public sealed class FixRegressionTests
             TurnId = "t1",
         }));
 
-        var part = Assert.IsType<ToolCallResponsePart>(chat.Turns.Single().ResponseParts.Single().Value);
+        var turn = Assert.IsType<MaterializedTurn>(chat.Turns.Single().Value);
+        var part = Assert.IsType<ToolCallResponsePart>(turn.ResponseParts.Single().Value);
         var cancelled = Assert.IsType<ToolCallCancelledState>(part.ToolCall.Value);
         Assert.Equal("List the files in the current directory", cancelled.Intention);
     }
@@ -1073,7 +1074,7 @@ public sealed class FixRegressionTests
 
         Assert.Equal(ReduceOutcome.Applied, outcome);
         Assert.Null(state.ActiveTurn);
-        Turn turn = Assert.Single(state.Turns);
+        MaterializedTurn turn = Assert.IsType<MaterializedTurn>(Assert.Single(state.Turns).Value);
         ResponsePart part = Assert.Single(turn.ResponseParts);
         var recorded = Assert.IsType<InputRequestResponsePart>(part.Value);
         Assert.Equal("req-1", recorded.Request.Id);

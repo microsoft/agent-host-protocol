@@ -157,6 +157,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatTurnsLoaded = new ActionType("chat/turnsLoaded");
 
+    public static readonly ActionType ChatTurnsMaterialized = new ActionType("chat/turnsMaterialized");
+
     public static readonly ActionType SessionIsReadChanged = new ActionType("session/isReadChanged");
 
     public static readonly ActionType SessionIsArchivedChanged = new ActionType("session/isArchivedChanged");
@@ -1766,7 +1768,8 @@ public sealed record ChatErrorAction
 /// The turn MUST be the latest turn, its state MUST be `error`, and its final
 /// response part MUST be a resumable error. The reducer reopens the same turn
 /// with its existing message, response parts, and usage intact. The host then
-/// resumes the provider's execution for that turn.</summary>
+/// resumes the provider's execution for that turn. A deferred turn cannot be
+/// resumed until it is materialized.</summary>
 public sealed record ChatTurnResumeAction
 {
     public ActionType Type { get; init; } = ActionType.ChatTurnResume;
@@ -1985,7 +1988,14 @@ public sealed record ChatTruncatedAction
 /// any operation that references a turn older than the currently loaded window.
 /// `turns` is ordered oldest-first and is prepended to the current `turns`
 /// window. `turnsNextCursor` replaces the state's cursor; omit it when all
-/// retained turns are now loaded.</summary>
+/// retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+/// only for clients that declared
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// This belongs to the legacy tail-window paging scheme, which deferred turns
+/// replace. See {@link FetchTurnsParams | `fetchTurns`}.
+///
+/// Stability: 3 - Legacy.</summary>
 public sealed record ChatTurnsLoadedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatTurnsLoaded;
@@ -1996,6 +2006,23 @@ public sealed record ChatTurnsLoadedAction
     /// <summary>Opaque cursor for loading the next older page, if one remains.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? TurnsNextCursor { get; init; }
+}
+
+/// <summary>Replaces {@link DeferredTurn | deferred turns} in place with their full
+/// {@link MaterializedTurn | turns}.
+///
+/// Hosts dispatch this before responding to `fetchDeferredTurns`, and before
+/// applying any operation that needs a deferred turn's response, such as
+/// `chat/turnResume`. Each entry replaces the deferred turn with the same `id`.
+/// Entries whose `id` does not name a deferred turn in state are ignored.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChatTurnsMaterializedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatTurnsMaterialized;
+
+    /// <summary>Full turns to replace their deferred entries.</summary>
+    public required List<MaterializedTurn> Turns { get; init; }
 }
 
 /// <summary>A pending message was set (upsert semantics: creates or replaces).
@@ -3012,6 +3039,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/reasoning"] = typeof(ChatReasoningAction),
         ["chat/truncated"] = typeof(ChatTruncatedAction),
         ["chat/turnsLoaded"] = typeof(ChatTurnsLoadedAction),
+        ["chat/turnsMaterialized"] = typeof(ChatTurnsMaterializedAction),
         ["chat/pendingMessageSet"] = typeof(ChatPendingMessageSetAction),
         ["chat/pendingMessageRemoved"] = typeof(ChatPendingMessageRemovedAction),
         ["chat/queuedMessagesReordered"] = typeof(ChatQueuedMessagesReorderedAction),

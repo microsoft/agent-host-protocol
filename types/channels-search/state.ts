@@ -142,8 +142,8 @@ export interface SessionsSearchTarget {
 }
 
 /**
- * Searches the visible text of chat requests and responses, including turns
- * that are not loaded in the chat's state. Results are
+ * Searches the visible text of chat requests and responses, including the
+ * responses of deferred turns. Results are
  * {@link ChatMessageSearchResult}s.
  *
  * @category Search Types

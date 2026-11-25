@@ -188,7 +188,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
 
     case .chatTurnResume(let a):
         guard state.activeTurn == nil,
-              let turn = state.turns.last,
+              case .materialized(let turn) = state.turns.last,
               turn.id == a.turnId,
               turn.state == .error,
               case .error(let errorPart) = turn.responseParts.last,
@@ -618,6 +618,21 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         var next = state
         next.turns = olderTurns + state.turns
         next.turnsNextCursor = a.turnsNextCursor
+        return next
+
+    case .chatTurnsMaterialized(let a):
+        let materialized = Dictionary(a.turns.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        var changed = false
+        let turns = state.turns.map { turn -> Turn in
+            guard case .deferred(let deferred) = turn, let replacement = materialized[deferred.id] else {
+                return turn
+            }
+            changed = true
+            return .materialized(replacement)
+        }
+        guard changed else { return state }
+        var next = state
+        next.turns = turns
         return next
 
     // ── Session Input Requests ─────────────────────────────────────────────
@@ -1215,7 +1230,7 @@ private func endTurn(
 
     // Defensive clamp: `duration` is producer-supplied and opaque to this
     // reducer, but a negative value would be nonsensical to display.
-    let turn = Turn(
+    let turn = MaterializedTurn(
         id: activeTurn.id,
         startedAt: activeTurn.startedAt,
         duration: max(0, duration),
@@ -1226,7 +1241,7 @@ private func endTurn(
     )
 
     var next = state
-    next.turns.append(turn)
+    next.turns.append(.materialized(turn))
     next.activeTurn = nil
     next.status = chatSummaryStatus(next, terminalStatus: terminalStatus)
     next.modifiedAt = addMillisecondsToTimestamp(activeTurn.startedAt, turn.duration ?? 0)

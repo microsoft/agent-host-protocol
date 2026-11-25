@@ -230,6 +230,7 @@ function typeTextToSchema(typeText: string, project: Project, _depth = 0): JsonS
   if (cleaned === 'string') return { type: 'string' };
   if (cleaned === 'number') return { type: 'number' };
   if (cleaned === 'boolean') return { type: 'boolean' };
+  if (cleaned === 'true' || cleaned === 'false') return { type: 'boolean', const: cleaned === 'true' };
   if (cleaned === 'null') return { type: 'null' };
   if (cleaned === 'unknown') return {};
   if (cleaned === 'object') return { type: 'object' };

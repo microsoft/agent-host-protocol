@@ -77,6 +77,7 @@ import type {
   ChatInputCompletedAction,
   ChatTruncatedAction,
   ChatTurnsLoadedAction,
+  ChatTurnsMaterializedAction,
   ChangesetStatusChangedAction,
   ChangesetFileSetAction,
   ChangesetFileRemovedAction,
@@ -253,6 +254,7 @@ export type ChatAction =
   | ChatInputCompletedAction
   | ChatTruncatedAction
   | ChatTurnsLoadedAction
+  | ChatTurnsMaterializedAction
 ;
 
 /** Union of chat actions that clients may dispatch. */
@@ -300,6 +302,7 @@ export type ServerChatAction =
   | ChatMovedAction
   | ChatInputRequestedAction
   | ChatTurnsLoadedAction
+  | ChatTurnsMaterializedAction
 ;
 
 /** Union of all canvas-scoped actions. */
@@ -558,6 +561,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatInputCompleted]: true,
   [ActionType.ChatTruncated]: true,
   [ActionType.ChatTurnsLoaded]: false,
+  [ActionType.ChatTurnsMaterialized]: false,
   [ActionType.ChangesetStatusChanged]: false,
   [ActionType.ChangesetFileSet]: false,
   [ActionType.ChangesetFileRemoved]: false,

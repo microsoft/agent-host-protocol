@@ -187,6 +187,9 @@ internal static class GeneratedActionMetadata
             case ChatTurnsLoadedAction value:
                 actionType = value.Type;
                 return true;
+            case ChatTurnsMaterializedAction value:
+                actionType = value.Type;
+                return true;
             case ChatTurnStartedAction value:
                 actionType = value.Type;
                 return true;

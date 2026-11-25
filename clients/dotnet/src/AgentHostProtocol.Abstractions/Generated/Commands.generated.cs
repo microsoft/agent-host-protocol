@@ -596,6 +596,24 @@ public sealed record ClientCapabilities
     /// App-bearing tool calls as ordinary MCP tool calls.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? McpApps { get; init; }
+
+    /// <summary>Client understands {@link DeferredTurn} entries in
+    /// {@link ChatState.turns | `ChatState.turns`} and can request their responses with
+    /// {@link FetchDeferredTurnsParams | `fetchDeferredTurns`}.
+    ///
+    /// Hosts MAY then defer any completed turn they send this client. Hosts
+    /// MUST NOT send deferred turns to clients that omit this capability.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DeferredTurnsCapability? DeferredTurns { get; init; }
+}
+
+/// <summary>Presence-only client capability for {@link ClientCapabilities.deferredTurns}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record DeferredTurnsCapability
+{
 }
 
 /// <summary>Automation features supported by this host authority.
@@ -908,7 +926,13 @@ public sealed record SubscribeView
     /// host MUST return all retained turns. When older turns remain available, the
     /// returned {@link ChatState} carries `turnsNextCursor`; clients pass that
     /// cursor to `fetchTurns` to ask the host to page more turns into the chat
-    /// state.</summary>
+    /// state.
+    ///
+    /// Clients that declare
+    /// {@link ClientCapabilities.deferredTurns | `deferredTurns`} SHOULD omit this
+    /// field and read history through deferred turns instead.
+    ///
+    /// Stability: 3 - Legacy.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? Turns { get; init; }
 }
@@ -1157,6 +1181,47 @@ public sealed record DisposeChatParams
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
+/// <summary>Requests the full responses of a range of {@link DeferredTurn | deferred
+/// turns} in a chat state.
+///
+/// The range runs from `turnId` through `endTurnId`, inclusive, in
+/// {@link ChatState.turns | `ChatState.turns`} order. The command result does
+/// not carry turns. Instead, before responding, the host MUST dispatch
+/// `chat/turnsMaterialized` to replace every deferred turn in the range in place
+/// with its full {@link MaterializedTurn}. Full turns in the range are left unchanged.
+///
+/// The host MUST reject the request with `InvalidParams` if `turnId` or
+/// `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.
+/// Hosts MAY also reject ranges that exceed an implementation-defined size limit
+/// with `InvalidParams`.
+///
+/// Requires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record FetchDeferredTurnsParams
+{
+    /// <summary>Chat URI</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>ID of the first turn in the range.</summary>
+    public required string TurnId { get; init; }
+
+    /// <summary>ID of the last turn in the range, inclusive. Omit to request only `turnId`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? EndTurnId { get; init; }
+}
+
+/// <summary>Result of the `fetchDeferredTurns` command.</summary>
+public sealed record FetchDeferredTurnsResult
+{
 }
 
 /// <summary>Moves a chat within or into an existing session.</summary>
@@ -1859,7 +1924,16 @@ public sealed record CreateSearchResult
 ///
 /// Before applying any operation that references a turn outside the currently
 /// loaded window, the host MUST eagerly load enough older turns into state for
-/// that operation to reduce against valid state.</summary>
+/// that operation to reduce against valid state.
+///
+/// Hosts MAY load turns as {@link DeferredTurn | deferred} for clients that
+/// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// Tail-window paging is legacy. It remains supported for 1.x clients, but new
+/// clients SHOULD declare `deferredTurns` and read history with
+/// {@link FetchDeferredTurnsParams | `fetchDeferredTurns`} instead.
+///
+/// Stability: 3 - Legacy.</summary>
 public sealed record FetchTurnsParams
 {
     /// <summary>Chat URI</summary>
@@ -1880,7 +1954,9 @@ public sealed record FetchTurnsParams
     public string? Cursor { get; init; }
 }
 
-/// <summary>Result of the `fetchTurns` command.</summary>
+/// <summary>Result of the `fetchTurns` command.
+///
+/// Stability: 3 - Legacy.</summary>
 public sealed record FetchTurnsResult
 {
 }

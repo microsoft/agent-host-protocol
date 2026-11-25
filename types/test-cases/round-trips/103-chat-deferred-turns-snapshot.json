@@ -1,0 +1,28 @@
+{
+  "name": "chat-deferred-turns-snapshot",
+  "group": "A",
+  "description": "A client that declared deferredTurns receives older turns without their responses, interleaved with full turns.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-chat:/c1",
+    "fromSeq": 10,
+    "state": {
+      "resource": "ahp-chat:/c1", "title": "Design", "status": 1, "modifiedAt": "2026-11-18T12:00:00Z",
+      "turns": [
+        { "id": "t1", "startedAt": "2026-11-18T11:00:00Z", "duration": 4000, "message": { "origin": { "kind": "user" }, "text": "Sketch the design" }, "state": "cancelled", "isDeferred": true },
+        { "id": "t2", "message": { "origin": { "kind": "user" }, "text": "Check the design" }, "responseParts": [{ "kind": "markdown", "id": "part-1", "content": "Design A or design B?" }], "state": "complete" }
+      ]
+    }
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-chat:/c1",
+    "fromSeq": 10,
+    "state": {
+      "resource": "ahp-chat:/c1", "title": "Design", "status": 1, "modifiedAt": "2026-11-18T12:00:00Z",
+      "turns": [
+        { "id": "t1", "startedAt": "2026-11-18T11:00:00Z", "duration": 4000, "message": { "origin": { "kind": "user" }, "text": "Sketch the design" }, "state": "cancelled", "isDeferred": true },
+        { "id": "t2", "message": { "origin": { "kind": "user" }, "text": "Check the design" }, "responseParts": [{ "kind": "markdown", "id": "part-1", "content": "Design A or design B?" }], "state": "complete" }
+      ]
+    }
+  }]
+}

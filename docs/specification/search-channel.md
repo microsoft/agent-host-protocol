@@ -77,7 +77,7 @@ Each target has a `kind`:
 | `fileNames` | File paths under `roots`. The host decides how to match `text` against paths, for example with fuzzy matching, and which query options apply. | `roots`, `includes`, `excludes`, `includeIgnored` |
 | `fileText` | The text content of files under `roots` | `roots`, `includes`, `excludes`, `includeIgnored` |
 | `sessions` | The host's sessions, the same sessions that `listSessions` returns. The host decides which session content it matches, for example titles or requests. | none |
-| `chatMessages` | The visible text of chat requests and responses, including turns that are not loaded in the chat's state | `chats`: the chats to search. At least one chat URI. |
+| `chatMessages` | The visible text of chat requests and responses, including the responses of [deferred turns](/specification/chat-channel#deferred-turns) | `chats`: the chats to search. At least one chat URI. |
 
 `includes` and `excludes` are glob patterns relative to a root. By default, the
 host skips files that its ignore rules, such as `.gitignore` files, exclude.
@@ -116,7 +116,8 @@ SHOULD sort them by descending score. A host that does not rank results omits
 the score.
 
 To open a `chatMessage` result, the client subscribes to the chat and locates
-the turn with `turnId`.
+the turn with `turnId`. If that turn is deferred, the client reads it with
+`fetchDeferredTurns`.
 
 ### Lifecycle
 

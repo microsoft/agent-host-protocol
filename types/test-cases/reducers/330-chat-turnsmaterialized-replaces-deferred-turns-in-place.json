@@ -1,0 +1,135 @@
+{
+  "description": "chat/turnsMaterialized replaces matching deferred turns in place and ignores unknown IDs",
+  "reducer": "chat",
+  "initial": {
+    "turns": [
+      {
+        "id": "t1",
+        "message": {
+          "text": "First",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "usage": null,
+        "state": "complete",
+        "isDeferred": true
+      },
+      {
+        "id": "t2",
+        "message": {
+          "text": "Second",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "usage": null,
+        "state": "complete",
+        "isDeferred": true
+      },
+      {
+        "id": "t3",
+        "message": {
+          "text": "Third",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ],
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/turnsMaterialized",
+      "turns": [
+        {
+          "id": "t1",
+          "message": {
+            "text": "First",
+            "origin": {
+              "kind": "user"
+            }
+          },
+          "responseParts": [
+            {
+              "kind": "markdown",
+              "id": "p1",
+              "content": "Answer"
+            }
+          ],
+          "usage": null,
+          "state": "complete"
+        },
+        {
+          "id": "missing",
+          "message": {
+            "text": "Missing",
+            "origin": {
+              "kind": "user"
+            }
+          },
+          "responseParts": [],
+          "usage": null,
+          "state": "complete"
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "turns": [
+      {
+        "id": "t1",
+        "message": {
+          "text": "First",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [
+          {
+            "kind": "markdown",
+            "id": "p1",
+            "content": "Answer"
+          }
+        ],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "t2",
+        "message": {
+          "text": "Second",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "usage": null,
+        "state": "complete",
+        "isDeferred": true
+      },
+      {
+        "id": "t3",
+        "message": {
+          "text": "Third",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ],
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  }
+}

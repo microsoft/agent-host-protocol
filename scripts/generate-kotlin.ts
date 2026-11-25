@@ -661,6 +661,35 @@ function generateDiscriminatedUnion(project: Project, config: UnionConfig): stri
 
 // ─── Interface → Kotlin data class (auto from project) ───────────────────────
 
+/**
+ * Discriminator fields dropped from generated data classes because a
+ * hand-rolled union serializer decodes and injects them instead.
+ */
+const OMITTED_PROPS: Record<string, readonly string[]> = {
+  MaterializedTurn: ['isDeferred'],
+  DeferredTurn: ['isDeferred'],
+};
+
+/**
+ * Pinned constructor parameter order (by wire name) for data classes whose
+ * fields moved into a `*Base` interface, keeping positional constructors
+ * source-compatible.
+ */
+const PROP_ORDER: Record<string, readonly string[]> = {
+  MaterializedTurn: ['id', 'startedAt', 'duration', 'message', 'responseParts', 'usage', 'state'],
+};
+
+function orderProps(tsInterfaceName: string, props: KotlinProp[]): KotlinProp[] {
+  const order = PROP_ORDER[tsInterfaceName];
+  if (!order) return props;
+  const rank = (p: KotlinProp) => {
+    const idx = order.indexOf(p.wireName);
+    if (idx < 0) throw new Error(`PROP_ORDER.${tsInterfaceName} is missing ${p.wireName}`);
+    return idx;
+  };
+  return [...props].sort((a, b) => rank(a) - rank(b));
+}
+
 function generateDataClassFromInterface(
   project: Project,
   tsInterfaceName: string,
@@ -669,7 +698,11 @@ function generateDataClassFromInterface(
   const iface = findInterface(project, tsInterfaceName);
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = ktNameOverride ?? tsInterfaceName;
-  const props = extractProps(iface, project);
+  const omitted = OMITTED_PROPS[tsInterfaceName] ?? [];
+  const props = orderProps(
+    tsInterfaceName,
+    extractProps(iface, project).filter(p => !omitted.includes(p.wireName)),
+  );
   const declaration = preservesUnknownMembers(iface)
     ? generatePreservingKotlinDataClass(name, props)
     : generateKotlinDataClass(name, props);
@@ -944,6 +977,73 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
 }`;
 }
 
+/**
+ * `Turn = MaterializedTurn | DeferredTurn`, discriminated by the boolean
+ * `isDeferred`. `true` decodes as [Turn.Deferred]; absent, `false`, or any
+ * other value decodes as [Turn.Materialized]. Neither variant data class
+ * carries `isDeferred`; the serializer injects `"isDeferred": true` when
+ * encoding a deferred turn. The shared `TurnBase` fields are exposed on the
+ * sealed interface so callers can read them without matching.
+ */
+function generateTurnKotlin(project: Project): string {
+  const base = findInterface(project, 'TurnBase');
+  if (!base) throw new Error('Interface TurnBase not found');
+  const baseProps = extractProps(base, project);
+  const alias = project.getSourceFiles().map(sf => sf.getTypeAlias('Turn')).find(a => a);
+  if (!alias) throw new Error('Type alias Turn not found');
+  const doc = getDocumentation(alias);
+  const overrides = baseProps
+    .map(p => `        override val ${p.name}: ${p.type} get() = value.${p.name}`)
+    .join('\n');
+  return `${emitKDoc(doc).join('\n')}
+@Serializable(with = TurnSerializer::class)
+sealed interface Turn {
+${baseProps.map(p => [...emitKDoc(p.doc, '    '), `    val ${p.name}: ${p.type}`].join('\n')).join('\n')}
+
+    /** A [MaterializedTurn] carrying its full response. */
+    @JvmInline value class Materialized(val value: MaterializedTurn) : Turn {
+${overrides}
+    }
+
+    /** A [DeferredTurn] whose response has not been sent yet. */
+    @JvmInline value class Deferred(val value: DeferredTurn) : Turn {
+${overrides}
+    }
+}
+
+internal object TurnSerializer : KSerializer<Turn> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("Turn")
+
+    override fun deserialize(decoder: Decoder): Turn {
+        val input = decoder as? JsonDecoder
+            ?: error("Turn can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for Turn")
+        val isDeferred = (obj["isDeferred"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
+        return if (isDeferred) {
+            Turn.Deferred(input.json.decodeFromJsonElement(DeferredTurn.serializer(), element))
+        } else {
+            Turn.Materialized(input.json.decodeFromJsonElement(MaterializedTurn.serializer(), element))
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: Turn) {
+        val output = encoder as? JsonEncoder
+            ?: error("Turn can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is Turn.Materialized -> output.json.encodeToJsonElement(MaterializedTurn.serializer(), value.value)
+            is Turn.Deferred -> JsonObject(
+                output.json.encodeToJsonElement(DeferredTurn.serializer(), value.value).jsonObject +
+                    ("isDeferred" to JsonPrimitive(true)),
+            )
+        }
+        output.encodeJsonElement(element)
+    }
+}`;
+}
+
 function generateToolResultContentUnion(): string {
   return `@Serializable(with = ToolResultContentSerializer::class)
 sealed interface ToolResultContent {
@@ -1037,13 +1137,13 @@ const STATE_STRUCTS = [
   'AgentCapabilities',
   'MultipleChatsCapability',
   'MultipleWorkingDirectoriesCapability',
-  'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
+  'ModelSourceInfo', 'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'BackgroundShellWork', 'BackgroundSubagentWork',
   'CanvasReference', 'CanvasState',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionToolAuthenticationRequest',
-  'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'Turn', 'ActiveTurn', 'Message',
+  'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'MaterializedTurn', 'DeferredTurn', 'ActiveTurn', 'Message',
   'MessageOrigin',
   'ChatInputOption',
   'ChatInputTextAnswerValue', 'ChatInputNumberAnswerValue',
@@ -1601,6 +1701,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SEARCH_LIFECYCLE_UNION));
   lines.push('');
+  lines.push(generateTurnKotlin(project));
+  lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1682,6 +1784,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/mcpServerBackgroundRequested', caseName: 'SessionMcpServerBackgroundRequested', tsInterface: 'SessionMcpServerBackgroundRequestedAction' },
   { type: 'chat/truncated', caseName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'chat/turnsLoaded', caseName: 'ChatTurnsLoaded', tsInterface: 'ChatTurnsLoadedAction' },
+  { type: 'chat/turnsMaterialized', caseName: 'ChatTurnsMaterialized', tsInterface: 'ChatTurnsMaterializedAction' },
   { type: 'session/configChanged', caseName: 'SessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
   { type: 'session/metaChanged', caseName: 'SessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
   { type: 'changeset/statusChanged', caseName: 'ChangesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
@@ -1884,7 +1987,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestina
 const COMMAND_STRUCTS = [
   'CreateTcpConnectionParams', 'CreateTcpConnectionResult',
   'InitializeParams', 'HostEnvironment', 'InitializeResult',
-  'ClientCapabilities', 'AutomationCapabilities',
+  'ClientCapabilities', 'DeferredTurnsCapability', 'AutomationCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
@@ -1915,6 +2018,7 @@ const COMMAND_STRUCTS = [
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'CreateSearchParams', 'CreateSearchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
+  'FetchDeferredTurnsParams', 'FetchDeferredTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
   'McpServerAuthenticateTarget',
   'AuthenticateParams', 'AuthenticateResult',
@@ -2449,6 +2553,9 @@ object AhpCommands {
     fun fetchTurns(id: Long, params: FetchTurnsParams): JsonRpcRequest<FetchTurnsParams> =
         JsonRpcRequest(id = id, method = "fetchTurns", params = params)
 
+    fun fetchDeferredTurns(id: Long, params: FetchDeferredTurnsParams): JsonRpcRequest<FetchDeferredTurnsParams> =
+        JsonRpcRequest(id = id, method = "fetchDeferredTurns", params = params)
+
     fun authenticate(id: Long, params: AuthenticateParams): JsonRpcRequest<AuthenticateParams> =
         JsonRpcRequest(id = id, method = "authenticate", params = params)
 
@@ -2552,6 +2659,8 @@ function checkExhaustiveness(project: Project): void {
     'ActionEnvelope',               // generateDataClassFromInterface() call in generateActionsFile()
     'ActionOrigin',                 // generateDataClassFromInterface() call in generateActionsFile()
     'ResponsePart',                 // RESPONSE_PART_UNION discriminated union
+    'Turn',                         // generateTurnKotlin()
+    'TurnBase',                     // base interface, flattened into MaterializedTurn / DeferredTurn via `extends`
     'ToolResultContent',            // generateToolResultContentUnion()
     'SessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
     'SessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction

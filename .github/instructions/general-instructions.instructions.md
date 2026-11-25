@@ -76,6 +76,8 @@ A spec change ripples into every `clients/<lang>/` mirror, so you often need to 
 | JDK 17 (Kotlin client) | `docker.io/library/eclipse-temurin:17-jdk` | Gradle comes from the repo's `./gradlew` wrapper. |
 | .NET SDK 10 (.NET client) | `mcr.microsoft.com/dotnet/sdk:10.0` | Supports `.slnx`; the test host rolls forward from .NET 8. |
 
+The full Swift client and tests import Apple-only `Network` and `CryptoKit`, so run them on macOS with a full Xcode install, which includes XCTest (Command Line Tools alone may lack it). Run every target; don't exclude transport targets or add platform shims to get a pass.
+
 Mount the **repo root** (the shared conformance fixtures under `types/test-cases/` are resolved by walking up from the working directory, so a client-dir-only mount fails) and keep build caches out of `$HOME`. Example — run the Kotlin client's tests:
 
 ```sh

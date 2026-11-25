@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "**Breaking (SDK source):** the full completed-turn type is renamed `Turn` → `MaterializedTurn`, and `Turn` is now the union `MaterializedTurn | DeferredTurn` used by `ChatState.turns` and `chat/turnsLoaded`. Code that reads `responseParts` must narrow to `MaterializedTurn` first. The wire format is unchanged for clients that don't declare `deferredTurns`."
+}

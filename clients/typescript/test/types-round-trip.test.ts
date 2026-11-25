@@ -60,13 +60,13 @@ import type {
 } from '../src/types/channels-session/state.js';
 import type { SessionAddedParams } from '../src/types/channels-root/notifications.js';
 import type {
-  Implementation, InitializeResult, SubscribeParams, SubscribeResult, ReconnectParams, ReconnectResult,
+  Implementation, InitializeParams, InitializeResult, SubscribeParams, SubscribeResult, ReconnectParams, ReconnectResult,
   ResourceListResult, ResourceReadParams, ResourceReadResult, AuthenticateParams,
 } from '../src/types/common/commands.js';
 import type { ChannelFrameParams, ChannelCreditParams } from '../src/types/common/notifications.js';
 import type { TcpDataParams, TcpEofParams, TcpResetParams } from '../src/types/channels-tcp/notifications.js';
 import type { CreateTcpConnectionParams } from '../src/types/channels-tcp/commands.js';
-import type { ChatSource, CreateChatParams } from '../src/types/channels-chat/commands.js';
+import type { ChatSource, CreateChatParams, FetchDeferredTurnsParams } from '../src/types/channels-chat/commands.js';
 
 // ─── Fixture directory ───────────────────────────────────────────────────────
 
@@ -248,8 +248,10 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'SessionAddedParams': void (parsed as SessionAddedParams); break;
     case 'PartialSessionSummary': void (parsed as Partial<SessionSummary>); break;
     case 'Implementation':     void (parsed as Implementation); break;
+    case 'InitializeParams':    void (parsed as InitializeParams); break;
     case 'InitializeResult':    void (parsed as InitializeResult); break;
     case 'CreateChatParams':    void (parsed as CreateChatParams); break;
+    case 'FetchDeferredTurnsParams': void (parsed as FetchDeferredTurnsParams); break;
     case 'ChatSource':          void (parsed as ChatSource); break;
     case 'Snapshot':            void (parsed as Snapshot); break;
     case 'SubscribeParams':     void (parsed as SubscribeParams); break;
