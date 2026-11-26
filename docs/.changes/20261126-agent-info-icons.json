@@ -1,4 +1,5 @@
 {
   "type": "added",
-  "message": "Add optional `AgentInfo.icons` so clients can show agent icons from root state, and an optional `AgentInfo._meta` for implementation-defined agent metadata."
+  "message": "Add optional `AgentInfo.icons` so clients can show agent icons from root state, and an optional `AgentInfo._meta` that `root/agentsChanged` keeps current, for implementation-defined agent metadata.",
+  "issues": [636]
 }

@@ -25,7 +25,7 @@ AgentInfo {
   description: string
   models: SessionModelInfo[]
   customizations?: Customization[]  // Open Plugins
-  icons?: Icon[]
+  icons?: Icon[]  // e.g. for an agent picker
   _meta?: Record<string, unknown>
 }
 
