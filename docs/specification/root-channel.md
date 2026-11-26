@@ -26,7 +26,7 @@ RootState {
 }
 ```
 
-- `agents` — agent backends the server can speak to, including any `protectedResources` they require for authentication. See [Authentication](/specification/authentication).
+- `agents` — agent backends the server can speak to, including any `protectedResources` they require for authentication. See [Authentication](/specification/authentication). Each agent can carry [`icons`](/reference/common#icon) for display.
 - `activeSessions` — count of non-disposed sessions. Lightweight badge counter.
 - `terminals` — lightweight per-terminal metadata for rendering a terminal manager UI without subscribing to every terminal. See [Terminal Channel](/specification/terminal-channel) for the full state.
 - `config` — host-level configuration schema and current values.

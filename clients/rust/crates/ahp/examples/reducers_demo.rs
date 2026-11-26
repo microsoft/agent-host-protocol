@@ -39,6 +39,8 @@ fn main() {
                     protected_resources: None,
                     customizations: None,
                     capabilities: None,
+                    icons: None,
+                    meta: None,
                 }],
             }),
             server_seq: 1,

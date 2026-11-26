@@ -2542,6 +2542,18 @@ public sealed record AgentInfo
     /// id.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AgentCapabilities? Capabilities { get; init; }
+
+    /// <summary>Icons for UI display, such as in an agent picker.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<Icon>? Icons { get; init; }
+
+    /// <summary>Additional implementation-defined metadata for this agent.
+    /// MUST NOT contain a credential.
+    ///
+    /// Clients MAY look for well-known keys here to provide enhanced UI.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
 }
 
 /// <summary>Static capabilities an {@link AgentInfo} advertises. Modelled after MCP

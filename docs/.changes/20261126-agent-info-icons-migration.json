@@ -1,0 +1,6 @@
+{
+  "type": "changed",
+  "message": "Require direct Rust struct literals for `AgentInfo` to initialize `icons: None` and `meta: None` (added for agent icons).",
+  "targets": ["rust"],
+  "issues": [636]
+}

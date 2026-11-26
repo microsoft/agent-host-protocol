@@ -2240,6 +2240,15 @@ pub struct AgentInfo {
     /// id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<AgentCapabilities>,
+    /// Icons for UI display, such as in an agent picker.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icons: Option<Vec<Icon>>,
+    /// Additional implementation-defined metadata for this agent.
+    /// MUST NOT contain a credential.
+    ///
+    /// Clients MAY look for well-known keys here to provide enhanced UI.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
 }
 
 /// Static capabilities an {@link AgentInfo} advertises. Modelled after MCP

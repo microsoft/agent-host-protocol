@@ -1,0 +1,76 @@
+{
+  "name": "agent-info-icons",
+  "group": "A",
+  "description": "AgentInfo.icons and AgentInfo._meta are optional. One agent carries a light and a dark icon plus metadata, the other has neither. Pins that icons and metadata survive a decode/re-encode cycle in root/agentsChanged and that absent fields stay absent instead of re-encoding as null.",
+  "type": "StateAction",
+  "input": {
+    "type": "root/agentsChanged",
+    "agents": [
+      {
+        "provider": "example",
+        "displayName": "Example",
+        "description": "An agent with themed icons.",
+        "models": [],
+        "icons": [
+          {
+            "src": "https://example.com/icons/example-light.png",
+            "contentType": "image/png",
+            "sizes": ["96x96"],
+            "theme": "light"
+          },
+          {
+            "src": "https://example.com/icons/example-dark.png",
+            "contentType": "image/png",
+            "sizes": ["96x96"],
+            "theme": "dark"
+          }
+        ],
+        "_meta": {
+          "example.com/badge": "beta"
+        }
+      },
+      {
+        "provider": "plain",
+        "displayName": "Plain",
+        "description": "An agent without icons.",
+        "models": []
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "type": "root/agentsChanged",
+      "agents": [
+        {
+          "provider": "example",
+          "displayName": "Example",
+          "description": "An agent with themed icons.",
+          "models": [],
+          "icons": [
+            {
+              "src": "https://example.com/icons/example-light.png",
+              "contentType": "image/png",
+              "sizes": ["96x96"],
+              "theme": "light"
+            },
+            {
+              "src": "https://example.com/icons/example-dark.png",
+              "contentType": "image/png",
+              "sizes": ["96x96"],
+              "theme": "dark"
+            }
+          ],
+          "_meta": {
+            "example.com/badge": "beta"
+          }
+        },
+        {
+          "provider": "plain",
+          "displayName": "Plain",
+          "description": "An agent without icons.",
+          "models": []
+        }
+      ]
+    }
+  ]
+}

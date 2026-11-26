@@ -1833,6 +1833,25 @@ public struct AgentInfo: Codable, Sendable, Equatable {
     /// to gate features (multi-chat, fork) instead of switching on the provider
     /// id.
     public var capabilities: AgentCapabilities?
+    /// Icons for UI display, such as in an agent picker.
+    public var icons: [Icon]?
+    /// Additional implementation-defined metadata for this agent.
+    /// MUST NOT contain a credential.
+    ///
+    /// Clients MAY look for well-known keys here to provide enhanced UI.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case provider
+        case displayName
+        case description
+        case models
+        case protectedResources
+        case customizations
+        case capabilities
+        case icons
+        case meta = "_meta"
+    }
 
     public init(
         provider: String,
@@ -1841,7 +1860,9 @@ public struct AgentInfo: Codable, Sendable, Equatable {
         models: [SessionModelInfo],
         protectedResources: [ProtectedResourceMetadata]? = nil,
         customizations: [Customization]? = nil,
-        capabilities: AgentCapabilities? = nil
+        capabilities: AgentCapabilities? = nil,
+        icons: [Icon]? = nil,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.provider = provider
         self.displayName = displayName
@@ -1850,6 +1871,8 @@ public struct AgentInfo: Codable, Sendable, Equatable {
         self.protectedResources = protectedResources
         self.customizations = customizations
         self.capabilities = capabilities
+        self.icons = icons
+        self.meta = meta
     }
 }
 

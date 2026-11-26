@@ -243,6 +243,8 @@ async fn single_constructor_yields_connected_handle() {
         protected_resources: None,
         customizations: None,
         capabilities: None,
+        icons: None,
+        meta: None,
     };
     let state = FakeHostState::new().with_agents(vec![agent.clone()]);
     let factory = make_basic_factory(state);
