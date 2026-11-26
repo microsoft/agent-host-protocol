@@ -28,6 +28,7 @@ The Rust, Swift, Go, and .NET SDKs ship a `MultiHostClient` for talking to two o
 - **[ahpc](https://github.com/softov/ahpc)** — A terminal client: CLI, interactive TUI, and an MCP server for agents and humans.
 - **[WeChat AHP](https://github.com/formulahendry/vscode-wechat-ahp)** — A VS Code extension that connects WeChat to an existing local Agent Host chat.
 - **[ahpw](https://github.com/softov/ahpw)** — A web client for any AHP server, run as an ahpd plugin or on its own.
+- **[Hostline](https://github.com/GreenJeans/ahp-android-client)** — A native Android and iOS client for watching sessions, approving tool calls, and steering agents from your phone.
 
 ## Servers
 
