@@ -1,0 +1,5 @@
+{
+  "type": "changed",
+  "message": "Direct Rust struct literals for `AgentInfo` must now include `icons: None` and `meta: None`.",
+  "targets": ["rust"]
+}

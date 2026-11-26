@@ -1833,10 +1833,10 @@ public struct AgentInfo: Codable, Sendable, Equatable {
     /// to gate features (multi-chat, fork) instead of switching on the provider
     /// id.
     public var capabilities: AgentCapabilities?
-    /// Icons for UI display, such as in an agent picker. When an agent's icons
-    /// change, the host dispatches `root/agentsChanged` with the new icons.
+    /// Icons for UI display, such as in an agent picker.
     public var icons: [Icon]?
     /// Additional implementation-defined metadata for this agent.
+    /// MUST NOT contain a credential.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     public var meta: [String: AnyCodable]?

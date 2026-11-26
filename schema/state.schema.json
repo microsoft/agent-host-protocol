@@ -630,12 +630,12 @@
           "items": {
             "$ref": "#/$defs/Icon"
           },
-          "description": "Icons for UI display, such as in an agent picker. When an agent's icons\nchange, the host dispatches `root/agentsChanged` with the new icons."
+          "description": "Icons for UI display, such as in an agent picker."
         },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
-          "description": "Additional implementation-defined metadata for this agent.\n\nClients MAY look for well-known keys here to provide enhanced UI."
+          "description": "Additional implementation-defined metadata for this agent.\nMUST NOT contain a credential.\n\nClients MAY look for well-known keys here to provide enhanced UI."
         }
       },
       "required": [

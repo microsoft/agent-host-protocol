@@ -2240,11 +2240,11 @@ pub struct AgentInfo {
     /// id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<AgentCapabilities>,
-    /// Icons for UI display, such as in an agent picker. When an agent's icons
-    /// change, the host dispatches `root/agentsChanged` with the new icons.
+    /// Icons for UI display, such as in an agent picker.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
     /// Additional implementation-defined metadata for this agent.
+    /// MUST NOT contain a credential.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]

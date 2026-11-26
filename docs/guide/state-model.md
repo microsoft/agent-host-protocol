@@ -26,6 +26,7 @@ AgentInfo {
   models: SessionModelInfo[]
   customizations?: Customization[]  // Open Plugins
   icons?: Icon[]
+  _meta?: Record<string, unknown>
 }
 
 SessionModelInfo {
