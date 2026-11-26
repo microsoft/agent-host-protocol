@@ -1843,7 +1843,19 @@ data class AgentInfo(
      * to gate features (multi-chat, fork) instead of switching on the provider
      * id.
      */
-    val capabilities: AgentCapabilities? = null
+    val capabilities: AgentCapabilities? = null,
+    /**
+     * Icons for UI display, such as in an agent picker. When an agent's icons
+     * change, the host dispatches `root/agentsChanged` with the new icons.
+     */
+    val icons: List<Icon>? = null,
+    /**
+     * Additional implementation-defined metadata for this agent.
+     *
+     * Clients MAY look for well-known keys here to provide enhanced UI.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable

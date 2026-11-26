@@ -27,7 +27,7 @@ These mutate root state and travel on the [Root Channel](/specification/root-cha
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
-| `root/agentsChanged` | No | Available agent backends or their models changed |
+| `root/agentsChanged` | No | Available agent backends, their models, or their icons changed |
 | `root/activeSessionsChanged` | No | Count of active sessions changed |
 | `root/terminalsChanged` | No | Lightweight terminal catalogue changed (full replacement) |
 | `root/configChanged` | **Yes** | Host-level configuration values changed |

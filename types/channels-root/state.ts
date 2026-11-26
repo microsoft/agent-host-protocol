@@ -105,6 +105,17 @@ export interface AgentInfo {
    * id.
    */
   capabilities?: AgentCapabilities;
+  /**
+   * Icons for UI display, such as in an agent picker. When an agent's icons
+   * change, the host dispatches `root/agentsChanged` with the new icons.
+   */
+  icons?: Icon[];
+  /**
+   * Additional implementation-defined metadata for this agent.
+   *
+   * Clients MAY look for well-known keys here to provide enhanced UI.
+   */
+  _meta?: Record<string, unknown>;
 }
 
 /**

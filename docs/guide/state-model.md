@@ -25,6 +25,7 @@ AgentInfo {
   description: string
   models: SessionModelInfo[]
   customizations?: Customization[]  // Open Plugins
+  icons?: Icon[]
 }
 
 SessionModelInfo {

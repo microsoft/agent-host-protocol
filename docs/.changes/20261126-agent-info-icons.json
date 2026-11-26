@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Add optional `AgentInfo.icons` so clients can show each agent's icon, for example in an agent picker, straight from `RootState.agents`; hosts dispatch `root/agentsChanged` when an agent's icons change. Also add an optional `AgentInfo._meta` for implementation-defined agent metadata."
+}

@@ -2808,6 +2808,18 @@
         "capabilities": {
           "$ref": "#/$defs/AgentCapabilities",
           "description": "Static capabilities the agent advertises about itself. Clients use these\nto gate features (multi-chat, fork) instead of switching on the provider\nid."
+        },
+        "icons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Icon"
+          },
+          "description": "Icons for UI display, such as in an agent picker. When an agent's icons\nchange, the host dispatches `root/agentsChanged` with the new icons."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for this agent.\n\nClients MAY look for well-known keys here to provide enhanced UI."
         }
       },
       "required": [
