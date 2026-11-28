@@ -37,6 +37,7 @@ The Rust, Swift, Go, and .NET SDKs ship a `MultiHostClient` for talking to two o
 - **[hydra-ahp](https://github.com/smagnuso/hydra-ahp)** — An open-source AHP host for [Hydra](https://github.com/smagnuso/hydra-acp), a multi-client ACP session daemon, exposing Hydra sessions to AHP clients such as VS Code's agent UI.
 - **[AHP-ACP Gateway](https://github.com/formulahendry/ahp-acp-gateway)** — A universal AHP WebSocket host that runs configured ACP agents, with persistent sessions, replay and reconnect, permissions, and cancellation.
 - **[AgentConnect](https://github.com/agentconnect-md/agentconnect)** — An open-source multi-agent platform that brings Claude Code, Codex and other ACP agents into Slack, Telegram, Discord and webchat, and serves each agent as an AHP 1.0 host over WebSocket.
+- **[go-ahp](https://github.com/gosuda/go-ahp)**: An open-source Go library for building AHP 1.1 hosts. It keeps the root, session and chat state with the official Go client's types and reducers, orders every action under one `serverSeq`, replays or sends snapshots on reconnect, and serves WebSocket. Includes `ahp-echo`, a demo host.
 
 ## Versioning and releases
 
