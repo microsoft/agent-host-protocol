@@ -7,7 +7,7 @@
 import type { URI } from '../../types/common/state.js';
 import type { StateAction } from '../../types/common/actions.js';
 import type { SubscribeResult } from '../../types/common/commands.js';
-import type { DispatchHandle } from '../client.js';
+import type { DispatchHandle, SubscribeOptions } from '../client.js';
 import { AsyncBroadcastQueue } from '../async-queue.js';
 import { HostClientHandle } from './host-client-handle.js';
 import {
@@ -258,10 +258,10 @@ export class MultiHostClient {
   }
 
   /** Convenience: subscribe to `uri` on `hostId`. */
-  async subscribe(hostId: HostId, uri: URI): Promise<SubscribeResult> {
+  async subscribe(hostId: HostId, uri: URI, options?: SubscribeOptions): Promise<SubscribeResult> {
     const runtime = this.hosts.get(hostId);
     if (!runtime) throw new UnknownHostError(hostId);
-    return runtime.subscribe(uri);
+    return runtime.subscribe(uri, options);
   }
 
   /** Convenience: unsubscribe from `uri` on `hostId`. */

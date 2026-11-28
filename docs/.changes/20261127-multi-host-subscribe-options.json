@@ -1,0 +1,6 @@
+{
+  "type": "fixed",
+  "message": "Forward `SubscribeOptions` from `MultiHostClient.subscribe` to the host, so a `view` or `delivery` preference now reaches the `subscribe` request instead of being dropped.",
+  "targets": ["typescript"],
+  "issues": [638]
+}

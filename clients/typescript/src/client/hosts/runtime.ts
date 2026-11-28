@@ -29,7 +29,7 @@ import type {
   SessionSummaryChangedParams,
 } from '../../types/channels-root/notifications.js';
 import { PROTOCOL_VERSION } from '../../types/version/registry.js';
-import { AhpClient, type DispatchHandle } from '../client.js';
+import { AhpClient, type DispatchHandle, type SubscribeOptions } from '../client.js';
 import type { ClientEvent } from '../events.js';
 import { RpcError } from '../error.js';
 import type { AsyncBroadcastQueue } from '../async-queue.js';
@@ -382,7 +382,7 @@ export class HostRuntime {
    * subscription list first, so the next successful (re)connect will
    * subscribe to it automatically.
    */
-  async subscribe(uri: URI): Promise<SubscribeResult> {
+  async subscribe(uri: URI, options?: SubscribeOptions): Promise<SubscribeResult> {
     if (this.shared.shutdownReason !== null) {
       throw new HostShutDownError(this.shared.id);
     }
@@ -391,7 +391,7 @@ export class HostRuntime {
       this.trackSubscription(uri);
       throw new HostNotConnectedError(this.shared.id);
     }
-    const { result } = await client.subscribe(uri);
+    const { result } = await client.subscribe(uri, options);
     this.trackSubscription(uri);
     return result;
   }

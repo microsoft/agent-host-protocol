@@ -25,7 +25,7 @@ import type {
 } from '../src/types/common/messages.js';
 import type { SessionSummary } from '../src/types/channels-session/state.js';
 import type { AgentInfo } from '../src/types/channels-root/state.js';
-import type { InitializeResult } from '../src/types/common/commands.js';
+import type { InitializeResult, SubscribeParams } from '../src/types/common/commands.js';
 import type { ListSessionsResult } from '../src/types/channels-root/commands.js';
 import { ReconnectResultType } from '../src/types/common/commands.js';
 import type { ReconnectResult } from '../src/types/common/commands.js';
@@ -69,6 +69,7 @@ interface FakeHostState {
   sessions: SessionSummary[];
   /** Optional callback invoked once after the first request is handled (init or reconnect). */
   injectAfterInit?: (server: AhpTransport) => void | Promise<void>;
+  subscribeParams?: SubscribeParams[];
 }
 
 function makeFakeState(overrides: Partial<FakeHostState> = {}): FakeHostState {
@@ -168,6 +169,7 @@ function handleRequest(req: JsonRpcRequest, state: FakeHostState): unknown {
     case 'listSessions':
       return buildListResult(state);
     case 'subscribe': {
+      state.subscribeParams?.push(req.params as SubscribeParams);
       // Minimal `SubscribeResult` — snapshot omitted, as older hosts do for
       // channels with no state. The fake server doesn't enforce real subscriptions.
       return {};
@@ -1103,6 +1105,30 @@ test('subscribe on a registered-but-not-yet-connected host throws HostNotConnect
     const handle = multi.host('pending');
     assert.ok(handle);
     assert.ok(handle.subscriptions.includes('ahp-session:/s1'));
+  } finally {
+    await multi.shutdown();
+  }
+});
+
+test('MultiHostClient.subscribe forwards subscribe options to each host', async () => {
+  const a = makeFakeState({ subscribeParams: [] });
+  const b = makeFakeState({ subscribeParams: [] });
+  const multi = new MultiHostClient();
+  try {
+    await multi.addHost({ id: 'a', label: 'A', transportFactory: makeBasicFactory(a) });
+    await multi.addHost({ id: 'b', label: 'B', transportFactory: makeBasicFactory(b) });
+    await waitUntil(() => multi.host('a')?.state.status === 'connected');
+    await waitUntil(() => multi.host('b')?.state.status === 'connected');
+
+    await multi.subscribe('a', 'ahp-session:/s1', { view: { turns: 20 } });
+    await multi.subscribe('b', 'ahp-session:/s1');
+    await multi.subscribe('b', 'ahp-session:/s2', {});
+
+    assert.deepEqual(a.subscribeParams, [{ channel: 'ahp-session:/s1', view: { turns: 20 } }]);
+    assert.deepEqual(b.subscribeParams, [
+      { channel: 'ahp-session:/s1' },
+      { channel: 'ahp-session:/s2' },
+    ]);
   } finally {
     await multi.shutdown();
   }
